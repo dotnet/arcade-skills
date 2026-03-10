@@ -1,5 +1,5 @@
 ---
-name: CI-Analysis-INVALID
+name: ci-analysis
 description: >
   Analyze CI build and test status from Azure DevOps and Helix for dotnet repository PRs.
   Use when checking CI status, investigating failures, determining if a PR is ready to merge,

@@ -1,5 +1,8 @@
 # Default owners for everything in the repo
-*
+* @lewing @danmoseley
 
 # CI/CD and engineering
-/.github/workflows/
+/.github/workflows/ @lewing @danmoseley
+
+# Skills
+/plugins/dotnet-dnceng/skills/ci-analysis/ @lewing @danmoseley
