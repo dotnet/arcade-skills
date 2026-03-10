@@ -1,0 +1,337 @@
+name: pr-validation
+
+on:
+  pull_request:
+    paths:
+      - 'plugins/**'
+      - 'tests/**'
+      - '.github/plugin/**'
+      - '.claude-plugin/**'
+      - '.github/workflows/pr-validation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/**'
+      - 'tests/**'
+      - '.github/plugin/**'
+      - '.claude-plugin/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-structure:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Validate plugin and skill structure
+        id: validate
+        shell: pwsh
+        run: |
+          $errors = [System.Collections.Generic.List[string]]::new()
+          $warnings = [System.Collections.Generic.List[string]]::new()
+
+          # ── Helper: validate kebab-case name ──────────────────────────
+          function Test-KebabName([string]$Name, [string]$Kind, [string]$Context) {
+            if ([string]::IsNullOrWhiteSpace($Name)) {
+              $errors.Add("$Context — $Kind name is empty (required).")
+              return
+            }
+            if ($Name.Length -gt 64) {
+              $errors.Add("$Context — $Kind name '$Name' is $($Name.Length) chars (max 64).")
+            }
+            if ($Name -cnotmatch '^[a-z0-9-]+$') {
+              $errors.Add("$Context — $Kind name '$Name' must be lowercase alphanumeric and hyphens only.")
+            }
+            if ($Name.StartsWith('-') -or $Name.EndsWith('-')) {
+              $errors.Add("$Context — $Kind name '$Name' starts or ends with a hyphen.")
+            }
+            if ($Name.Contains('--')) {
+              $errors.Add("$Context — $Kind name '$Name' contains consecutive hyphens.")
+            }
+          }
+
+          # ── Helper: parse YAML frontmatter from SKILL.md ─────────────
+          function Get-Frontmatter([string]$Content) {
+            if ($Content -match '(?s)^---\r?\n(.*?)\r?\n---') {
+              $yaml = $Matches[1]
+              $result = @{ name = $null; description = $null }
+              foreach ($line in $yaml -split '\r?\n') {
+                if ($line -match '^\s*name\s*:\s*(.+)$') {
+                  $result.name = $Matches[1].Trim().Trim('"', "'")
+                }
+                if ($line -match '^\s*description\s*:\s*(.+)$') {
+                  $result.description = $Matches[1].Trim().Trim('"', "'")
+                }
+              }
+              return $result
+            }
+            return $null
+          }
+
+          # ── 1. Marketplace JSON consistency ──────────────────────────
+          $ghMarketplace = '.github/plugin/marketplace.json'
+          $clMarketplace = '.claude-plugin/marketplace.json'
+
+          if ((Test-Path $ghMarketplace) -and (Test-Path $clMarketplace)) {
+            $ghContent = Get-Content -Path $ghMarketplace -Raw
+            $clContent = Get-Content -Path $clMarketplace -Raw
+            if ($ghContent.Trim() -ne $clContent.Trim()) {
+              $errors.Add("Marketplace files differ: '$ghMarketplace' and '$clMarketplace' must be identical.")
+            }
+
+            # Validate marketplace entries point to real plugin dirs
+            try {
+              $marketplace = $ghContent | ConvertFrom-Json
+              foreach ($entry in $marketplace.plugins) {
+                $source = $entry.source
+                if ($source -and -not (Test-Path $source)) {
+                  $errors.Add("Marketplace entry '$($entry.name)' references '$source' which does not exist.")
+                }
+              }
+            } catch {
+              $errors.Add("Failed to parse '$ghMarketplace' as JSON: $_")
+            }
+          } elseif ((Test-Path $ghMarketplace) -xor (Test-Path $clMarketplace)) {
+            $errors.Add("Both '$ghMarketplace' and '$clMarketplace' must exist (one is missing).")
+          }
+
+          # ── 2. Plugin validation ─────────────────────────────────────
+          if (Test-Path 'plugins') {
+            $pluginDirs = Get-ChildItem -Path 'plugins' -Directory
+            foreach ($pluginDir in $pluginDirs) {
+              $pluginName = $pluginDir.Name
+              $pluginJsonPath = Join-Path $pluginDir.FullName 'plugin.json'
+              $ctx = "plugins/$pluginName"
+
+              if (-not (Test-Path $pluginJsonPath)) {
+                $errors.Add("$ctx — missing plugin.json (required).")
+                continue
+              }
+
+              try {
+                $pluginJson = Get-Content -Path $pluginJsonPath -Raw | ConvertFrom-Json
+              } catch {
+                $errors.Add("$ctx — plugin.json is not valid JSON: $_")
+                continue
+              }
+
+              # Name
+              $pName = $pluginJson.name
+              if ([string]::IsNullOrWhiteSpace($pName)) {
+                $errors.Add("$ctx — plugin.json has no 'name' field (required).")
+              } elseif ($pName -ne $pluginName) {
+                $errors.Add("$ctx — plugin.json name '$pName' does not match directory name '$pluginName'.")
+              }
+              Test-KebabName $pName 'Plugin' $ctx
+
+              # Version
+              if ([string]::IsNullOrWhiteSpace($pluginJson.version)) {
+                $errors.Add("$ctx — plugin.json has no 'version' field (required).")
+              }
+
+              # Description
+              $pDesc = $pluginJson.description
+              if ([string]::IsNullOrWhiteSpace($pDesc)) {
+                $errors.Add("$ctx — plugin.json has no 'description' field (required).")
+              } elseif ($pDesc.Length -gt 1024) {
+                $errors.Add("$ctx — plugin.json description is $($pDesc.Length) chars (max 1024).")
+              }
+
+              # Skills path
+              $skillsField = $pluginJson.skills
+              if ([string]::IsNullOrWhiteSpace($skillsField)) {
+                $errors.Add("$ctx — plugin.json has no 'skills' field (required).")
+              } else {
+                $skillsDir = Join-Path $pluginDir.FullName $skillsField
+                if (-not (Test-Path $skillsDir)) {
+                  $errors.Add("$ctx — plugin.json skills path '$skillsField' does not exist.")
+                }
+              }
+
+              # Agents path (optional, but validate if present)
+              $agentsField = $pluginJson.agents
+              if (-not [string]::IsNullOrWhiteSpace($agentsField)) {
+                $agentsDir = Join-Path $pluginDir.FullName $agentsField
+                if (-not (Test-Path $agentsDir)) {
+                  $warnings.Add("$ctx — plugin.json agents path '$agentsField' does not exist.")
+                }
+              }
+
+              # ── 3. Skill validation ────────────────────────────────────
+              if (-not [string]::IsNullOrWhiteSpace($skillsField)) {
+                $skillsDirPath = Join-Path $pluginDir.FullName $skillsField
+                if (Test-Path $skillsDirPath) {
+                  $skillDirs = Get-ChildItem -Path $skillsDirPath -Directory
+                  foreach ($skillDir in $skillDirs) {
+                    $skillName = $skillDir.Name
+                    $sCtx = "$ctx/skills/$skillName"
+                    $skillMdPath = Join-Path $skillDir.FullName 'SKILL.md'
+
+                    if (-not (Test-Path $skillMdPath)) {
+                      $errors.Add("$sCtx — missing SKILL.md (required).")
+                      continue
+                    }
+
+                    $skillContent = Get-Content -Path $skillMdPath -Raw
+                    $fm = Get-Frontmatter $skillContent
+
+                    if ($null -eq $fm) {
+                      $errors.Add("$sCtx — SKILL.md has no YAML frontmatter (required).")
+                      continue
+                    }
+
+                    # Name
+                    if ([string]::IsNullOrWhiteSpace($fm.name)) {
+                      $errors.Add("$sCtx — SKILL.md frontmatter has no 'name' field (required).")
+                    } elseif ($fm.name -ne $skillName) {
+                      $errors.Add("$sCtx — SKILL.md name '$($fm.name)' does not match directory name '$skillName'.")
+                    }
+                    Test-KebabName $fm.name 'Skill' $sCtx
+
+                    # Description
+                    if ([string]::IsNullOrWhiteSpace($fm.description)) {
+                      $errors.Add("$sCtx — SKILL.md frontmatter has no 'description' field (required).")
+                    } elseif ($fm.description.Length -gt 1024) {
+                      $errors.Add("$sCtx — SKILL.md description is $($fm.description.Length) chars (max 1024).")
+                    }
+                  }
+                }
+              }
+
+              # ── 4. Agent validation ────────────────────────────────────
+              if (-not [string]::IsNullOrWhiteSpace($agentsField)) {
+                $agentsDirPath = Join-Path $pluginDir.FullName $agentsField
+                if (Test-Path $agentsDirPath) {
+                  $agentFiles = Get-ChildItem -Path $agentsDirPath -Filter '*.agent.md'
+                  foreach ($agentFile in $agentFiles) {
+                    $aCtx = "$ctx/agents/$($agentFile.Name)"
+                    $agentContent = Get-Content -Path $agentFile.FullName -Raw
+                    $afm = Get-Frontmatter $agentContent
+
+                    if ($null -eq $afm) {
+                      $warnings.Add("$aCtx — agent file has no YAML frontmatter.")
+                    } elseif ([string]::IsNullOrWhiteSpace($afm.name)) {
+                      $warnings.Add("$aCtx — agent frontmatter has no 'name' field.")
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          # ── 5. eval.yaml validation ──────────────────────────────────
+          if (Test-Path 'tests') {
+            $testPluginDirs = Get-ChildItem -Path 'tests' -Directory
+            foreach ($testPluginDir in $testPluginDirs) {
+              $testSkillDirs = Get-ChildItem -Path $testPluginDir.FullName -Directory
+              foreach ($testSkillDir in $testSkillDirs) {
+                $tCtx = "tests/$($testPluginDir.Name)/$($testSkillDir.Name)"
+                $evalPath = Join-Path $testSkillDir.FullName 'eval.yaml'
+
+                if (-not (Test-Path $evalPath)) {
+                  $warnings.Add("$tCtx — no eval.yaml found.")
+                  continue
+                }
+
+                # Basic YAML structure validation (scenarios with name + prompt)
+                try {
+                  $evalContent = Get-Content -Path $evalPath -Raw
+
+                  # Check for scenarios key
+                  if ($evalContent -notmatch '(?m)^scenarios\s*:') {
+                    $errors.Add("$tCtx — eval.yaml must have a 'scenarios' key.")
+                    continue
+                  }
+
+                  # Check each scenario has name and prompt
+                  $scenarioBlocks = [regex]::Matches($evalContent, '(?m)^\s{2}-\s+name\s*:\s*(.+)$')
+                  if ($scenarioBlocks.Count -eq 0) {
+                    $errors.Add("$tCtx — eval.yaml has no scenarios with 'name' field.")
+                  }
+
+                  $promptBlocks = [regex]::Matches($evalContent, '(?m)^\s+prompt\s*:\s*(.+)$')
+                  if ($promptBlocks.Count -eq 0) {
+                    $errors.Add("$tCtx — eval.yaml has no scenarios with 'prompt' field.")
+                  }
+
+                  # Validate known assertion types
+                  $assertionTypes = [regex]::Matches($evalContent, '(?m)^\s+-?\s*type\s*:\s*["\x27]?(\w+)["\x27]?')
+                  $validTypes = @('output_contains', 'output_not_contains', 'output_matches',
+                    'output_not_matches', 'file_exists', 'file_not_exists',
+                    'file_contains', 'file_not_contains', 'exit_success')
+                  foreach ($at in $assertionTypes) {
+                    $typeName = $at.Groups[1].Value
+                    if ($typeName -notin $validTypes) {
+                      $errors.Add("$tCtx — eval.yaml has unknown assertion type '$typeName'.")
+                    }
+                  }
+                } catch {
+                  $errors.Add("$tCtx — failed to read eval.yaml: $_")
+                }
+              }
+            }
+          }
+
+          # ── 6. Orphaned test directories ─────────────────────────────
+          if ((Test-Path 'tests') -and (Test-Path 'plugins')) {
+            $testPluginDirs = Get-ChildItem -Path 'tests' -Directory
+            foreach ($testPluginDir in $testPluginDirs) {
+              $pluginName = $testPluginDir.Name
+              if (-not (Test-Path "plugins/$pluginName")) {
+                $warnings.Add("tests/$pluginName/ — no matching plugin directory plugins/$pluginName/.")
+                continue
+              }
+
+              $testSkillDirs = Get-ChildItem -Path $testPluginDir.FullName -Directory
+              foreach ($testSkillDir in $testSkillDirs) {
+                $skillName = $testSkillDir.Name
+                if (-not (Test-Path "plugins/$pluginName/skills/$skillName")) {
+                  $warnings.Add("tests/$pluginName/$skillName/ — no matching skill directory plugins/$pluginName/skills/$skillName/.")
+                }
+              }
+            }
+          }
+
+          # ── Summary ──────────────────────────────────────────────────
+          Write-Host ""
+          if ($errors.Count -eq 0 -and $warnings.Count -eq 0) {
+            Write-Host "✅ All structural validation checks passed." -ForegroundColor Green
+          } else {
+            if ($warnings.Count -gt 0) {
+              Write-Host "⚠️  Warnings ($($warnings.Count)):" -ForegroundColor Yellow
+              foreach ($w in $warnings) { Write-Host "  - $w" }
+              Write-Host ""
+            }
+            if ($errors.Count -gt 0) {
+              Write-Host "❌ Errors ($($errors.Count)):" -ForegroundColor Red
+              foreach ($e in $errors) { Write-Host "  - $e" }
+            }
+          }
+
+          # Write summary to GITHUB_STEP_SUMMARY if available
+          if ($env:GITHUB_STEP_SUMMARY) {
+            $summary = "## Structural Validation`n`n"
+            if ($errors.Count -eq 0 -and $warnings.Count -eq 0) {
+              $summary += "✅ All checks passed.`n"
+            }
+            if ($warnings.Count -gt 0) {
+              $summary += "### ⚠️ Warnings`n`n"
+              foreach ($w in $warnings) { $summary += "- $w`n" }
+              $summary += "`n"
+            }
+            if ($errors.Count -gt 0) {
+              $summary += "### ❌ Errors`n`n"
+              foreach ($e in $errors) { $summary += "- $e`n" }
+            }
+            $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          }
+
+          if ($errors.Count -gt 0) {
+            Write-Error "Structural validation failed with $($errors.Count) error(s)."
+            exit 1
+          }
