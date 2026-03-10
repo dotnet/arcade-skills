@@ -1,0 +1,61 @@
+{
+  "name": "dotnet-dnceng",
+  "version": "0.1.0",
+  "description": "Skills for .NET engineering infrastructure: CI/CD analysis, build pipeline workflows",
+  "author": {
+    "name": "dotnet"
+  },
+  "license": "MIT",
+  "keywords": [
+    "dotnet",
+    "dnceng",
+    "ci",
+    "helix",
+    "azure-devops"
+  ],
+  "skills": "skills",
+  "mcpServers": {
+    "ado-dnceng-public": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@azure-devops/mcp",
+        "dnceng-public"
+      ],
+      "env": {
+        "AZURE_DEVOPS_AUTH_METHOD": "azure-cli"
+      }
+    },
+    "ado-dnceng": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@azure-devops/mcp",
+        "dnceng"
+      ],
+      "env": {
+        "AZURE_DEVOPS_AUTH_METHOD": "azure-cli"
+      }
+    },
+    "hlx": {
+      "command": "dotnet",
+      "args": [
+        "dnx",
+        "--yes",
+        "lewing.helix.mcp"
+      ]
+    },
+    "mcp-binlog-tool": {
+      "command": "dotnet",
+      "args": [
+        "dnx",
+        "--yes",
+        "baronfel.binlog.mcp"
+      ]
+    },
+    "mihubot": {
+      "type": "http",
+      "url": "https://mihubot.xyz/mcp"
+    }
+  }
+}

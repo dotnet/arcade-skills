@@ -3,5 +3,12 @@
   "owner": {
     "name": ".NET Team at Microsoft"
   },
-  "plugins": []
+  "plugins": [
+    {
+      "name": "dotnet-dnceng",
+      "source": "./plugins/dotnet-dnceng",
+      "description": "Skills for .NET engineering infrastructure: CI/CD analysis, build pipeline workflows",
+      "version": "0.1.0"
+    }
+  ]
 }
