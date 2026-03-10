@@ -35,14 +35,23 @@ jobs:
           $errors = [System.Collections.Generic.List[string]]::new()
           $warnings = [System.Collections.Generic.List[string]]::new()
 
-          # ── Helper: validate kebab-case name ──────────────────────────
+          # ── Constants (from agentskills.io spec + SkillProfiler.cs) ──
+          $MaxNameLength = 64
+          $MaxDescriptionLength = 1024
+          $MaxCompatibilityLength = 500
+          $MaxBodyLines = 500
+          $TokenSweetLow = 200   # chars/4 approximation
+          $TokenSweetHigh = 2500
+          $TokenWarnHigh = 5000
+
+          # ── Helper: validate kebab-case name ─────────────────────────
           function Test-KebabName([string]$Name, [string]$Kind, [string]$Context) {
             if ([string]::IsNullOrWhiteSpace($Name)) {
               $errors.Add("$Context — $Kind name is empty (required).")
               return
             }
-            if ($Name.Length -gt 64) {
-              $errors.Add("$Context — $Kind name '$Name' is $($Name.Length) chars (max 64).")
+            if ($Name.Length -gt $MaxNameLength) {
+              $errors.Add("$Context — $Kind name '$Name' is $($Name.Length) chars (max $MaxNameLength).")
             }
             if ($Name -cnotmatch '^[a-z0-9-]+$') {
               $errors.Add("$Context — $Kind name '$Name' must be lowercase alphanumeric and hyphens only.")
@@ -55,11 +64,11 @@ jobs:
             }
           }
 
-          # ── Helper: parse YAML frontmatter from SKILL.md ─────────────
+          # ── Helper: parse YAML frontmatter ───────────────────────────
           function Get-Frontmatter([string]$Content) {
             if ($Content -match '(?s)^---\r?\n(.*?)\r?\n---') {
               $yaml = $Matches[1]
-              $result = @{ name = $null; description = $null }
+              $result = @{ name = $null; description = $null; compatibility = $null }
               foreach ($line in $yaml -split '\r?\n') {
                 if ($line -match '^\s*name\s*:\s*(.+)$') {
                   $result.name = $Matches[1].Trim().Trim('"', "'")
@@ -67,10 +76,33 @@ jobs:
                 if ($line -match '^\s*description\s*:\s*(.+)$') {
                   $result.description = $Matches[1].Trim().Trim('"', "'")
                 }
+                if ($line -match '^\s*compatibility\s*:\s*(.+)$') {
+                  $result.compatibility = $Matches[1].Trim().Trim('"', "'")
+                }
               }
               return $result
             }
             return $null
+          }
+
+          # ── Helper: strip frontmatter, return body ───────────────────
+          function Get-SkillBody([string]$Content) {
+            return $Content -replace '(?s)^---\r?\n.*?\r?\n---\r?\n?', ''
+          }
+
+          # ── Helper: validate path stays within root (no traversal) ───
+          function Test-SafeSubpath([string]$RootDir, [string]$RelativePath, [string]$Context) {
+            if ([System.IO.Path]::IsPathRooted($RelativePath)) {
+              $errors.Add("$Context — path '$RelativePath' must be relative, not absolute.")
+              return $false
+            }
+            $rootFull = [System.IO.Path]::GetFullPath($RootDir)
+            $combinedFull = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($rootFull, $RelativePath))
+            if (-not $combinedFull.StartsWith($rootFull)) {
+              $errors.Add("$Context — path '$RelativePath' resolves outside the plugin directory.")
+              return $false
+            }
+            return $true
           }
 
           # ── 1. Marketplace JSON consistency ──────────────────────────
@@ -84,7 +116,6 @@ jobs:
               $errors.Add("Marketplace files differ: '$ghMarketplace' and '$clMarketplace' must be identical.")
             }
 
-            # Validate marketplace entries point to real plugin dirs
             try {
               $marketplace = $ghContent | ConvertFrom-Json
               foreach ($entry in $marketplace.plugins) {
@@ -138,27 +169,29 @@ jobs:
               $pDesc = $pluginJson.description
               if ([string]::IsNullOrWhiteSpace($pDesc)) {
                 $errors.Add("$ctx — plugin.json has no 'description' field (required).")
-              } elseif ($pDesc.Length -gt 1024) {
-                $errors.Add("$ctx — plugin.json description is $($pDesc.Length) chars (max 1024).")
+              } elseif ($pDesc.Length -gt $MaxDescriptionLength) {
+                $errors.Add("$ctx — plugin.json description is $($pDesc.Length) chars (max $MaxDescriptionLength).")
               }
 
-              # Skills path
+              # Skills path (with traversal protection)
               $skillsField = $pluginJson.skills
               if ([string]::IsNullOrWhiteSpace($skillsField)) {
                 $errors.Add("$ctx — plugin.json has no 'skills' field (required).")
-              } else {
+              } elseif (Test-SafeSubpath $pluginDir.FullName $skillsField $ctx) {
                 $skillsDir = Join-Path $pluginDir.FullName $skillsField
                 if (-not (Test-Path $skillsDir)) {
                   $errors.Add("$ctx — plugin.json skills path '$skillsField' does not exist.")
                 }
               }
 
-              # Agents path (optional, but validate if present)
+              # Agents path (optional, with traversal protection)
               $agentsField = $pluginJson.agents
               if (-not [string]::IsNullOrWhiteSpace($agentsField)) {
-                $agentsDir = Join-Path $pluginDir.FullName $agentsField
-                if (-not (Test-Path $agentsDir)) {
-                  $warnings.Add("$ctx — plugin.json agents path '$agentsField' does not exist.")
+                if (Test-SafeSubpath $pluginDir.FullName $agentsField $ctx) {
+                  $agentsDir = Join-Path $pluginDir.FullName $agentsField
+                  if (-not (Test-Path $agentsDir)) {
+                    $warnings.Add("$ctx — plugin.json agents path '$agentsField' does not exist.")
+                  }
                 }
               }
 
@@ -168,6 +201,7 @@ jobs:
                 if (Test-Path $skillsDirPath) {
                   $skillDirs = Get-ChildItem -Path $skillsDirPath -Directory
                   foreach ($skillDir in $skillDirs) {
+                    if ($skillDir.Name.StartsWith('.')) { continue }
                     $skillName = $skillDir.Name
                     $sCtx = "$ctx/skills/$skillName"
                     $skillMdPath = Join-Path $skillDir.FullName 'SKILL.md'
@@ -196,8 +230,95 @@ jobs:
                     # Description
                     if ([string]::IsNullOrWhiteSpace($fm.description)) {
                       $errors.Add("$sCtx — SKILL.md frontmatter has no 'description' field (required).")
-                    } elseif ($fm.description.Length -gt 1024) {
-                      $errors.Add("$sCtx — SKILL.md description is $($fm.description.Length) chars (max 1024).")
+                    } elseif ($fm.description.Length -gt $MaxDescriptionLength) {
+                      $errors.Add("$sCtx — SKILL.md description is $($fm.description.Length) chars (max $MaxDescriptionLength).")
+                    }
+
+                    # Compatibility field (optional, ≤500 chars)
+                    if ($null -ne $fm.compatibility) {
+                      if ([string]::IsNullOrWhiteSpace($fm.compatibility)) {
+                        $errors.Add("$sCtx — compatibility field must be 1-$MaxCompatibilityLength non-whitespace characters when provided.")
+                      } elseif ($fm.compatibility.Length -gt $MaxCompatibilityLength) {
+                        $errors.Add("$sCtx — compatibility field is $($fm.compatibility.Length) chars (max $MaxCompatibilityLength).")
+                      }
+                    }
+
+                    # Body analysis
+                    $body = Get-SkillBody $skillContent
+                    $trimmedBody = $body.TrimEnd("`r", "`n")
+                    $bodyLineCount = if ($trimmedBody.Length -eq 0) { 0 } else { ($trimmedBody -split "`n").Count }
+
+                    # Body line count (≤500)
+                    if ($bodyLineCount -gt $MaxBodyLines) {
+                      $errors.Add("$sCtx — SKILL.md body is $bodyLineCount lines (max $MaxBodyLines). Move detailed reference material to separate files.")
+                    }
+
+                    # File reference depth + traversal check
+                    $fileRefs = [regex]::Matches($body, '\]\(([^)]+)\)')
+                    foreach ($ref in $fileRefs) {
+                      $refPath = $ref.Groups[1].Value
+                      if ($refPath.StartsWith('http', [System.StringComparison]::OrdinalIgnoreCase) -or $refPath.StartsWith('#')) { continue }
+                      # Strip fragment anchors
+                      $fragIdx = $refPath.IndexOf('#')
+                      if ($fragIdx -ge 0) { $refPath = $refPath.Substring(0, $fragIdx) }
+                      if ($refPath.Length -eq 0) { continue }
+                      # Normalize leading ./
+                      if ($refPath.StartsWith('./')) { $refPath = $refPath.Substring(2) }
+                      $segments = $refPath -split '/'
+                      # Reject parent traversal
+                      if ($segments -contains '..') {
+                        $errors.Add("$sCtx — file reference '$($ref.Groups[1].Value)' uses parent-directory traversal.")
+                        continue
+                      }
+                      # Depth = directory segments only (exclude filename)
+                      $dirDepth = $segments.Count - 1
+                      if ($dirDepth -gt 1) {
+                        $errors.Add("$sCtx — file reference '$($ref.Groups[1].Value)' is $dirDepth directories deep (max 1 level from SKILL.md).")
+                      }
+                    }
+
+                    # Token size analysis (chars/4 approximation of BPE count)
+                    $approxTokens = [int][System.Math]::Ceiling($skillContent.Length / 4.0)
+                    $sectionCount = ([regex]::Matches($body, '(?m)^#{1,4}\s+')).Count
+                    $codeBlockCount = [int](([regex]::Matches($body, '```')).Count / 2)
+                    $numberedStepCount = ([regex]::Matches($body, '(?m)^\d+\.\s')).Count
+
+                    if ($approxTokens -gt $TokenWarnHigh) {
+                      $warnings.Add("$sCtx — ~$approxTokens tokens (chars/4) — 'comprehensive' skills hurt performance. Consider splitting into 2-3 focused skills.")
+                    } elseif ($approxTokens -gt $TokenSweetHigh) {
+                      $warnings.Add("$sCtx — ~$approxTokens tokens (chars/4) — approaching 'comprehensive' range where gains diminish.")
+                    } elseif ($approxTokens -lt $TokenSweetLow) {
+                      $warnings.Add("$sCtx — only ~$approxTokens tokens (chars/4) — may be too sparse to provide actionable guidance.")
+                    }
+
+                    if ($sectionCount -eq 0) {
+                      $warnings.Add("$sCtx — no section headers — agents navigate structured documents better.")
+                    }
+                    if ($codeBlockCount -eq 0) {
+                      $warnings.Add("$sCtx — no code blocks — agents perform better with concrete snippets and commands.")
+                    }
+                    if ($numberedStepCount -eq 0) {
+                      $warnings.Add("$sCtx — no numbered workflow steps — agents follow sequenced procedures more reliably.")
+                    }
+
+                    # Eval prompt bias: skill name mentioned in eval prompts
+                    if (-not [string]::IsNullOrWhiteSpace($fm.name)) {
+                      $escapedName = [regex]::Escape($fm.name.Trim())
+                      $namePattern = [regex]::new("(?<![\\w-])$escapedName(?![\\w-])", [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+                      $testDir = "tests/$pluginName/$skillName"
+                      $evalPath = Join-Path $testDir 'eval.yaml'
+                      if (Test-Path $evalPath) {
+                        $evalContent = Get-Content -Path $evalPath -Raw
+                        # Extract scenario name+prompt pairs and check prompts
+                        $scenarioMatches = [regex]::Matches($evalContent, '(?ms)^\s{2}-\s+name\s*:\s*(?:"([^"]+)"|''([^'']+)''|(.+?))\s*$.*?prompt\s*:\s*(?:"([^"]+)"|''([^'']+)''|(.+?))\s*$')
+                        foreach ($sm in $scenarioMatches) {
+                          $scenarioName = if ($sm.Groups[1].Success) { $sm.Groups[1].Value } elseif ($sm.Groups[2].Success) { $sm.Groups[2].Value } else { $sm.Groups[3].Value }
+                          $promptText = if ($sm.Groups[4].Success) { $sm.Groups[4].Value } elseif ($sm.Groups[5].Success) { $sm.Groups[5].Value } else { $sm.Groups[6].Value }
+                          if ($namePattern.IsMatch($promptText)) {
+                            $errors.Add("$sCtx — eval scenario '$scenarioName' prompt mentions skill name '$($fm.name)' — remove to avoid biasing baseline runs.")
+                          }
+                        }
+                      }
                     }
                   }
                 }
@@ -225,6 +346,20 @@ jobs:
           }
 
           # ── 5. eval.yaml validation ──────────────────────────────────
+          # Required fields per assertion type (from EvalSchema.cs)
+          $assertionRequiredFields = @{
+            'file_exists' = @('path')
+            'file_not_exists' = @('path')
+            'file_contains' = @('path', 'value')
+            'file_not_contains' = @('path', 'value')
+            'output_contains' = @('value')
+            'output_not_contains' = @('value')
+            'output_matches' = @('pattern')
+            'output_not_matches' = @('pattern')
+            'exit_success' = @()
+          }
+          $validAssertionTypes = $assertionRequiredFields.Keys
+
           if (Test-Path 'tests') {
             $testPluginDirs = Get-ChildItem -Path 'tests' -Directory
             foreach ($testPluginDir in $testPluginDirs) {
@@ -238,11 +373,9 @@ jobs:
                   continue
                 }
 
-                # Basic YAML structure validation (scenarios with name + prompt)
                 try {
                   $evalContent = Get-Content -Path $evalPath -Raw
 
-                  # Check for scenarios key
                   if ($evalContent -notmatch '(?m)^scenarios\s*:') {
                     $errors.Add("$tCtx — eval.yaml must have a 'scenarios' key.")
                     continue
@@ -259,15 +392,26 @@ jobs:
                     $errors.Add("$tCtx — eval.yaml has no scenarios with 'prompt' field.")
                   }
 
-                  # Validate known assertion types
-                  $assertionTypes = [regex]::Matches($evalContent, '(?m)^\s+-?\s*type\s*:\s*["\x27]?(\w+)["\x27]?')
-                  $validTypes = @('output_contains', 'output_not_contains', 'output_matches',
-                    'output_not_matches', 'file_exists', 'file_not_exists',
-                    'file_contains', 'file_not_contains', 'exit_success')
-                  foreach ($at in $assertionTypes) {
-                    $typeName = $at.Groups[1].Value
-                    if ($typeName -notin $validTypes) {
+                  # Validate assertion types and required fields per type.
+                  # Extract assertion blocks: each starts with "- type:" and extends
+                  # until the next "- type:" or end of the assertions section.
+                  $assertionBlockPattern = '(?m)^\s+-\s*type\s*:\s*["\x27]?(\w+)["\x27]?((?:\n(?!\s+-\s).*)*)'
+                  $assertionBlockMatches = [regex]::Matches($evalContent, $assertionBlockPattern)
+
+                  foreach ($abm in $assertionBlockMatches) {
+                    $typeName = $abm.Groups[1].Value
+                    $blockText = $abm.Groups[2].Value
+
+                    if ($typeName -notin $validAssertionTypes) {
                       $errors.Add("$tCtx — eval.yaml has unknown assertion type '$typeName'.")
+                      continue
+                    }
+
+                    $requiredFields = $assertionRequiredFields[$typeName]
+                    foreach ($field in $requiredFields) {
+                      if ($blockText -notmatch "(?m)^\s+$field\s*:") {
+                        $errors.Add("$tCtx — assertion '$typeName' requires '$field' field.")
+                      }
                     }
                   }
                 } catch {
@@ -300,32 +444,31 @@ jobs:
           # ── Summary ──────────────────────────────────────────────────
           Write-Host ""
           if ($errors.Count -eq 0 -and $warnings.Count -eq 0) {
-            Write-Host "✅ All structural validation checks passed." -ForegroundColor Green
+            Write-Host "All structural validation checks passed." -ForegroundColor Green
           } else {
             if ($warnings.Count -gt 0) {
-              Write-Host "⚠️  Warnings ($($warnings.Count)):" -ForegroundColor Yellow
+              Write-Host "Warnings ($($warnings.Count)):" -ForegroundColor Yellow
               foreach ($w in $warnings) { Write-Host "  - $w" }
               Write-Host ""
             }
             if ($errors.Count -gt 0) {
-              Write-Host "❌ Errors ($($errors.Count)):" -ForegroundColor Red
+              Write-Host "Errors ($($errors.Count)):" -ForegroundColor Red
               foreach ($e in $errors) { Write-Host "  - $e" }
             }
           }
 
-          # Write summary to GITHUB_STEP_SUMMARY if available
           if ($env:GITHUB_STEP_SUMMARY) {
             $summary = "## Structural Validation`n`n"
             if ($errors.Count -eq 0 -and $warnings.Count -eq 0) {
-              $summary += "✅ All checks passed.`n"
+              $summary += "All checks passed.`n"
             }
             if ($warnings.Count -gt 0) {
-              $summary += "### ⚠️ Warnings`n`n"
+              $summary += "### Warnings`n`n"
               foreach ($w in $warnings) { $summary += "- $w`n" }
               $summary += "`n"
             }
             if ($errors.Count -gt 0) {
-              $summary += "### ❌ Errors`n`n"
+              $summary += "### Errors`n`n"
               foreach ($e in $errors) { $summary += "- $e`n" }
             }
             $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
