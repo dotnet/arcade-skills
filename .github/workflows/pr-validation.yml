@@ -19,6 +19,7 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
 
 jobs:
   validate-structure:
@@ -474,7 +475,48 @@ jobs:
             $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           }
 
+          # Write comment body for the PR comment step
+          if ($errors.Count -gt 0 -or $warnings.Count -gt 0) {
+            $marker = "<!-- pr-validation -->"
+            $body = "$marker`n"
+            $runUrl = "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            if ($errors.Count -gt 0) {
+              $body += "### Structural validation failed with $($errors.Count) error(s)`n`n"
+              foreach ($e in $errors) { $body += "- $e`n" }
+              $body += "`n"
+            }
+            if ($warnings.Count -gt 0) {
+              $body += "### Warnings ($($warnings.Count))`n`n"
+              foreach ($w in $warnings) { $body += "- $w`n" }
+              $body += "`n"
+            }
+            $body += "[View workflow run]($runUrl)`n"
+            $body | Out-File -FilePath 'pr-comment.md' -Encoding utf8
+            "has_comment=true" >> $env:GITHUB_OUTPUT
+          }
+
           if ($errors.Count -gt 0) {
             Write-Error "Structural validation failed with $($errors.Count) error(s)."
             exit 1
           }
+
+      - name: Post or update PR comment
+        if: always() && github.event_name == 'pull_request' && steps.validate.outputs.has_comment == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          MARKER="<!-- pr-validation -->"
+
+          # Find existing comment by marker
+          EXISTING=$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            --jq ".[] | select(.body | startswith(\"${MARKER}\")) | .id" | head -1)
+
+          if [ -n "$EXISTING" ]; then
+            gh api "repos/${{ github.repository }}/issues/comments/${EXISTING}" \
+              -X PATCH -F "body=@pr-comment.md"
+          else
+            gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+              -X POST -F "body=@pr-comment.md"
+          fi
