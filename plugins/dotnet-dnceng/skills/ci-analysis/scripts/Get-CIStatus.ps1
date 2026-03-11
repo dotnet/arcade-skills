@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Retrieves test failures from Azure DevOps builds and Helix test runs.
 
@@ -1584,7 +1584,7 @@ try {
     # Handle direct Helix job query
     if ($PSCmdlet.ParameterSetName -eq 'HelixJob') {
         Write-Host "`n=== Helix Job $HelixJob ===" -ForegroundColor Yellow
-        Write-Host "URL: https://helix.dot.net/api/2019-06-17/jobs/$HelixJob" -ForegroundColor Gray
+        Write-Host "URL: https://helix.dot.net/api/jobs/$HelixJob" -ForegroundColor Gray
 
         # Get job details
         $jobDetails = Get-HelixJobDetails -JobId $HelixJob
@@ -1625,8 +1625,7 @@ try {
                 }
 
                 # Fetch console log
-                $escapedWorkItem = [uri]::EscapeDataString($WorkItem)
-                $consoleUrl = "https://helix.dot.net/api/2019-06-17/jobs/$HelixJob/workitems/$escapedWorkItem/console"
+                $consoleUrl = "https://helix.dot.net/api/2019-06-17/jobs/$HelixJob/workitems/$WorkItem/console"
                 Write-Host "`n  Console Log: $consoleUrl" -ForegroundColor Yellow
 
                 $consoleLog = Get-HelixConsoleLog -Url $consoleUrl
