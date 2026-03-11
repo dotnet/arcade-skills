@@ -28,7 +28,7 @@ When tracing a component SHA through a **1xx branch** build:
 When tracing through a **2xx or 3xx branch** build:
 - `source-manifest.json` will NOT list runtime (it's not source-built)
 - Instead, check `eng/Version.Details.xml` for `MicrosoftNETCoreAppRefPackageVersion`
-- That version's `Sha` attribute points to the **1xx VMR commit** that produced the runtime packages
+- That dependency's `<Sha>` element points to the **1xx VMR commit** that produced the runtime packages
 - Then check `source-manifest.json` at THAT 1xx VMR commit for the actual runtime SHA
 
 ### Example Chain (10.0.300 SDK)
@@ -65,6 +65,6 @@ When tracing through a **2xx or 3xx branch** build:
 
 | File | Purpose | Location |
 |------|---------|----------|
-| `source-manifest.json` | Lists all source-built component SHAs | Root of VMR repo |
+| `src/source-manifest.json` | Lists all source-built component SHAs | Root of VMR repo |
 | `eng/Version.Details.xml` | Lists package dependencies with source SHAs | Root of VMR repo |
 | `eng/Versions.props` | Package version properties | Root of VMR repo |

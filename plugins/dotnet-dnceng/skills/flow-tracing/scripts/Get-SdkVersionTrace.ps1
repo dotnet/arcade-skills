@@ -140,7 +140,9 @@ $buildDateStr = $buildDate.ToString("yyyy-MM-dd")
 
 # Determine VMR branch — 1xx preview/rc branches use a suffix, all others use just the band
 if ($band -eq 1 -and $prerelease) {
-    $vmrBranch = "release/$major.$minor.${bandStr}-$prerelease"
+    # VMR preview/rc branches use preview1/rc1 (no dot before N)
+    $normalizedPrerelease = $prerelease -replace '\\.(\d+)$', '$1'
+    $vmrBranch = "release/$major.$minor.${bandStr}-$normalizedPrerelease"
 } else {
     $vmrBranch = "release/$major.$minor.${bandStr}"
 }
@@ -247,7 +249,7 @@ Write-Section "Step 3: Check source-manifest.json"
 $manifestContent = Get-GitHubFileContent -Repo "dotnet/dotnet" -Path "src/source-manifest.json" -Ref $vmrCommit
 if (-not $manifestContent) {
     Write-Status "⚠️" "Cannot fetch source-manifest.json from VMR at $vmrCommit" Yellow
-    Write-Host "  The agent should use github-mcp-server-get_file_contents to fetch this file." -ForegroundColor DarkGray
+    Write-Host "  The agent should fetch this file via gh api or raw.githubusercontent.com." -ForegroundColor DarkGray
 
     Write-Host ""
     Write-Host "[SKILL_SUMMARY]"
@@ -306,7 +308,7 @@ if (-not $vdxContent) {
         vmrCommit = $vmrCommit
         buildNumber = $buildNumber
         component = $Component
-        fallback = "Fetch eng/Version.Details.xml from dotnet/dotnet at $vmrCommit and look for dotnet-dotnet Sha attribute for MicrosoftNETCoreAppRefPackageVersion"
+        fallback = "Fetch eng/Version.Details.xml from dotnet/dotnet at $vmrCommit and inspect the <Dependency> entry for MicrosoftNETCoreAppRefPackageVersion, then use its <Sha> element as the component commit."
     }
     Write-Host ($summary | ConvertTo-Json -Depth 4 -Compress)
     Write-Host "[/SKILL_SUMMARY]"

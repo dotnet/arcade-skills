@@ -46,8 +46,16 @@ static string? RunGh(string arguments, int timeoutSeconds = 30)
         };
         using var proc = Process.Start(psi);
         if (proc == null) return null;
-        var output = proc.StandardOutput.ReadToEnd();
-        proc.WaitForExit(timeoutSeconds * 1000);
+        // Read stdout/stderr async to avoid deadlock on full buffers
+        var outputTask = proc.StandardOutput.ReadToEndAsync();
+        var errorTask = proc.StandardError.ReadToEndAsync();
+        var exited = proc.WaitForExit(timeoutSeconds * 1000);
+        if (!exited)
+        {
+            try { proc.Kill(entireProcessTree: true); } catch { }
+            return null;
+        }
+        var output = outputTask.Result;
         return proc.ExitCode == 0 ? output : null;
     }
     catch { return null; }
