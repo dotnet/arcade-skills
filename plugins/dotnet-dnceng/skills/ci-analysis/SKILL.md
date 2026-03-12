@@ -119,7 +119,7 @@ Lead with a 1-2 sentence verdict, then the summary table, then detail bullets (o
 - **Recommendation generation**: [references/recommendation-generation.md](references/recommendation-generation.md)
 - **Analysis workflow (Steps 1–3)**: [references/analysis-workflow.md](references/analysis-workflow.md)
 - **Helix artifacts & binlogs**: [references/helix-artifacts.md](references/helix-artifacts.md)
-- **Binlog comparison**: [references/binlog-comparison.md](references/binlog-comparison.md)
+- **Binlog comparison**: Use the `binlog-comparison` skill for cross-build binlog diffs
 - **Build progression analysis**: [references/build-progression-analysis.md](references/build-progression-analysis.md)
 - **Subagent delegation**: [references/delegation-patterns.md](references/delegation-patterns.md)
 - **Azure CLI investigation**: [references/azure-cli.md](references/azure-cli.md)
