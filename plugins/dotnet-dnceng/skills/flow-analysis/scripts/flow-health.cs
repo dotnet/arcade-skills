@@ -57,7 +57,9 @@ async Task<(string? output, string? error)> RunGhCoreAsync(string arguments, int
         }
         var outputTask = proc.StandardOutput.ReadToEndAsync();
         var errorTask = proc.StandardError.ReadToEndAsync();
-        var exited = await proc.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(timeoutSeconds)).ContinueWith(t => !t.IsFaulted);
+        var exited = true;
+        try { await proc.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(timeoutSeconds)); }
+        catch (TimeoutException) { exited = false; }
         if (!exited)
         {
             try { proc.Kill(entireProcessTree: true); } catch { }

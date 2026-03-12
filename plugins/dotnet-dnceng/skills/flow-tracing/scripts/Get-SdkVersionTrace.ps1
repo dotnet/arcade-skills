@@ -152,7 +152,8 @@ if ($band -eq 1 -and $prerelease) {
 } elseif ($band -eq 1 -and -not $prerelease) {
     # GA 1xx — if the release branch doesn't exist, this is the current dev major (use main)
     $vmrBranch = "release/$major.$minor.${bandStr}"
-    $branchCheck = gh api "repos/dotnet/dotnet/branches/$vmrBranch" 2>$null | ConvertFrom-Json -ErrorAction SilentlyContinue
+    $encodedBranch = [uri]::EscapeDataString($vmrBranch)
+    $branchCheck = gh api "repos/dotnet/dotnet/branches/$encodedBranch" 2>$null | ConvertFrom-Json -ErrorAction SilentlyContinue
     if (-not $branchCheck -or -not $branchCheck.name) {
         $vmrBranch = "main"
     }
