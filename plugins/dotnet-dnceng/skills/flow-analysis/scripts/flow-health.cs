@@ -28,13 +28,18 @@ if (string.IsNullOrEmpty(repository) || !Regex.IsMatch(repository, @"^[A-Za-z0-9
 
 const int ReleasedPreviewThresholdDays = 14;
 const int MergedRetries = 3;
+const int MaxConcurrentGhCalls = 20;
 
 // =============================================================================
-// gh CLI helper with retry for search-index queries
+// gh CLI helper — properly async with error tracking
 // =============================================================================
 
-static string? RunGh(string arguments, int timeoutSeconds = 30)
+var ghSemaphore = new SemaphoreSlim(MaxConcurrentGhCalls);
+int ghFailureCount = 0;
+
+async Task<(string? output, string? error)> RunGhCoreAsync(string arguments, int timeoutSeconds = 30)
 {
+    await ghSemaphore.WaitAsync();
     try
     {
         var psi = new ProcessStartInfo("gh", arguments)
@@ -45,44 +50,70 @@ static string? RunGh(string arguments, int timeoutSeconds = 30)
             CreateNoWindow = true
         };
         using var proc = Process.Start(psi);
-        if (proc == null) return null;
-        // Read stdout/stderr async to avoid deadlock on full buffers
+        if (proc == null)
+        {
+            Interlocked.Increment(ref ghFailureCount);
+            return (null, "Failed to start gh process");
+        }
         var outputTask = proc.StandardOutput.ReadToEndAsync();
         var errorTask = proc.StandardError.ReadToEndAsync();
-        var exited = proc.WaitForExit(timeoutSeconds * 1000);
+        var exited = await proc.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(timeoutSeconds)).ContinueWith(t => !t.IsFaulted);
         if (!exited)
         {
             try { proc.Kill(entireProcessTree: true); } catch { }
-            return null;
+            Interlocked.Increment(ref ghFailureCount);
+            return (null, $"gh timed out after {timeoutSeconds}s: {arguments}");
         }
-        var output = outputTask.Result;
-        return proc.ExitCode == 0 ? output : null;
+        var output = await outputTask;
+        var stderr = await errorTask;
+        if (proc.ExitCode != 0)
+        {
+            Interlocked.Increment(ref ghFailureCount);
+            return (null, stderr);
+        }
+        return (output, null);
     }
-    catch { return null; }
+    catch (Exception ex)
+    {
+        Interlocked.Increment(ref ghFailureCount);
+        return (null, ex.Message);
+    }
+    finally
+    {
+        ghSemaphore.Release();
+    }
 }
 
-static JsonArray? RunGhJson(string arguments, int timeoutSeconds = 30)
+async Task<string?> RunGhAsync(string arguments, int timeoutSeconds = 30)
 {
-    var output = RunGh(arguments, timeoutSeconds);
+    var (output, _) = await RunGhCoreAsync(arguments, timeoutSeconds);
+    return output;
+}
+
+async Task<JsonArray?> RunGhJsonAsync(string arguments, int timeoutSeconds = 30)
+{
+    var output = await RunGhAsync(arguments, timeoutSeconds);
     if (string.IsNullOrWhiteSpace(output)) return null;
     try { return JsonNode.Parse(output) as JsonArray; }
     catch { return null; }
 }
 
-static JsonObject? RunGhJsonObject(string arguments, int timeoutSeconds = 30)
+async Task<JsonObject?> RunGhJsonObjectAsync(string arguments, int timeoutSeconds = 60)
 {
-    var output = RunGh(arguments, timeoutSeconds);
+    var output = await RunGhAsync(arguments, timeoutSeconds);
     if (string.IsNullOrWhiteSpace(output)) return null;
     try { return JsonNode.Parse(output) as JsonObject; }
     catch { return null; }
 }
 
-// Parallel gh call — returns Task<string?>
-static Task<string?> RunGhAsync(string arguments, int timeoutSeconds = 30)
-    => Task.Run(() => RunGh(arguments, timeoutSeconds));
-
-static Task<JsonObject?> RunGhJsonObjectAsync(string arguments, int timeoutSeconds = 60)
-    => Task.Run(() => RunGhJsonObject(arguments, timeoutSeconds));
+// Verify gh is available before starting
+var (ghCheck, ghCheckErr) = await RunGhCoreAsync("auth status", 10);
+if (ghCheck == null)
+{
+    Console.Error.WriteLine($"❌ gh CLI is not available or not authenticated: {ghCheckErr}");
+    return 1;
+}
+ghFailureCount = 0; // reset after auth check
 
 // =============================================================================
 // Phase 1: Find codeflow PRs
@@ -91,7 +122,7 @@ static Task<JsonObject?> RunGhJsonObjectAsync(string arguments, int timeoutSecon
 Console.Error.WriteLine($"🔍 Searching for codeflow PRs in {repository}...");
 
 // Open backflow PRs — uses --search to embed author filter (avoids PS 5.1 --author [bot] bug)
-var allOpen = RunGhJson($"pr list --repo {repository} --search \"author:app/dotnet-maestro\" --state open --json number,title --limit 100");
+var allOpen = await RunGhJsonAsync($"pr list --repo {repository} --search \"author:app/dotnet-maestro\" --state open --json number,title --limit 100");
 var openPRs = new List<(int number, string title, string branch)>();
 if (allOpen != null)
 {
@@ -111,7 +142,7 @@ var mergedPRs = new List<(int number, string title, string branch, string? close
 for (int retry = 0; retry < MergedRetries && mergedPRs.Count == 0; retry++)
 {
     if (retry > 0) await Task.Delay(1000);
-    var allMerged = RunGhJson($"pr list --repo {repository} --search \"author:app/dotnet-maestro Source code updates from dotnet/dotnet\" --state merged --json number,title,closedAt --limit 30");
+    var allMerged = await RunGhJsonAsync($"pr list --repo {repository} --search \"author:app/dotnet-maestro Source code updates from dotnet/dotnet\" --state merged --json number,title,closedAt --limit 30");
     if (allMerged != null)
     {
         foreach (var pr in allMerged)
@@ -308,7 +339,7 @@ foreach (var kv in healthTasks)
 Console.Error.WriteLine("↔️ Scanning forward flow PRs...");
 var repoShortName = Regex.Replace(repository, @"^dotnet/", "");
 
-var fwdJson = RunGhJson($"pr list --repo dotnet/dotnet --search \"author:app/dotnet-maestro Source code updates from dotnet/{repoShortName}\" --state open --json number,title --limit 10");
+var fwdJson = await RunGhJsonAsync($"pr list --repo dotnet/dotnet --search \"author:app/dotnet-maestro Source code updates from dotnet/{repoShortName}\" --state open --json number,title --limit 10");
 var fwdPRs = new List<(int number, string title, string branch)>();
 if (fwdJson != null)
 {
@@ -504,6 +535,7 @@ int fwdHealthy = forwardFlowPRs.Count(b => b["status"]?.ToString() == "healthy")
 int fwdStale = forwardFlowPRs.Count(b => b["status"]?.ToString() == "stale");
 int fwdConflict = forwardFlowPRs.Count(b => b["status"]?.ToString() == "conflict");
 int fwdCiRed = forwardFlowPRs.Count(b => b["status"]?.ToString() == "ci-red");
+int fwdIssues = fwdStale + fwdConflict + fwdCiRed;
 
 var output = new Dictionary<string, object>
 {
@@ -532,12 +564,18 @@ var output = new Dictionary<string, object>
     }
 };
 
+if (ghFailureCount > 0)
+    output["ghFailures"] = ghFailureCount;
+
 // Summary to stderr
 int problemCount = blocked + missing;
-if (problemCount == 0 && fwdStale == 0 && fwdConflict == 0 && fwdCiRed == 0)
+if (problemCount == 0 && fwdIssues == 0)
     Console.Error.WriteLine($"✅ {repository}: {backflowBranches.Count} branches healthy, {forwardFlowPRs.Count} forward flow PRs");
 else
-    Console.Error.WriteLine($"⚠️ {repository}: {problemCount} backflow issues ({blocked} blocked, {missing} missing), {fwdStale + fwdConflict} forward flow issues");
+    Console.Error.WriteLine($"⚠️ {repository}: {problemCount} backflow issues ({blocked} blocked, {missing} missing), {fwdIssues} forward flow issues ({fwdCiRed} ci-red, {fwdConflict} conflict, {fwdStale} stale)");
+
+if (ghFailureCount > 0)
+    Console.Error.WriteLine($"⚠️ {ghFailureCount} gh CLI call(s) failed — results may be incomplete");
 
 // JSON to stdout
 var options = new JsonSerializerOptions
@@ -546,4 +584,4 @@ var options = new JsonSerializerOptions
     TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver()
 };
 Console.WriteLine(JsonSerializer.Serialize(output, options));
-return 0;
+return ghFailureCount > 0 ? 2 : 0;

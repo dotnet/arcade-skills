@@ -73,7 +73,7 @@ function Get-GitHubFileContent {
     # Fallback: download raw content via download_url
     if ($obj.download_url) {
         try {
-            return (Invoke-WebRequest -Uri $obj.download_url -UseBasicParsing).Content
+            return (Invoke-RestMethod -Uri $obj.download_url)
         } catch {
             return $null
         }
@@ -87,14 +87,19 @@ function Find-ComponentInManifest {
     param($Manifest, [string]$Component)
     $lower = $Component.ToLower()
     # Try exact path match first
-    $entry = $manifest.repositories | Where-Object { $_.path -eq $lower }
-    if ($entry) { return $entry }
+    $matches = @($manifest.repositories | Where-Object { $_.path -eq $lower })
+    if ($matches.Count -eq 1) { return $matches[0] }
     # Try matching the repo name portion of remoteUri (e.g., "runtime" matches "https://github.com/dotnet/runtime")
-    $entry = $manifest.repositories | Where-Object { $_.remoteUri -match "/$lower(\.\w+)?$" }
-    if ($entry) { return $entry }
+    $matches = @($manifest.repositories | Where-Object { $_.remoteUri -match "/$lower(\.\w+)?$" })
+    if ($matches.Count -eq 1) { return $matches[0] }
     # Try partial match on path (e.g., "nuget" matches "nuget-client")
-    $entry = $manifest.repositories | Where-Object { $_.path -like "*$lower*" }
-    return $entry
+    $matches = @($manifest.repositories | Where-Object { $_.path -like "*$lower*" })
+    if ($matches.Count -eq 1) { return $matches[0] }
+    if ($matches.Count -gt 1) {
+        Write-Status "⚠️" "Ambiguous component '$Component' — matched $($matches.Count) entries: $(($matches | ForEach-Object { $_.path }) -join ', ')" Yellow
+        return $null
+    }
+    return $null
 }
 
 # ─── Step 1: Decode SDK version ───
@@ -139,10 +144,18 @@ $buildDate = Get-Date -Year $year -Month $mm -Day $dd
 $buildDateStr = $buildDate.ToString("yyyy-MM-dd")
 
 # Determine VMR branch — 1xx preview/rc branches use a suffix, all others use just the band
+# For 1xx GA: current dev major builds from 'main', released majors from 'release/X.Y.1xx'
 if ($band -eq 1 -and $prerelease) {
     # VMR preview/rc branches use preview1/rc1 (no dot before N)
     $normalizedPrerelease = $prerelease -replace '\\.(\d+)$', '$1'
     $vmrBranch = "release/$major.$minor.${bandStr}-$normalizedPrerelease"
+} elseif ($band -eq 1 -and -not $prerelease) {
+    # GA 1xx — if the release branch doesn't exist, this is the current dev major (use main)
+    $vmrBranch = "release/$major.$minor.${bandStr}"
+    $branchCheck = gh api "repos/dotnet/dotnet/branches/$vmrBranch" 2>$null | ConvertFrom-Json -ErrorAction SilentlyContinue
+    if (-not $branchCheck -or -not $branchCheck.name) {
+        $vmrBranch = "main"
+    }
 } else {
     $vmrBranch = "release/$major.$minor.${bandStr}"
 }
@@ -260,7 +273,7 @@ if (-not $manifestContent) {
         vmrCommit = $vmrCommit
         buildNumber = $buildNumber
         component = $Component
-        fallback = "Use github-mcp-server-get_file_contents for dotnet/dotnet source-manifest.json at sha $vmrCommit"
+        fallback = "Fetch via: gh api repos/dotnet/dotnet/contents/src/source-manifest.json?ref=$vmrCommit"
     }
     Write-Host ($summary | ConvertTo-Json -Depth 4 -Compress)
     Write-Host "[/SKILL_SUMMARY]"

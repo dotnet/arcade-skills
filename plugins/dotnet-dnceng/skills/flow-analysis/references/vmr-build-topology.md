@@ -65,12 +65,13 @@ $blobUrl = $resp.Headers.Location.ToString()  # Only if StatusCode is 301
 $resp.Dispose()
 
 # Step 2: HEAD the blob for Last-Modified
-$head = Invoke-WebRequest -Uri $blobUrl -Method Head -UseBasicParsing
-$published = [DateTimeOffset]::Parse($head.Headers['Last-Modified']).UtcDateTime
+$headReq = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::Head, $blobUrl)
+$headResp = $client.SendAsync($headReq).Result
+$published = $headResp.Content.Headers.LastModified.Value.UtcDateTime
 $age = [DateTime]::UtcNow - $published
 
-$client.Dispose()
-$handler.Dispose()
+$headReq.Dispose(); $headResp.Dispose()
+$client.Dispose(); $handler.Dispose()
 ```
 
 ### Interpreting results
