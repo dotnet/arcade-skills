@@ -10,7 +10,7 @@ When a test **passes on the target branch but fails on a PR**, comparing MSBuild
 
 ## The Pattern: Delegate to Subagents
 
-> ⚠️ **Do NOT download, load, and parse binlogs in the main conversation context.** This burns 10+ turns on mechanical work. Delegate to subagents instead.
+> ⚠️ **Delegate binlog download/parsing to subagents** — don't do it in the main conversation.
 
 ### Step 1: Identify the two work items to compare
 
@@ -51,7 +51,7 @@ Parse into individual args using regex: (?:"[^"]+"|/[^\s]+|[^\s]+)
 Report the total arg count prominently.
 ```
 
-**Important:** When diffing, look for **extra or missing args** (different count), not value differences in existing args. A Debug/Release difference in `/define:` is expected noise — an extra `/analyzerconfig:` or `/reference:` arg is the real signal.
+When diffing, focus on **extra or missing args** (different count). Ignore value-only diffs in existing args (e.g., Debug vs Release `/define:`).
 
 ### Step 3: Diff the results
 
@@ -78,7 +78,7 @@ Helix work items run on different machines with different paths. Normalize befor
 
 ### After normalizing paths, focus on structural differences
 
-> ⚠️ **Ignore value-only differences in existing args** (e.g., Debug vs Release in `/define:`, different hash paths). These are expected configuration differences. Focus on **extra or missing args** — a different arg count indicates a real build behavior change.
+> Focus on structural differences — extra/missing args indicate real behavior changes.
 
 ## Example: CscArguments Investigation
 

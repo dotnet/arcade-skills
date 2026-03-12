@@ -16,9 +16,9 @@ Read `recommendationHint` as a starting point, then layer in context:
 | `MERGE_CONFLICTS` | PR has merge conflicts — CI won't run. Tell the user to resolve conflicts. Offer to analyze a previous build by ID. |
 | `NO_BUILDS` | No AzDO builds found (CI not triggered). Offer to check if CI needs to be triggered or analyze a previous build. |
 
-## Layering Nuance
+## Refining with Context
 
-Then layer in nuance the heuristic can't capture:
+Refine the recommendation with context the heuristic can't capture:
 
 - **Mixed signals**: Some failures match known issues AND some correlate with PR changes → separate them. Known issues = safe to retry; correlated = fix first.
 - **Canceled jobs with recoverable results**: If `canceledJobNames` is non-empty, mention that canceled jobs may have passing Helix results (see [failure-interpretation.md](failure-interpretation.md) — Recovering Results).

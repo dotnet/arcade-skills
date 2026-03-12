@@ -53,8 +53,6 @@ For full parameter reference and mode details, see [references/script-modes.md](
 
 ## Step 0: Gather Context (before running anything)
 
-Context changes how you interpret every failure. **Don't skip this.**
-
 1. **Read PR metadata** — title, description, author, labels, linked issues
 2. **Classify the PR type**:
 
