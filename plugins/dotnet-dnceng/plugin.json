@@ -15,28 +15,6 @@
   ],
   "skills": "skills",
   "mcpServers": {
-    "ado-dnceng-public": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@azure-devops/mcp",
-        "dnceng-public"
-      ],
-      "env": {
-        "AZURE_DEVOPS_AUTH_METHOD": "azure-cli"
-      }
-    },
-    "ado-dnceng": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@azure-devops/mcp",
-        "dnceng"
-      ],
-      "env": {
-        "AZURE_DEVOPS_AUTH_METHOD": "azure-cli"
-      }
-    },
     "hlx": {
       "command": "dotnet",
       "args": [
