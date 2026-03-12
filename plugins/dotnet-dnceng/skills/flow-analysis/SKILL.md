@@ -72,26 +72,43 @@ The **1xx band** has full source-build with runtime forward flow. **2xx/3xx band
 
 | Question | Mode | Approach |
 |----------|------|----------|
+| "What's the flow status for X?" | **Codeflow overview** | Codeflow statuses → subscription health with validate → build freshness |
 | "Is backflow healthy for X on Y?" | **PR analysis** | `Get-CodeflowStatus.ps1 -Repository -Branch` → read output → MCP enrichment |
 | "Why is this PR stale/blocked?" | **PR analysis** | `Get-CodeflowStatus.ps1 -PrUrl` → read output → MCP enrichment |
-| "What's the flow status across all repos?" | **Codeflow overview** | Subscription health + codeflow PRs + build freshness (MCP tools) |
+| "What's the flow status across all repos?" | **Codeflow overview** | Codeflow statuses for each repo → subscription health + build freshness |
 | "Full flow health report for X" | **Flow health** | `flow-health.cs` script for batch GitHub scanning + maestro enrichment |
 
 ## Codeflow Overview Workflow
 
-When the user asks "what codeflow PRs are active?" or "what's the flow status?", use MCP tools for the fast multi-repo scan, then **run the script for any repo you'll call stale**.
+When the user asks "what codeflow PRs are active?" or "what's the flow status?", start with **codeflow statuses** for the target repo/branch — one call shows per-mapping forward flow and backflow status with active PRs and build staleness. Then drill into problems with subscription health and scripts.
 
 > 🚨 **Trust "commits behind", don't trust "builds behind".** Subscription health returns two kinds of staleness numbers — **"N commits behind"** is real commit distance (trust it, report it directly) and **"~N builds behind"** (note the `~` prefix) is a meaningless BAR build ID delta that overstates staleness by 10x-300x. For any stale entry showing `~builds behind`, compute the real commit distance yourself (see Step 5).
+
+### Step 0: Quick Status via Codeflow Statuses
+
+For any repo or the VMR, get **codeflow statuses** for the repo and branch (defaults to `dotnet/dotnet` on `main`). This returns per-mapping forward flow and backflow status in one call — active PRs, build staleness, and subscription details. Use this as the initial triage to identify which mappings need investigation before drilling into subscription health.
+
+> 💡 **When to skip Step 0**: If you already have a specific PR URL or subscription ID, go directly to PR Analysis or subscription health. Codeflow statuses is for "what's the overall picture?" questions.
 
 ### Step 1: Check Subscription Health
 
 Check subscription health for the target repository. This shows which subscriptions are stale and which are current. Entries showing "N commits behind" (no `~`) have real commit distances — use those directly. Entries showing "~N builds behind" (with `~`) need commit distance computation in Step 5.
+
+Use the `validate` option to enable **cross-validation** — this checks subscription state against GitHub PR state, detects state oscillation patterns, and traces source-manifest commits. Always use `validate` when investigating stuck subscriptions.
 
 > ⚠️ **Output includes ALL subscriptions** (all branches and channels). For a version-specific query like "net11 status", filter the results for channels containing your target version (e.g., `11.0`) and the relevant branch (`main` for current dev).
 
 ### Step 2: Check Forward Flow
 
 **Before drilling into backflow problems**, check for open forward flow PRs from the product repo into `dotnet/dotnet`. An open forward flow PR is the #1 cause of backflow staleness — if forward flow is pending, backflow is blocked by design.
+
+If codeflow statuses (Step 0) shows a forward flow subscription with failures or high commit distance, investigate:
+
+1. **Check the subscription's update history** — look for consecutive `Failed` or state oscillation (e.g., repeating `ApplyingUpdates → MergingPullRequest → ApplyingUpdates`). State oscillation means Maestro keeps retrying but something prevents completion.
+2. **Check if a tracked PR exists** — a forward flow subscription may report failures but actually have a merged-then-reopened PR, or no PR at all. The tracked PR tells you what Maestro thinks is happening.
+3. **Cross-validate against GitHub** — if Maestro says the subscription is failing but a PR exists and is merged, the subscription has a **bookkeeping bug** (Maestro never updated `LastAppliedBuildId`). Use `validate` on subscription health to detect this automatically.
+
+> 🚨 **Forward flow bookkeeping bug**: When a forward flow subscription shows "N builds behind" with consecutive failures but GitHub shows PRs merging successfully, this is a known Maestro issue where `LastAppliedBuildId` doesn't update after merge. The subscription is stuck in an infinite retry loop. **Remedy**: force-trigger the subscription — this resets Maestro's state by creating a fresh PR branch.
 
 ### Step 3: List Tracked PRs
 
@@ -272,17 +289,19 @@ Check `isCodeflowPR` first — if the PR isn't from `dotnet-maestro[bot]`, skip 
 | Action | When |
 |--------|------|
 | Trigger subscription | PR was closed or no PR exists for an enabled subscription |
-| Check latest build for trigger | Need a buildId to trigger with |
+| Trigger with source repo + channel | Provide source repository URL and channel name to auto-resolve latest build (eliminates manual build lookup) |
+| Force-trigger subscription | Bookkeeping bug — subscription shows failures but PRs merge. Force-trigger overwrites the existing PR branch with fresh content, resetting Maestro's state |
 | Check subscription history | Diagnosing when a subscription got stuck or failed |
 | Check backflow status for a VMR build | Understanding which product repos received a VMR build |
 | Bypass cache after action | After triggering, verify state changed using noCache |
 
-> ⚠️ **Force trigger vs normal trigger**: The MCP trigger is a normal trigger. For force-trigger (overwrites existing PR branch), use `darc trigger-subscriptions --id <id> --force` via shell. The MCP server doesn't yet support force-trigger.
+> 💡 **Smart trigger**: When triggering a subscription, you can provide the source repository and channel name instead of looking up the latest build ID manually. The MCP server resolves the latest build automatically.
+
+> 💡 **Force trigger**: Force-trigger overwrites the existing PR branch with fresh content. Use this when the subscription has a bookkeeping bug (consecutive failures but PRs merge) or when the tracked PR is in a broken state. Force-trigger is available via MCP.
 
 ### Darc Commands (When MCP Insufficient)
 
 ```bash
-darc trigger-subscriptions --id <subscription-id> --force    # Force trigger (not yet in MCP)
 darc vmr resolve-conflict --subscription <subscription-id>   # Resolve conflicts locally
 ```
 
