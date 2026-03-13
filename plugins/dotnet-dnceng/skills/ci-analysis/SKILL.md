@@ -136,3 +136,6 @@ Lead with a 1-2 sentence verdict, then the summary table, then detail bullets (o
 3. Use `-SearchMihuBot` for semantic search of related issues
 4. `gh pr checks --json` fields: `bucket`, `completedAt`, `description`, `event`, `link`, `name`, `startedAt`, `state`, `workflow` — `state` has `SUCCESS`/`FAILURE` directly (no `conclusion` field)
 5. "Canceled" ≠ "Failed" — canceled jobs may have recoverable Helix results. Helix data may persist even when AzDO builds have expired — query Helix directly if you have job IDs.
+6. **XHarness exit-0 blind spot**: XHarness exits with code 0 even when device tests fail. The ADO job shows ✅ "Succeeded" and the script may report no failures, but actual test failures are hidden inside Helix work items. Always cross-check Helix `ResultSummaryByBuild` (`GET https://helix.dot.net/api/2019-06-17/jobs/{correlationId}/aggregated`) when device test builds look green but failures are suspected.
+7. When `failedJobDetailsTruncated` is `true` in the JSON output, grep the full script log for additional `errorSnippet` occurrences before summarizing — the script caps at 10 detailed entries by default.
+8. **Container-type artifacts**: Some repos use Container-type build artifacts (not PipelineArtifact). `az pipelines runs artifact download` won't work for these — use the ADO File Container API with a Bearer token instead.
