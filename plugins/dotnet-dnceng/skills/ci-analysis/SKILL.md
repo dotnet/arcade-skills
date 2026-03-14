@@ -136,3 +136,4 @@ Lead with a 1-2 sentence verdict, then the summary table, then detail bullets (o
 3. Use `-SearchMihuBot` for semantic search of related issues
 4. `gh pr checks --json` fields: `bucket`, `completedAt`, `description`, `event`, `link`, `name`, `startedAt`, `state`, `workflow` — `state` has `SUCCESS`/`FAILURE` directly (no `conclusion` field)
 5. "Canceled" ≠ "Failed" — canceled jobs may have recoverable Helix results. Helix data may persist even when AzDO builds have expired — query Helix directly if you have job IDs.
+6. **Truncated failure details**: When `failedJobDetailsTruncated` is `true` in the JSON output, the `failedJobDetails` array is capped at `-MaxJobs` (default 5). The full failure count is always available in `totalFailedJobs`, and all failed job names are listed in `failedJobNames` — use these to assess the full scope before investigating details. Pass `-MaxJobs N` to increase the detail cap for builds with many failures.
