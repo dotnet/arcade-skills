@@ -209,9 +209,11 @@ The post-build template handles validation and publishing. Add it after all buil
 - `NetCore-Svc-Public` — release branch public CI
 
 ### Image overrides:
-- `windows.vs2022.amd64` — Windows with VS2022
+- `windows.vs2022.amd64` — Windows with VS2022 (or `windows.vs2026preview.scout.amd64` for preview)
 - `build.ubuntu.2204.amd64.open` — Ubuntu 22.04 (public)
 - `1es-ubuntu-2204` — Ubuntu 22.04 (internal, 1ES)
+
+**Note:** Pool names and image overrides evolve. Check existing dotnet repos (runtime, aspire) for current values.
 
 ## GitHub Actions CI
 

@@ -105,9 +105,15 @@ Controls versioning and lists all NuGet dependency versions. The naming conventi
 <Project>
 
   <PropertyGroup>
-    <!-- Product version -->
-    <VersionPrefix>1.0.0</VersionPrefix>
+    <!-- Product version (both runtime and aspire use the computed pattern) -->
+    <MajorVersion>1</MajorVersion>
+    <MinorVersion>0</MinorVersion>
+    <PatchVersion>0</PatchVersion>
+    <VersionPrefix>$(MajorVersion).$(MinorVersion).$(PatchVersion)</VersionPrefix>
     <PreReleaseVersionLabel>preview</PreReleaseVersionLabel>
+    <!-- <PreReleaseVersionIteration>1</PreReleaseVersionIteration> -->
+    <!-- Set to true when stabilizing a release (removes prerelease label) -->
+    <StabilizePackageVersion>false</StabilizePackageVersion>
 
     <!-- Arcade features (set to true to enable) -->
     <!-- <UsingToolXliff>false</UsingToolXliff> -->
@@ -119,16 +125,17 @@ Controls versioning and lists all NuGet dependency versions. The naming conventi
   </PropertyGroup>
 
   <PropertyGroup>
-    <!-- Additional pinned dependencies -->
+    <!-- Additional pinned dependencies (not flowing via maestro) -->
   </PropertyGroup>
 
 </Project>
 ```
 
 **Versioning properties:**
-- `VersionPrefix`: 3-part SemVer prefix (MAJOR.MINOR.PATCH)
+- `MajorVersion`, `MinorVersion`, `PatchVersion`: individual components, `VersionPrefix` computed from them. This is the pattern used by runtime, aspire, and other arcade repos.
 - `PreReleaseVersionLabel`: label like `alpha`, `beta`, `preview`, `rc`. Empty for release-only packages.
 - `PreReleaseVersionIteration`: optional numeric iteration (e.g. `1` for `preview.1`)
+- `StabilizePackageVersion`: set to `true` when cutting a release to drop the prerelease label
 
 **Version property naming convention:**
 For a package `Microsoft.Extensions.Logging`, the version property is:
@@ -191,7 +198,7 @@ Must include the Arcade/dnceng feeds. Clear existing sources to ensure determini
     <add key="dotnet-public" value="https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-public/nuget/v3/index.json" />
     <add key="dotnet-tools" value="https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3/index.json" />
     <add key="dotnet-eng" value="https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-eng/nuget/v3/index.json" />
-    <add key="dotnet9" value="https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet9/nuget/v3/index.json" />
+    <add key="dotnet10" value="https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet10/nuget/v3/index.json" />
     <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
   </packageSources>
   <disabledPackageSources>
@@ -201,19 +208,56 @@ Must include the Arcade/dnceng feeds. Clear existing sources to ensure determini
 ```
 
 **Notes:**
-- Replace `dotnet9` with latest .NET version feed (e.g. `dotnet10`, `dotnet11`).
-- Keep `nuget.org` if the repo has non-dotnet dependencies.
-- Add `<packageSourceMapping>` if needed for security.
+- Replace `dotnet10` with the feed matching your target .NET version (e.g. `dotnet9`, `dotnet11`). Check runtime and aspire for current feed names.
+- For transport packages, add `dotnet10-transport` if needed: `https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet10-transport/nuget/v3/index.json`
+- Keep `nuget.org` if the repo has non-dotnet third-party dependencies.
 - If existing NuGet.config exists, **merge** the feeds rather than replacing.
+
+### Package Source Mapping (recommended for repos with CPM or multiple feeds)
+
+Aspire uses package source mapping to pin packages to specific feeds. Add inside `<configuration>`:
+
+```xml
+<packageSourceMapping>
+  <packageSource key="nuget.org">
+    <package pattern="*" />
+  </packageSource>
+  <packageSource key="dotnet-public">
+    <package pattern="*" />
+  </packageSource>
+  <packageSource key="dotnet-eng">
+    <package pattern="*" />
+  </packageSource>
+  <packageSource key="dotnet10">
+    <package pattern="*" />
+  </packageSource>
+</packageSourceMapping>
+```
+
+This prevents NU1507 errors when `TreatWarningsAsErrors` is enabled alongside Central Package Management.
 
 ## eng/Publishing.props
 
-Required for V3 publishing:
+Required for V3 publishing. Minimal template:
 
 ```xml
 <Project>
   <PropertyGroup>
     <PublishingVersion>3</PublishingVersion>
+  </PropertyGroup>
+</Project>
+```
+
+For repos that produce shipping assets (.NET release), add:
+
+```xml
+<Project>
+  <PropertyGroup>
+    <PublishingVersion>3</PublishingVersion>
+    <!-- Set to true for .NET release-tracked repos (like runtime, aspire) -->
+    <!-- <ProducesDotNetReleaseShippingAssets>true</ProducesDotNetReleaseShippingAssets> -->
+    <!-- Set to false if symbol packages are generated separately or not needed -->
+    <!-- <AutoGenerateSymbolPackages>false</AutoGenerateSymbolPackages> -->
   </PropertyGroup>
 </Project>
 ```
