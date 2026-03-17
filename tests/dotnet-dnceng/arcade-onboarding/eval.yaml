@@ -1,0 +1,22 @@
+scenarios:
+  - name: "Detect arcade onboarding need and analyze repository"
+    prompt: "Analyze this .NET repository and tell me what arcade infrastructure files are missing"
+    assertions:
+      - type: "output_contains"
+        value: "global.json"
+      - type: "output_contains"
+        value: "Directory.Build"
+      - type: "output_contains"
+        value: "eng"
+    timeout: 120
+
+  - name: "Generate arcade infrastructure files"
+    prompt: "Onboard this repository onto the dotnet/arcade build system"
+    assertions:
+      - type: "output_contains"
+        value: "Versions.props"
+      - type: "output_contains"
+        value: "Version.Details.xml"
+      - type: "output_contains"
+        value: "Publishing.props"
+    timeout: 300

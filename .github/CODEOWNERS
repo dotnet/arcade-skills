@@ -18,3 +18,5 @@
 /plugins/dotnet-dnceng/skills/pipeline-investigation/ @lewing @danmoseley
 /plugins/dotnet-dnceng/agents/ @lewing @danmoseley
 /plugins/dotnet-dnceng/skills/test-arcade/ @ellahathaway @dotnet/dnceng
+/plugins/dotnet-dnceng/skills/arcade-onboarding/ @rmarinho @lewing
+/tests/dotnet-dnceng/arcade-onboarding/ @rmarinho @lewing
