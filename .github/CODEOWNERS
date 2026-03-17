@@ -6,3 +6,5 @@
 
 # Skills
 /plugins/dotnet-dnceng/skills/ci-analysis/ @lewing @danmoseley
+/plugins/dotnet-dnceng/skills/arcade-onboarding/ @rmarinho @lewing
+/tests/dotnet-dnceng/arcade-onboarding/ @rmarinho @lewing
