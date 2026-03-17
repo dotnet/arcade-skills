@@ -212,35 +212,114 @@ Replace dots with nothing, append `Version`:
 - `Microsoft.Extensions.Logging` → `<MicrosoftExtensionsLoggingVersion>`
 - `System.Text.Json` → `<SystemTextJsonVersion>`
 
-## Step 8: Summary and Next Steps
+## Step 8: Darc Setup and Summary
 
-After all files are created/modified, provide the user with:
+After all files are created/modified:
+
+### Check and install darc
+
+```bash
+# Check if darc is installed
+which darc || ls ~/.dotnet/tools/darc 2>/dev/null
+```
+
+If not installed, ask the user: "darc CLI is not installed. Should I install it now?"
+
+If yes:
+```bash
+./eng/common/darc-init.sh   # macOS/Linux
+# or: .\eng\common\darc-init.ps1   # Windows
+```
+
+Then check authentication:
+```bash
+darc get-channels 2>&1 | head -5
+```
+
+If authentication fails, prompt the user to run `darc authenticate` which opens a browser to get a BAR token.
+
+### Generate setup script
+
+Create `eng/setup-darc.sh` (or `.ps1`) in the repo with all the darc commands pre-filled for this specific repo. The script should:
+1. Check if darc is installed, install if missing
+2. Verify authentication
+3. Set the default channel
+4. Create all subscriptions (arcade, plus one per source repo in Version.Details.xml)
+5. Print a summary of what was configured
+
+Use this template — replace OWNER, REPO, channel names, and subscription entries based on the analysis from Steps 1 and 7:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPO="https://github.com/OWNER/REPO"
+TARGET_BRANCH="main"
+
+echo "=== Arcade Dependency Flow Setup ==="
+echo ""
+
+# 1. Check darc
+if ! command -v darc &>/dev/null && [ ! -f ~/.dotnet/tools/darc ]; then
+  echo "Installing darc CLI..."
+  ./eng/common/darc-init.sh
+  export PATH="$HOME/.dotnet/tools:$PATH"
+fi
+
+# 2. Verify authentication
+if ! darc get-channels &>/dev/null 2>&1; then
+  echo "darc is not authenticated. Running 'darc authenticate'..."
+  echo "You will need a BAR token from https://maestro.dot.net/"
+  darc authenticate
+fi
+
+# 3. Set default channel
+echo ""
+echo "Setting default channel..."
+darc add-default-channel \
+  --branch "refs/heads/$TARGET_BRANCH" \
+  --repo "$REPO" \
+  --channel "<CHANNEL_NAME>"
+
+# 4. Subscribe to arcade updates (required for all onboarded repos)
+echo ""
+echo "Creating arcade subscription..."
+darc add-subscription \
+  --channel ".NET Eng - Latest" \
+  --source-repo https://github.com/dotnet/arcade \
+  --target-repo "$REPO" \
+  --target-branch "$TARGET_BRANCH" \
+  --update-frequency everyDay \
+  --standard-automerge
+
+# 5. Subscribe to product dependency sources
+# <ADD ONE darc add-subscription BLOCK PER SOURCE REPO>
+
+# 6. Verify
+echo ""
+echo "=== Subscriptions ==="
+darc get-subscriptions --target-repo "$REPO"
+echo ""
+echo "=== Default Channels ==="
+darc get-default-channels --source-repo "$REPO"
+echo ""
+echo "Done! Dependency flow is configured."
+```
+
+Make the script executable: `chmod +x eng/setup-darc.sh`
+
+### Ask to run
+
+After generating the script, ask the user: "I've created `eng/setup-darc.sh` with all darc commands for this repo. Would you like me to run it now, or will you run it after merge?"
+
+If they choose to run now, execute: `./eng/setup-darc.sh`
+
+### Provide summary
 
 1. **List of files created/modified** with a brief description of each change
-2. **Dependency flow setup commands** — darc commands to run:
-   ```bash
-   # Install darc
-   ./eng/common/darc-init.sh  # or .\eng\common\darc-init.ps1
-
-   # Authenticate
-   darc authenticate
-
-   # Subscribe to Arcade updates
-   darc add-subscription --channel ".NET Eng - Latest" \
-     --source-repo https://github.com/dotnet/arcade \
-     --target-repo https://github.com/OWNER/REPO \
-     --target-branch main \
-     --update-frequency everyDay \
-     --standard-automerge
-
-   # Set default channel for your repo's builds
-   darc add-default-channel --branch refs/heads/main \
-     --repo https://github.com/OWNER/REPO \
-     --channel "<appropriate channel>"
-   ```
-3. **Azure DevOps pipeline setup** — instructions to create pipeline definitions in dnceng-public and/or dnceng/internal
-4. **Build verification** — run `./eng/common/cibuild.sh --configuration Release --prepareMachine` to verify the setup works
-5. **Remaining manual steps** — GitHub app installation (dotnet-maestro), service connections, etc.
+2. **Azure DevOps pipeline setup** — instructions to create pipeline definitions in dnceng-public and/or dnceng/internal
+3. **Build verification** — run `./eng/common/cibuild.sh --configuration Release --prepareMachine` to verify the setup works
+4. **Remaining manual steps** — GitHub app installation (dotnet-maestro), service connections, etc.
 
 ## Validation
 
