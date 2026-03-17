@@ -213,28 +213,16 @@ Must include the Arcade/dnceng feeds. Clear existing sources to ensure determini
 - Keep `nuget.org` if the repo has non-dotnet third-party dependencies.
 - If existing NuGet.config exists, **merge** the feeds rather than replacing.
 
-### Package Source Mapping (recommended for repos with CPM or multiple feeds)
+### Package Source Mapping — CAUTION
 
-Aspire uses package source mapping to pin packages to specific feeds. Add inside `<configuration>`:
+⚠️ **Do NOT add `<packageSourceMapping>` for repos with official builds.** During official builds, `eng/common/SetupNugetSources.ps1` dynamically injects internal authenticated feeds (e.g. `darc-int-dotnet-arcade`) that are not listed in NuGet.config. These feeds won't be covered by the mapping, causing **NU1507 warnings** on every project.
 
+**Instead:** Suppress NU1507 in `Directory.Build.props`:
 ```xml
-<packageSourceMapping>
-  <packageSource key="nuget.org">
-    <package pattern="*" />
-  </packageSource>
-  <packageSource key="dotnet-public">
-    <package pattern="*" />
-  </packageSource>
-  <packageSource key="dotnet-eng">
-    <package pattern="*" />
-  </packageSource>
-  <packageSource key="dotnet10">
-    <package pattern="*" />
-  </packageSource>
-</packageSourceMapping>
+<NoWarn>$(NoWarn);NU1507</NoWarn>
 ```
 
-This prevents NU1507 errors when `TreatWarningsAsErrors` is enabled alongside Central Package Management.
+Package source mapping only works for repos that exclusively use public CI (no official builds at dnceng/internal).
 
 ## eng/Publishing.props
 

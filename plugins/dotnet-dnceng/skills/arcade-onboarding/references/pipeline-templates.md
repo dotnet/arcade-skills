@@ -73,10 +73,15 @@ stages:
 For internal official builds at `dnceng/internal` with signing, publishing, and 1ES compliance.
 
 ```yaml
+parameters:
+- name: publishPackages
+  displayName: 'Publish packages to feed'
+  type: boolean
+  default: true
+
 variables:
   - name: _TeamName
     value: <TEAM_NAME>
-  - group: SDL_Settings
 
 trigger:
   batch: true
@@ -108,7 +113,7 @@ extends:
       jobs:
       - template: /eng/common/templates-official/jobs/jobs.yml@self
         parameters:
-          enablePublishUsingPipelines: true
+          enablePublishUsingPipelines: ${{ parameters.publishPackages }}
           enablePublishBuildArtifacts: true
           enableTelemetry: true
           jobs:
@@ -122,7 +127,7 @@ extends:
                   _BuildConfig: Release
                   _OfficialBuildArgs: /p:DotNetSignType=$(_SignType)
                     /p:TeamName=$(_TeamName)
-                    /p:DotNetPublishUsingPipelines=true
+                    /p:DotNetPublishUsingPipelines=${{ parameters.publishPackages }}
                     /p:OfficialBuildId=$(BUILD.BUILDNUMBER)
             steps:
             - script: eng\common\cibuild.cmd
@@ -131,11 +136,12 @@ extends:
                 $(_OfficialBuildArgs)
               displayName: Build and Test
 
-    - template: /eng/common/templates-official/post-build/post-build.yml@self
-      parameters:
-        enableSourceLinkValidation: false
-        enableSigningValidation: true
-        enableNugetValidation: true
+    - ${{ if eq(parameters.publishPackages, true) }}:
+      - template: /eng/common/templates-official/post-build/post-build.yml@self
+        parameters:
+          enableSourceLinkValidation: false
+          enableSigningValidation: true
+          enableNugetValidation: true
 ```
 
 ## 1ES Pipeline Template
