@@ -105,9 +105,10 @@ Read [references/file-templates.md](references/file-templates.md) for complete t
 ### Important rules:
 - **Never delete** existing content from files — always merge
 - If repo uses `Directory.Packages.props` (Central Package Management), **both approaches are valid**:
-  - **Option A (aspire pattern)**: Keep CPM active. Dependency versions flow into `eng/Versions.props`, and `Directory.Packages.props` references those properties via `$(PropertyName)`. Enable `<CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>`. Add `<packageSourceMapping>` in NuGet.config to avoid NU1507.
+  - **Option A (aspire pattern)**: Keep CPM active. Dependency versions flow into `eng/Versions.props`, and `Directory.Packages.props` references those properties via `$(PropertyName)`. Enable `<CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>`.
   - **Option B**: Migrate all versions from `Directory.Packages.props` to `eng/Versions.props` and update PackageReference elements to use `$(VersionPropertyName)` pattern. Disable CPM.
   - **Prefer Option A** if CPM is already well-established.
+- **NU1507 warning**: Always add `<NoWarn>$(NoWarn);NU1507</NoWarn>` in `Directory.Build.props`. Official builds inject internal feeds via `SetupNugetSources` that break `packageSourceMapping`. Do NOT rely on `packageSourceMapping` alone.
 - Ensure all `.sh` files have executable permissions: `git add --chmod=+x *.sh`
 - Use the computed `VersionPrefix` pattern: `<VersionPrefix>$(MajorVersion).$(MinorVersion).$(PatchVersion)</VersionPrefix>` (matches runtime and aspire)
 
