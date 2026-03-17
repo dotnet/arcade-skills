@@ -104,8 +104,12 @@ Read [references/file-templates.md](references/file-templates.md) for complete t
 
 ### Important rules:
 - **Never delete** existing content from files — always merge
-- If repo uses `Directory.Packages.props` (Central Package Management), migrate version properties to `eng/Versions.props` and update PackageReference elements to use `$(VersionPropertyName)` pattern
+- If repo uses `Directory.Packages.props` (Central Package Management), **both approaches are valid**:
+  - **Option A (aspire pattern)**: Keep CPM active. Dependency versions flow into `eng/Versions.props`, and `Directory.Packages.props` references those properties via `$(PropertyName)`. Enable `<CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>`. Add `<packageSourceMapping>` in NuGet.config to avoid NU1507.
+  - **Option B**: Migrate all versions from `Directory.Packages.props` to `eng/Versions.props` and update PackageReference elements to use `$(VersionPropertyName)` pattern. Disable CPM.
+  - **Prefer Option A** if CPM is already well-established.
 - Ensure all `.sh` files have executable permissions: `git add --chmod=+x *.sh`
+- Use the computed `VersionPrefix` pattern: `<VersionPrefix>$(MajorVersion).$(MinorVersion).$(PatchVersion)</VersionPrefix>` (matches runtime and aspire)
 
 ## Step 4: Copy eng/common/
 
@@ -237,3 +241,23 @@ After all files are created/modified, provide the user with:
 3. **Azure DevOps pipeline setup** — instructions to create pipeline definitions in dnceng-public and/or dnceng/internal
 4. **Build verification** — run `./eng/common/cibuild.sh --configuration Release --prepareMachine` to verify the setup works
 5. **Remaining manual steps** — GitHub app installation (dotnet-maestro), service connections, etc.
+
+## Validation
+
+Cross-check generated files against known arcade-onboarded repos for correctness:
+
+| File | Check against |
+|------|---------------|
+| global.json | [dotnet/aspire](https://github.com/dotnet/aspire/blob/main/global.json) — `msbuild-sdks` shape |
+| Directory.Build.props | [dotnet/aspire](https://github.com/dotnet/aspire/blob/main/Directory.Build.props) — Arcade SDK import at top |
+| eng/Versions.props | [dotnet/aspire](https://github.com/dotnet/aspire/blob/main/eng/Versions.props) — MajorVersion/MinorVersion/PatchVersion pattern, StabilizePackageVersion |
+| eng/Version.Details.xml | [dotnet/runtime](https://github.com/dotnet/runtime/blob/main/eng/Version.Details.xml) — ProductDependencies/ToolsetDependencies structure |
+| NuGet.config | [dotnet/aspire](https://github.com/dotnet/aspire/blob/main/NuGet.config) — feed URLs, packageSourceMapping |
+| eng/Publishing.props | [dotnet/aspire](https://github.com/dotnet/aspire/blob/main/eng/Publishing.props) — PublishingVersion=3 |
+| Official pipeline | [dotnet/aspire](https://github.com/dotnet/aspire/blob/main/eng/pipelines/azure-pipelines.yml) — 1ES template, post-build |
+
+**Key patterns validated against real repos:**
+- `VersionPrefix` is computed from `$(MajorVersion).$(MinorVersion).$(PatchVersion)` (not hardcoded)
+- `StabilizePackageVersion` property exists for release cutting
+- CPM (Directory.Packages.props) is compatible with arcade (aspire uses it)
+- Package source mapping prevents NU1507 with CPM + multiple feeds
