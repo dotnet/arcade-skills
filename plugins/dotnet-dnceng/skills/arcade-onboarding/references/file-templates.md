@@ -92,10 +92,23 @@ Minimal template:
 
   <Import Project="Sdk.targets" Sdk="Microsoft.DotNet.Arcade.Sdk" />
 
+  <!-- Workaround for dotnet/arcade#16611: WiX 5 tools path missing platform subdirectories.
+       Remove once the upstream fix is available. -->
+  <Target Name="CreateWixToolsPathWorkaround"
+          BeforeTargets="Build"
+          Condition="Exists('$(RepoRoot).packages\microsoft.wixtoolset.sdk\$(MicrosoftWixToolsetSdkVersion)')">
+    <MakeDir Directories="$(RepoRoot).packages\microsoft.wixtoolset.sdk\$(MicrosoftWixToolsetSdkVersion)\tools\net472\x64"
+             Condition="!Exists('$(RepoRoot).packages\microsoft.wixtoolset.sdk\$(MicrosoftWixToolsetSdkVersion)\tools\net472\x64')" />
+    <MakeDir Directories="$(RepoRoot).packages\microsoft.wixtoolset.sdk\$(MicrosoftWixToolsetSdkVersion)\tools\net472\arm64"
+             Condition="!Exists('$(RepoRoot).packages\microsoft.wixtoolset.sdk\$(MicrosoftWixToolsetSdkVersion)\tools\net472\arm64')" />
+  </Target>
+
 </Project>
 ```
 
 If the repo already has a `Directory.Build.targets`, add the Arcade SDK import at the top.
+
+**WiX workaround:** The `CreateWixToolsPathWorkaround` target is only needed with Arcade SDK 10+. It creates missing `tools/net472/x64` and `arm64` subdirectories that `Sign.proj` expects but the WiX 5 package doesn't ship. See [dotnet/arcade#16611](https://github.com/dotnet/arcade/issues/16611). Remove once the upstream fix is available.
 
 ## eng/Versions.props
 

@@ -320,3 +320,75 @@ jobs:
 ```
 
 Note: Official builds and publishing still require Azure Pipelines at dnceng/internal.
+
+## NuGet.org Publishing with 1ES.PublishNuget@1
+
+For publishing NuGet packages to NuGet.org from dnceng official builds, use the `1ES.PublishNuget@1` task. This is the approved pattern for 1ES Pipeline Templates — do NOT use `DotNetCoreCLI@2` or `NuGetCommand@2` as they don't support encrypted API keys.
+
+### Prerequisites
+
+1. **Service connection** named `NuGet.org - dotnet/{repo}` created at `dev.azure.com/dnceng/internal` with NuGet.org API key
+2. **Network isolation** set to `Permissive` at the 1ES template level (NOT `Permissive,CFSClean` — that blocks NuGet.org)
+
+### Template
+
+Add a `publish_nuget` stage after the post-build stages:
+
+```yaml
+  - stage: publish_nuget
+    displayName: Publish to NuGet.org
+    dependsOn:
+    - Validate    # from post-build.yml
+    - publish_using_darc  # from post-build.yml
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+    - job: publish
+      displayName: Publish Packages
+      templateContext:
+        type: releaseJob
+        isProduction: true
+        inputs:
+        - input: pipelineArtifact
+          artifactName: PackageArtifacts
+          targetPath: $(Build.ArtifactStagingDirectory)/PackageArtifacts
+      pool:
+        name: NetCore1ESPool-Internal
+        demands: ImageOverride -equals windows.vs2022.amd64
+      steps:
+      - task: 1ES.PublishNuget@1
+        displayName: Publish to NuGet.org
+        inputs:
+          useDotNetTask: false
+          packagesToPush: $(Build.ArtifactStagingDirectory)/PackageArtifacts/*.nupkg
+          packageParentPath: $(Build.ArtifactStagingDirectory)/PackageArtifacts
+          nuGetFeedType: external
+          publishFeedCredentials: 'NuGet.org - dotnet/{repo}'
+```
+
+### Key settings
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| `useDotNetTask` | `false` | `DotNetCoreCLI@2` doesn't support encrypted API keys |
+| `templateContext.type` | `releaseJob` | Required for network access in 1ES templates |
+| `isProduction` | `true` | Enables production network access (NuGet.org) |
+| `nuGetFeedType` | `external` | NuGet.org is external to Azure DevOps |
+| `packageParentPath` | Path to parent dir | Used by 1ES for package validation |
+
+### Common conditions
+
+```yaml
+# Publish only from main branch
+condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+
+# Publish from release branches
+condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/heads/release/'))
+
+# Gated by parameter
+condition: and(succeeded(), eq('${{ parameters.publishToNuGet }}', 'true'))
+```
+
+### Reference
+
+- [dotnet/aspire release-publish-nuget.yml](https://github.com/dotnet/aspire/blob/main/eng/pipelines/release-publish-nuget.yml) — production example
+- [1ES NuGet Packages docs](https://eng.ms/docs/coreai/devdiv/one-engineering-system-1es/1es-docs/1es-pipeline-templates/features/outputs/nuget-packages)
