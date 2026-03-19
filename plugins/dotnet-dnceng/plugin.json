@@ -13,7 +13,7 @@
     "helix",
     "azure-devops"
   ],
-  "skills": "skills",
+  "skills": "./skills",
   "mcpServers": {
     "ado-dnceng-public": {
       "command": "npx",
