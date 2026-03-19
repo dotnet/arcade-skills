@@ -351,3 +351,105 @@ Cross-check generated files against known arcade-onboarded repos for correctness
 - `StabilizePackageVersion` property exists for release cutting
 - CPM (Directory.Packages.props) is compatible with arcade (aspire uses it)
 - Package source mapping prevents NU1507 with CPM + multiple feeds
+
+## Build Verification
+
+**IMPORTANT:** Always verify the Arcade build works locally before committing or pushing. This catches issues like missing workloads, duplicate assembly attributes, stale obj folders, and WiX toolset problems early.
+
+### Steps
+
+1. **Clean stale artifacts** — critical if the repo was previously built without Arcade or with a different configuration:
+   ```bash
+   git clean -xdf artifacts/
+   # Also clean obj/bin in project dirs if they exist outside artifacts/
+   find . -type d \( -name "obj" -o -name "bin" \) -not -path "./eng/*" -not -path "./.dotnet/*" | xargs rm -rf
+   ```
+
+2. **Install required workloads** — if projects target platform-specific TFMs (e.g. `net10.0-android`, `net10.0-ios`):
+   ```bash
+   .dotnet/dotnet workload restore
+   ```
+   Note: The `.dotnet/` SDK is installed automatically by the build script on first run.
+
+3. **Run the Arcade build** with restore + build + pack:
+   ```bash
+   ./eng/common/build.sh --restore --build --pack \
+     --configuration Release --prepareMachine \
+     --projects /absolute/path/to/Solution.slnf
+   ```
+   On Windows:
+   ```cmd
+   eng\common\build.cmd -restore -build -pack ^
+     -configuration Release -prepareMachine ^
+     -projects C:\full\path\to\Solution.slnf
+   ```
+
+   **Key notes:**
+   - You MUST pass `--restore --build` explicitly — without these flags, `build.sh` does nothing
+   - The `--projects` path MUST be absolute — Arcade's `Build.proj` resolves it from a different working directory, so relative paths fail
+   - If the repo has a solution filter (`.slnf`) that excludes sample/playground projects, prefer it to avoid workload issues
+   - Add `-bl` to produce a binary log (`artifacts/log/Release/Build.binlog`) for debugging
+
+4. **Verify outputs:**
+   ```bash
+   ls artifacts/packages/Release/Shipping/
+   ```
+   You should see `.nupkg` files for all projects with `<IsPackable>true</IsPackable>` or `<IsShipping>true</IsShipping>`.
+
+### Common build failures
+
+| Error | Cause | Fix |
+|-------|-------|-----|
+| `NETSDK1147: workloads must be installed` | Multi-targeted projects need platform workloads | Run `.dotnet/dotnet workload restore` |
+| `CS0579: Duplicate attribute` | Stale `obj/` folders from prior builds | `git clean -xdf artifacts/` and clean obj dirs |
+| `Toolset version has not been restored` | Arcade SDK not yet downloaded | Run with `--restore` flag |
+| `The project file was not found` | Relative path to `--projects` | Use absolute path |
+| WiX/signing errors | Arcade SDK 10+ WiX bug | Add MakeDir workaround (see Known Issues) |
+
+## Known Issues & Workarounds
+
+### WiX 5 toolset unconditionally required (dotnet/arcade#16611)
+
+**Affects:** Arcade SDK 10.0.0-beta and later (any repo not producing MSI/WiX installers)
+
+**Problem:** `Sign.proj` and `Tools.proj` unconditionally reference both WiX 3 (`Microsoft.Signed.Wix`) and WiX 5 (`Microsoft.WixToolset.Sdk`) packages. `SignToolTask` validates that both `Wix3ToolsPath` and `WixToolsPath` directories exist, erroring if they're missing — even for repos that produce no MSI/wixpack artifacts. Additionally, `Sign.proj` constructs `WixToolsPath` as `tools/net472/$(Platform)` (e.g. `tools/net472/x64`), but the WiX 5 SDK package has **no platform subdirectory** under `tools/net472/`.
+
+**Workaround:** Add a target in `Directory.Build.targets` that creates the missing platform subdirectories during the build phase (before `Sign.proj` runs):
+
+```xml
+<!-- Workaround for dotnet/arcade#16611 -->
+<Target Name="CreateWixToolsPathWorkaround"
+        BeforeTargets="Build"
+        Condition="Exists('$(RepoRoot).packages\microsoft.wixtoolset.sdk\$(MicrosoftWixToolsetSdkVersion)')">
+  <MakeDir Directories="$(RepoRoot).packages\microsoft.wixtoolset.sdk\$(MicrosoftWixToolsetSdkVersion)\tools\net472\x64"
+           Condition="!Exists('$(RepoRoot).packages\microsoft.wixtoolset.sdk\$(MicrosoftWixToolsetSdkVersion)\tools\net472\x64')" />
+  <MakeDir Directories="$(RepoRoot).packages\microsoft.wixtoolset.sdk\$(MicrosoftWixToolsetSdkVersion)\tools\net472\arm64"
+           Condition="!Exists('$(RepoRoot).packages\microsoft.wixtoolset.sdk\$(MicrosoftWixToolsetSdkVersion)\tools\net472\arm64')" />
+</Target>
+```
+
+**Why `PackageDownload` doesn't work:** Downloads to the NuGet global cache, but `Sign.proj` looks in `.packages/`. And the `tools/net472/x64` subdirectory doesn't exist in the package regardless.
+
+**Verified:** dnceng/internal build [2930786](https://dev.azure.com/dnceng/internal/_build/results?buildId=2930786) (dotnet/maui-labs). Remove once upstream is fixed.
+
+**Tracking:** https://github.com/dotnet/arcade/issues/16611
+
+### Post-build stages require service connection authorization
+
+**Affects:** Any newly onboarded repo running the Arcade `post-build.yml` template for the first time.
+
+**Problem:** The `Validate` and `publish_using_darc` stages use the **`Darc: Maestro Production`** Azure service connection. When a pipeline uses a service connection for the first time, Azure DevOps **pauses the build and waits for manual authorization** — appearing as if the build is "hanging".
+
+**How to resolve:** Ask in the dnceng [First Responders Teams channel](https://teams.microsoft.com/l/team/19%3Aa88bb61ffc1a4392ad38ebbc526c86f8%40thread.skype/conversations?groupId=4d73664c-9f2f-450d-82a5-c2f02756606d&tenantId=72f988bf-86f1-41af-91ab-2d7cd011db47) to approve the pending service connection authorization. This is a **one-time setup** per pipeline definition.
+
+### NuGet.org publishing with 1ES Pipeline Templates
+
+**Pattern:** For publishing NuGet packages to NuGet.org from dnceng official builds, use the `1ES.PublishNuget@1` task (not `DotNetCoreCLI@2` or `NuGetCommand@2`).
+
+Key requirements:
+- `settings.networkIsolationPolicy: Permissive` at the 1ES template level (do NOT use `Permissive,CFSClean` — it blocks NuGet.org)
+- `templateContext.type: releaseJob` with `isProduction: true` on the publish job
+- `useDotNetTask: false` (DotNetCoreCLI@2 doesn't support encrypted API keys)
+- `nuGetFeedType: external` with a `publishFeedCredentials` service connection (naming convention: `NuGet.org - dotnet/{repo}`)
+
+Reference implementation: [dotnet/aspire release-publish-nuget.yml](https://github.com/dotnet/aspire/blob/main/eng/pipelines/release-publish-nuget.yml). See [references/pipeline-templates.md](references/pipeline-templates.md#nugetorg-publishing-with-1espublishnuget1) for the full template.
