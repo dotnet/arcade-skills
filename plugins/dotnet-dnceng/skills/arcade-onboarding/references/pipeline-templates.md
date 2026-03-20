@@ -82,6 +82,10 @@ parameters:
 variables:
   - name: _TeamName
     value: <TEAM_NAME>
+  - name: _SignType
+    value: Real
+  - name: PostBuildSign
+    value: false
 
 trigger:
   batch: true
@@ -106,6 +110,9 @@ extends:
       name: NetCore1ESPool-Internal
       image: windows.vs2022.amd64
       os: windows
+    # Required for publishing to external feeds like nuget.org
+    settings:
+      networkIsolationPolicy: Permissive
 
     stages:
     - stage: build
@@ -113,8 +120,10 @@ extends:
       jobs:
       - template: /eng/common/templates-official/jobs/jobs.yml@self
         parameters:
-          enablePublishUsingPipelines: ${{ parameters.publishPackages }}
+          enableMicrobuild: true
+          enablePublishBuildAssets: true
           enablePublishBuildArtifacts: true
+          enablePublishTestResults: true
           enableTelemetry: true
           jobs:
           - job: Windows
@@ -127,7 +136,6 @@ extends:
                   _BuildConfig: Release
                   _OfficialBuildArgs: /p:DotNetSignType=$(_SignType)
                     /p:TeamName=$(_TeamName)
-                    /p:DotNetPublishUsingPipelines=${{ parameters.publishPackages }}
                     /p:OfficialBuildId=$(BUILD.BUILDNUMBER)
             steps:
             - script: eng\common\cibuild.cmd
@@ -136,13 +144,19 @@ extends:
                 $(_OfficialBuildArgs)
               displayName: Build and Test
 
-    - ${{ if eq(parameters.publishPackages, true) }}:
-      - template: /eng/common/templates-official/post-build/post-build.yml@self
-        parameters:
-          enableSourceLinkValidation: false
-          enableSigningValidation: true
-          enableNugetValidation: true
+    - template: /eng/common/templates-official/post-build/post-build.yml@self
+      parameters:
+        enableSourceLinkValidation: false
+        enableSigningValidation: true
+        enableNugetValidation: true
 ```
+
+**Key differences from public CI:**
+- Uses `templates-official/` (not `templates/`)
+- `enableMicrobuild: true` — installs MicroBuild Signing Plugin for code signing
+- `enablePublishBuildAssets: true` — creates BAR entries and `ReleaseConfigs` artifact for post-build stages
+- `_SignType` variable controls signing behavior (`Real` for production, `test` for development)
+- **Do NOT use** `enablePublishUsingPipelines` or `/p:DotNetPublishUsingPipelines` — these are obsolete V2 parameters
 
 ## 1ES Pipeline Template
 
@@ -200,9 +214,12 @@ The post-build template handles validation and publishing. Add it after all buil
 ```
 /p:DotNetSignType=$(_SignType)
 /p:TeamName=$(_TeamName)
-/p:DotNetPublishUsingPipelines=true
 /p:OfficialBuildId=$(BUILD.BUILDNUMBER)
 ```
+
+**⚠️ Obsolete parameters — do NOT use:**
+- `/p:DotNetPublishUsingPipelines=true` — V2 parameter, no longer exists in Arcade SDK 10+
+- `enablePublishUsingPipelines` — use `enablePublishBuildAssets` instead
 
 ### Pool references:
 
