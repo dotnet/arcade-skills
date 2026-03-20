@@ -349,7 +349,7 @@ For publishing NuGet packages to NuGet.org from dnceng official builds, use the 
 
 ### Template
 
-Add a `publish_nuget` stage after the post-build stages:
+Add a `publish_nuget` stage after the post-build stages. **Important:** The stage requires two jobs — a `PrepareArtifacts` job that re-publishes the build artifacts through 1ES `templateContext.outputs` (which generates the SBOM manifest), and a `PublishNuGet` job that consumes the SBOM-annotated artifact and pushes to NuGet.org. Without the prepare step, the 1ES-injected SBOM validator fails with `manifest.spdx.json not found`.
 
 ```yaml
   - stage: publish_nuget
@@ -359,15 +359,37 @@ Add a `publish_nuget` stage after the post-build stages:
     - publish_using_darc  # from post-build.yml
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
-    - job: publish
+    # Step 1: Re-publish artifacts through 1ES outputs to generate SBOM manifest.
+    # Without this, the releaseJob SBOM validator fails because PackageArtifacts
+    # was published by Arcade (not through 1ES templateContext outputs).
+    - job: PrepareArtifacts
+      displayName: Prepare Artifacts with SBOM
+      timeoutInMinutes: 15
+      pool:
+        name: NetCore1ESPool-Internal
+        demands: ImageOverride -equals windows.vs2022.amd64
+      templateContext:
+        outputs:
+        - output: pipelineArtifact
+          displayName: Publish PackageArtifacts
+          targetPath: $(Pipeline.Workspace)/PackageArtifacts
+          artifactName: PackageArtifactsForNuGet
+      steps:
+      - download: current
+        artifact: PackageArtifacts
+        displayName: Download PackageArtifacts
+
+    # Step 2: Consume the SBOM-annotated artifact and push to NuGet.org
+    - job: PublishNuGet
       displayName: Publish Packages
+      dependsOn: PrepareArtifacts
       templateContext:
         type: releaseJob
         isProduction: true
         inputs:
         - input: pipelineArtifact
-          artifactName: PackageArtifacts
-          targetPath: $(Build.ArtifactStagingDirectory)/PackageArtifacts
+          artifactName: PackageArtifactsForNuGet
+          targetPath: $(Pipeline.Workspace)/PackageArtifacts
       pool:
         name: NetCore1ESPool-Internal
         demands: ImageOverride -equals windows.vs2022.amd64
@@ -376,8 +398,8 @@ Add a `publish_nuget` stage after the post-build stages:
         displayName: Publish to NuGet.org
         inputs:
           useDotNetTask: false
-          packagesToPush: $(Build.ArtifactStagingDirectory)/PackageArtifacts/*.nupkg
-          packageParentPath: $(Build.ArtifactStagingDirectory)/PackageArtifacts
+          packagesToPush: $(Pipeline.Workspace)/PackageArtifacts/*.nupkg
+          packageParentPath: $(Pipeline.Workspace)/PackageArtifacts
           nuGetFeedType: external
           publishFeedCredentials: 'NuGet.org - dotnet/{repo}'
 ```
