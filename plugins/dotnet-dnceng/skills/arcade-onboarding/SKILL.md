@@ -564,7 +564,7 @@ Cross-check generated files against known arcade-onboarded repos for correctness
 </Target>
 ```
 
-**Why `PackageDownload` doesn't work:** Downloads to the NuGet global cache, but `Sign.proj` looks in `.packages/`. And the `tools/net472/x64` subdirectory doesn't exist in the package regardless.
+**Why `PackageDownload` doesn't work:** Downloads to the NuGet global cache, but `Sign.proj` looks in the repo-local `.packages/` folder (note: `$(RepoRoot)` includes a trailing backslash, so `$(RepoRoot).packages` correctly resolves to `<repo>\.packages`). And the `tools/net472/x64` subdirectory doesn't exist in the package regardless.
 
 **Verified:** dnceng/internal build [2930786](https://dev.azure.com/dnceng/internal/_build/results?buildId=2930786) (dotnet/maui-labs). Remove once upstream is fixed.
 
@@ -580,7 +580,7 @@ Cross-check generated files against known arcade-onboarded repos for correctness
 2. **`DevDiv-ESRP-PME-DNCENG`** — ESRP code signing service (when `enableMicrobuild: true`)
 3. **`MicroBuild Signing Task (DevDiv)`** — MicroBuild signing plugin (when `enableMicrobuild: true`)
 
-**How to resolve:** Ask in the dnceng [First Responders Teams channel](https://teams.microsoft.com/l/team/19%3Aa88bb61ffc1a4392ad38ebbc526c86f8%40thread.skype/conversations?groupId=4d73664c-9f2f-450d-82a5-c2f02756606d&tenantId=72f988bf-86f1-41af-91ab-2d7cd011db47) to approve the pending service connection authorizations. This is a **one-time setup** per pipeline definition — expect multiple approval rounds on the first few builds as different stages trigger different service connections.
+**How to resolve:** Ask in the dnceng **First Responders** Teams channel to approve the pending service connection authorizations. This is a **one-time setup** per pipeline definition — expect multiple approval rounds on the first few builds as different stages trigger different service connections.
 
 ### Real signing requires enableMicrobuild
 

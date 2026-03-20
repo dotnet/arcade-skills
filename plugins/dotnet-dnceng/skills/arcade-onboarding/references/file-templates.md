@@ -112,7 +112,7 @@ Minimal template:
 
 If the repo already has a `Directory.Build.targets`, add the Arcade SDK import at the top.
 
-**WiX workaround:** The `CreateWixToolsPathWorkaround` target is only needed with Arcade SDK 10+. It creates missing `tools/net472/x64` and `arm64` subdirectories that `Sign.proj` expects but the WiX 5 package doesn't ship. See [dotnet/arcade#16611](https://github.com/dotnet/arcade/issues/16611). Remove once the upstream fix is available.
+**WiX workaround:** The `CreateWixToolsPathWorkaround` target is only needed with Arcade SDK 10+. It creates missing `tools/net472/x64` and `arm64` subdirectories that `Sign.proj` expects but the WiX 5 package doesn't ship. Note: `$(RepoRoot)` includes a trailing backslash, so `$(RepoRoot).packages` correctly resolves to the repo-local `.packages` folder. See [dotnet/arcade#16611](https://github.com/dotnet/arcade/issues/16611). Remove once the upstream fix is available.
 
 ## eng/Versions.props
 
