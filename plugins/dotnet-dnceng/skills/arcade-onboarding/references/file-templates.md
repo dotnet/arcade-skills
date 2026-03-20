@@ -11,6 +11,10 @@ Templates for all files that must be created or modified when onboarding a repos
 - [eng/Version.Details.xml](#engversiondetailsxml)
 - [NuGet.config](#nugetconfig)
 - [eng/Publishing.props](#engpublishingprops)
+- [eng/Signing.props](#engsigningprops)
+- [eng/SignCheckExclusionsFile.txt](#engsigncheckexclusionsfiletxt)
+- [NuGet.config](#nugetconfig)
+- [eng/Publishing.props](#engpublishingprops)
 
 ## global.json
 
@@ -261,4 +265,66 @@ For repos that produce shipping assets (.NET release), add:
     <!-- <AutoGenerateSymbolPackages>false</AutoGenerateSymbolPackages> -->
   </PropertyGroup>
 </Project>
+```
+
+## eng/Signing.props
+
+Controls MicroBuild/ESRP code signing during official builds. Maps assemblies and file types to signing certificates.
+
+```xml
+<Project>
+  <!--
+    Signing configuration for ESRP/MicroBuild package signing.
+    Maps assemblies and file types to their signing certificates.
+
+    Certificate types:
+    - UseDotNetCertificate: Default Microsoft .NET certificate for first-party assemblies
+    - 3PartySHA2: For redistributed third-party assemblies
+    - NuGet: For NuGet package signing (.nupkg files)
+    - None: For files that should not be signed
+  -->
+  <PropertyGroup>
+    <UseDotNetCertificate>true</UseDotNetCertificate>
+  </PropertyGroup>
+
+  <!-- Third-party assemblies that ship inside our NuGet packages -->
+  <ItemGroup Label="Third Party Assemblies">
+    <!-- Add one entry per third-party DLL bundled in your packages.
+         To find these, build locally and inspect nupkg contents:
+         unzip -l artifacts/packages/Release/Shipping/*.nupkg | grep "\.dll$" -->
+    <!-- <FileSignInfo Include="ThirdParty.dll" CertificateName="3PartySHA2" /> -->
+  </ItemGroup>
+
+  <!-- File extension signing rules -->
+  <ItemGroup>
+    <!-- NuGet packages are signed with NuGet certificate -->
+    <FileExtensionSignInfo Update=".nupkg" CertificateName="NuGet" />
+    <!-- JS files don't need code signing — they are static web assets -->
+    <FileExtensionSignInfo Update=".js" CertificateName="None" />
+  </ItemGroup>
+</Project>
+```
+
+**How to populate third-party assemblies:**
+1. Build locally: `./eng/common/build.sh --restore --build --pack --configuration Release`
+2. List DLLs in each nupkg: `for f in artifacts/packages/Release/Shipping/*.nupkg; do echo "=== $(basename $f) ==="; unzip -l "$f" | grep "\.dll$" | awk '{print $NF}'; done`
+3. Cross-reference with your repo's projects — any DLL not from your source is third-party
+4. Add a `<FileSignInfo Include="Name.dll" CertificateName="3PartySHA2" />` for each
+
+## eng/SignCheckExclusionsFile.txt
+
+Exclusions for post-build SignCheck validation. This is **separate** from `Signing.props` — it controls what the post-build `Signing Validation` stage skips when verifying signatures.
+
+```
+;; Exclusions for SignCheck. Corresponds to info in Signing.props.
+;; Format: https://github.com/dotnet/arcade/blob/397316e195639450b6c76bfeb9823b40bee72d6d/src/SignCheck/Microsoft.SignCheck/Verification/Exclusion.cs#L23-L35
+*.js;; We do not sign JavaScript files.
+```
+
+**Format:** Each line is a glob pattern followed by `;;` and a comment. Common exclusions:
+- `*.js` — JavaScript files (Blazor static web assets, embedded scripts)
+
+**Important:** This file must be consistent with `Signing.props`. If you set `CertificateName="None"` for `.js` in `Signing.props`, you must also exclude `*.js` in `SignCheckExclusionsFile.txt`. Otherwise the post-build validation will flag those files as unsigned.
+
+**Reference:** Pattern from [dotnet/Scaffolding](https://github.com/dotnet/Scaffolding/blob/main/eng/SignCheckExclusionsFile.txt).
 ```
