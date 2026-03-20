@@ -94,7 +94,7 @@ Read [references/file-templates.md](references/file-templates.md) for complete t
 
 3. **Directory.Build.targets** — import `Sdk.targets` from Arcade SDK. If file exists, add the import at the top.
 
-4. **eng/Versions.props** — set `VersionPrefix`, `PreReleaseVersionLabel`, and all dependency version properties. Migrate versions from any existing `Directory.Packages.props` or centralized version file.
+4. **eng/Versions.props** — set `VersionPrefix`, `PreReleaseVersionLabel`, `PreReleaseVersionIteration`, and all dependency version properties. Migrate versions from any existing `Directory.Packages.props` or centralized version file.
 
 5. **eng/Version.Details.xml** — create with Arcade SDK dependency entry at minimum. Add entries for all dependencies that will flow via maestro (see Step 6).
 
@@ -115,6 +115,7 @@ Read [references/file-templates.md](references/file-templates.md) for complete t
 - **NU1507 warning**: Always add `<NoWarn>$(NoWarn);NU1507</NoWarn>` in `Directory.Build.props`. Official builds inject internal feeds via `SetupNugetSources` that break `packageSourceMapping`. Do NOT rely on `packageSourceMapping` alone.
 - Ensure all `.sh` files have executable permissions: `git add --chmod=+x *.sh`
 - Use the computed `VersionPrefix` pattern: `<VersionPrefix>$(MajorVersion).$(MinorVersion).$(PatchVersion)</VersionPrefix>` (matches runtime and aspire)
+- Always set `PreReleaseVersionIteration` (e.g. `1`) — produces `preview.1.{build}` versioning which gives clearer NuGet sort order than `preview.{build}` alone. Bump for each release cycle: `preview.1` → `preview.2` → `rc.1`.
 
 ## Step 4: Copy eng/common/
 

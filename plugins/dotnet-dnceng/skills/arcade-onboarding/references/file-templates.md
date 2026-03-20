@@ -128,7 +128,7 @@ Controls versioning and lists all NuGet dependency versions. The naming conventi
     <PatchVersion>0</PatchVersion>
     <VersionPrefix>$(MajorVersion).$(MinorVersion).$(PatchVersion)</VersionPrefix>
     <PreReleaseVersionLabel>preview</PreReleaseVersionLabel>
-    <!-- <PreReleaseVersionIteration>1</PreReleaseVersionIteration> -->
+    <PreReleaseVersionIteration>1</PreReleaseVersionIteration>
     <!-- Set to true when stabilizing a release (removes prerelease label) -->
     <StabilizePackageVersion>false</StabilizePackageVersion>
 
@@ -151,7 +151,7 @@ Controls versioning and lists all NuGet dependency versions. The naming conventi
 **Versioning properties:**
 - `MajorVersion`, `MinorVersion`, `PatchVersion`: individual components, `VersionPrefix` computed from them. This is the pattern used by runtime, aspire, and other arcade repos.
 - `PreReleaseVersionLabel`: label like `alpha`, `beta`, `preview`, `rc`. Empty for release-only packages.
-- `PreReleaseVersionIteration`: optional numeric iteration (e.g. `1` for `preview.1`)
+- `PreReleaseVersionIteration`: numeric iteration that controls the prerelease version segment. When set to `1`, packages version as `{VersionPrefix}-{Label}.1.{build_number}` (e.g. `1.0.0-preview.1.26080.3`). Bump this for each preview release cycle: `preview.1`, `preview.2`, etc. Without it, versions are `{VersionPrefix}-{Label}.{build_number}` (e.g. `1.0.0-preview.26080.3`). **Recommended:** always set this property — it gives clearer version ordering and is the pattern used by dotnet/maui, dotnet/aspire, and dotnet/runtime.
 - `StabilizePackageVersion`: set to `true` when cutting a release to drop the prerelease label
 
 **Version property naming convention:**
