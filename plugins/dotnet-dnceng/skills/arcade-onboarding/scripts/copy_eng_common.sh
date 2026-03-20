@@ -2,7 +2,7 @@
 # Copy eng/common from dotnet/arcade into the target repository.
 # Usage: copy_eng_common.sh [target_repo_root] [arcade_ref]
 #   target_repo_root: Path to the repository being onboarded (default: current directory)
-#   arcade_ref: Git ref to use (branch/tag/SHA) (default: main)
+#   arcade_ref: Git ref to use (branch or tag only — SHA is not supported) (default: main)
 
 set -euo pipefail
 

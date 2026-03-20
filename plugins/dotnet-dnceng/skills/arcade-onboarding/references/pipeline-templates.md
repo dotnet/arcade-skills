@@ -250,7 +250,7 @@ Create `.config/1espt/PipelineAutobaseliningConfig.yml` with an empty pipelines 
 # 1ES Pipeline Template auto-baselining configuration.
 # Pipeline IDs will be populated automatically once pipelines are registered in Azure DevOps.
 #
-# See: https://eng.ms/docs/cloud-ai-platform/devdiv/one-engineering-system-1es/1es-docs/1es-pipeline-templates/features/sdlanalysis/overview
+# See 1ES Pipeline Templates SDL analysis documentation for details.
 pipelines: {}
 ```
 
@@ -408,4 +408,4 @@ condition: and(succeeded(), eq('${{ parameters.publishToNuGet }}', 'true'))
 ### Reference
 
 - [dotnet/aspire release-publish-nuget.yml](https://github.com/dotnet/aspire/blob/main/eng/pipelines/release-publish-nuget.yml) — production example
-- [1ES NuGet Packages docs](https://eng.ms/docs/coreai/devdiv/one-engineering-system-1es/1es-docs/1es-pipeline-templates/features/outputs/nuget-packages)
+- 1ES NuGet Packages documentation (available on the internal 1ES docs site)
