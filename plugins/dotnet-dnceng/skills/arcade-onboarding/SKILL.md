@@ -542,6 +542,7 @@ Cross-check generated files against known arcade-onboarded repos for correctness
 | `Toolset version has not been restored` | Arcade SDK not yet downloaded | Run with `--restore` flag |
 | `The project file was not found` | Relative path to `--projects` | Use absolute path |
 | WiX/signing errors | Arcade SDK 10+ WiX bug | Add MakeDir workaround (see Known Issues) |
+| `manifest.spdx.json not found` | SBOM missing in NuGet publish stage | Add PrepareArtifacts job (see Known Issues) |
 
 ## Known Issues & Workarounds
 
@@ -610,5 +611,7 @@ Key requirements:
 - `templateContext.type: releaseJob` with `isProduction: true` on the publish job
 - `useDotNetTask: false` (DotNetCoreCLI@2 doesn't support encrypted API keys)
 - `nuGetFeedType: external` with a `publishFeedCredentials` service connection (naming convention: `NuGet.org - dotnet/{repo}`)
+
+**SBOM requirement (critical):** The `releaseJob` type triggers an SBOM validator that expects `_manifest/spdx_2.2/manifest.spdx.json` alongside the packages. Since `PackageArtifacts` is published by Arcade (not through 1ES `templateContext.outputs`), no SBOM is generated. **You must add a `PrepareArtifacts` job** that downloads the artifact and re-publishes it through `templateContext.outputs` — this generates the SBOM. The `PublishNuGet` job then consumes the SBOM-annotated artifact. Without this, the build fails with `manifest.spdx.json not found`.
 
 Reference implementation: [dotnet/aspire release-publish-nuget.yml](https://github.com/dotnet/aspire/blob/main/eng/pipelines/release-publish-nuget.yml). See [references/pipeline-templates.md](references/pipeline-templates.md#nugetorg-publishing-with-1espublishnuget1) for the full template.
