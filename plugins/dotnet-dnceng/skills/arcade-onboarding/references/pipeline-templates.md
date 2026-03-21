@@ -342,66 +342,126 @@ Note: Official builds and publishing still require Azure Pipelines at dnceng/int
 
 For publishing NuGet packages to NuGet.org from dnceng official builds, use the `1ES.PublishNuget@1` task. This is the approved pattern for 1ES Pipeline Templates — do NOT use `DotNetCoreCLI@2` or `NuGetCommand@2` as they don't support encrypted API keys.
 
+### CRITICAL: Must be a separate pipeline
+
+**NuGet.org publishing MUST be in a separate pipeline** from the main build pipeline. MicroBuild signing (enabled via `enableMicrobuild: true`) activates CFS (Container Fencing Service) network isolation for the entire pipeline run. CFS redirects DNS for external hosts to TEST-NET IPs (`192.0.2.x`), blocking outbound HTTPS to NuGet.org. This cannot be overridden with `networkIsolationPolicy: Permissive` within the same pipeline — the MicroBuild CFS rules take precedence.
+
+The solution is a dedicated `release-publish-nuget.yml` pipeline that:
+- Has NO MicroBuild/signing stages (so CFS is not activated)
+- References the build pipeline via `resources.pipelines`
+- Downloads signed packages from a completed build run
+- Publishes to NuGet.org in a clean network environment
+
 ### Prerequisites
 
-1. **Service connection** named `NuGet.org - dotnet/{repo}` created at `dev.azure.com/dnceng/internal` with NuGet.org API key
-2. **Network isolation** set to `Permissive` at the 1ES template level (NOT `Permissive,CFSClean` — that blocks NuGet.org)
+1. **Service connection** for NuGet.org created at `dev.azure.com/dnceng/internal` with NuGet.org API key
+2. **Pipeline definition** created in dnceng/internal pointing at `eng/pipelines/release-publish-nuget.yml`
+3. **Network isolation** set to `Permissive` at the 1ES template level (NOT `Permissive,CFSClean` — that also blocks NuGet.org)
 
 ### Template
 
-Add a `publish_nuget` stage after the post-build stages. **Important:** The stage requires two jobs — a `PrepareArtifacts` job that re-publishes the build artifacts through 1ES `templateContext.outputs` (which generates the SBOM manifest), and a `PublishNuGet` job that consumes the SBOM-annotated artifact and pushes to NuGet.org. Without the prepare step, the 1ES-injected SBOM validator fails with `manifest.spdx.json not found`.
+Create `eng/pipelines/release-publish-nuget.yml` as a standalone pipeline:
 
 ```yaml
-  - stage: publish_nuget
-    displayName: Publish to NuGet.org
-    dependsOn:
-    - Validate    # from post-build.yml
-    - publish_using_darc  # from post-build.yml
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-    jobs:
-    # Step 1: Re-publish artifacts through 1ES outputs to generate SBOM manifest.
-    # Without this, the releaseJob SBOM validator fails because PackageArtifacts
-    # was published by Arcade (not through 1ES templateContext outputs).
-    - job: PrepareArtifacts
-      displayName: Prepare Artifacts with SBOM
-      timeoutInMinutes: 15
-      pool:
-        name: NetCore1ESPool-Internal
-        demands: ImageOverride -equals windows.vs2022.amd64
-      templateContext:
-        outputs:
-        - output: pipelineArtifact
-          displayName: Publish PackageArtifacts
-          targetPath: $(Pipeline.Workspace)/PackageArtifacts
-          artifactName: PackageArtifactsForNuGet
-      steps:
-      - download: current
-        artifact: PackageArtifacts
-        displayName: Download PackageArtifacts
+# Release Pipeline: Publish NuGet Packages to NuGet.org
+# MUST be separate from build pipeline - MicroBuild CFS blocks NuGet.org
+trigger: none  # Manual trigger only
+pr: none
 
-    # Step 2: Consume the SBOM-annotated artifact and push to NuGet.org
-    - job: PublishNuGet
-      displayName: Publish Packages
+parameters:
+- name: DryRun
+  displayName: 'Dry Run (skip actual NuGet push)'
+  type: boolean
+  default: false
+
+resources:
+  repositories:
+  - repository: 1ESPipelineTemplates
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+  pipelines:
+  - pipeline: source-build
+    source: {repo}-official  # Name of the main build pipeline definition
+    project: internal
+    trigger: none
+
+extends:
+  template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
+  parameters:
+    pool:
+      name: NetCore1ESPool-Internal
+      image: windows.vs2026preview.scout.amd64
+      os: windows
+    settings:
+      networkIsolationPolicy: Permissive
+
+    stages:
+    # Stage 1: Download artifacts and re-publish with SBOM
+    # 1ES PT injects SBOM generation for templateContext outputs
+    - stage: PrepareArtifacts
+      displayName: Prepare Artifacts with SBOM
+      jobs:
+      - job: PrepareJob
+        displayName: Download and Re-publish Artifacts
+        timeoutInMinutes: 30
+        pool:
+          name: NetCore1ESPool-Internal
+          image: windows.vs2026preview.scout.amd64
+          os: windows
+        templateContext:
+          outputs:
+          - output: pipelineArtifact
+            displayName: Publish PackageArtifacts with SBOM
+            targetPath: $(Pipeline.Workspace)/packages/PackageArtifacts
+            artifactName: PackageArtifacts
+        steps:
+        - checkout: none
+        - download: source-build
+          displayName: Download PackageArtifacts from Source Build
+          artifact: PackageArtifacts
+          patterns: '**/*.nupkg'
+        - powershell: |
+            $sourcePath = "$(Pipeline.Workspace)/source-build/PackageArtifacts"
+            $targetPath = "$(Pipeline.Workspace)/packages/PackageArtifacts"
+            New-Item -ItemType Directory -Force -Path $targetPath | Out-Null
+            $packages = Get-ChildItem -Path $sourcePath -Filter "*.nupkg" -Recurse
+            Write-Host "Found $($packages.Count) packages"
+            foreach ($pkg in $packages) {
+                Write-Host "  - $($pkg.Name)"
+                Copy-Item $pkg.FullName -Destination $targetPath
+            }
+          displayName: Move Artifacts to Output Path
+
+    # Stage 2: Publish to NuGet.org
+    - stage: Release
+      displayName: Publish to NuGet.org
       dependsOn: PrepareArtifacts
-      templateContext:
-        type: releaseJob
-        isProduction: true
-        inputs:
-        - input: pipelineArtifact
-          artifactName: PackageArtifactsForNuGet
-          targetPath: $(Pipeline.Workspace)/PackageArtifacts
-      pool:
-        name: NetCore1ESPool-Internal
-        demands: ImageOverride -equals windows.vs2022.amd64
-      steps:
-      - task: 1ES.PublishNuget@1
-        displayName: Publish to NuGet.org
-        inputs:
-          useDotNetTask: false
-          packagesToPush: $(Pipeline.Workspace)/PackageArtifacts/*.nupkg
-          packageParentPath: $(Pipeline.Workspace)/PackageArtifacts
-          nuGetFeedType: external
-          publishFeedCredentials: 'NuGet.org - dotnet/{repo}'
+      jobs:
+      - job: PublishNuGet
+        displayName: Push Packages to NuGet.org
+        timeoutInMinutes: 30
+        pool:
+          name: NetCore1ESPool-Internal
+          image: windows.vs2026preview.scout.amd64
+          os: windows
+        templateContext:
+          type: releaseJob
+          isProduction: true
+          inputs:
+          - input: pipelineArtifact
+            artifactName: PackageArtifacts
+            targetPath: $(Pipeline.Workspace)/PackageArtifacts
+        steps:
+        - task: 1ES.PublishNuget@1
+          displayName: Push Packages to NuGet.org
+          condition: eq('${{ parameters.DryRun }}', 'false')
+          inputs:
+            useDotNetTask: false
+            packagesToPush: $(Pipeline.Workspace)/PackageArtifacts/*.nupkg
+            packageParentPath: $(Pipeline.Workspace)/PackageArtifacts
+            nuGetFeedType: external
+            publishFeedCredentials: '{service-connection-name}'
 ```
 
 ### Key settings
@@ -413,19 +473,7 @@ Add a `publish_nuget` stage after the post-build stages. **Important:** The stag
 | `isProduction` | `true` | Enables production network access (NuGet.org) |
 | `nuGetFeedType` | `external` | NuGet.org is external to Azure DevOps |
 | `packageParentPath` | Path to parent dir | Used by 1ES for package validation |
-
-### Common conditions
-
-```yaml
-# Publish only from main branch
-condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-
-# Publish from release branches
-condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/heads/release/'))
-
-# Gated by parameter
-condition: and(succeeded(), eq('${{ parameters.publishToNuGet }}', 'true'))
-```
+| Separate pipeline | No MicroBuild | CFS from signing blocks NuGet.org |
 
 ### Reference
 

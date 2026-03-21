@@ -606,12 +606,15 @@ Also ensure `eng/Signing.props` maps third-party DLLs to `3PartySHA2` certificat
 
 **Pattern:** For publishing NuGet packages to NuGet.org from dnceng official builds, use the `1ES.PublishNuget@1` task (not `DotNetCoreCLI@2` or `NuGetCommand@2`).
 
-Key requirements:
-- `settings.networkIsolationPolicy: Permissive` at the 1ES template level (do NOT use `Permissive,CFSClean` — it blocks NuGet.org)
+**CRITICAL: NuGet.org publishing MUST be a separate pipeline** from the main build pipeline. MicroBuild signing (used for Authenticode signing in the build pipeline) enables CFS (Container Fencing Service) network isolation that blocks outbound HTTPS to external hosts including NuGet.org. This manifests as DNS being redirected to TEST-NET IPs (`192.0.2.x`), causing `Unable to connect to the remote server` errors. This cannot be worked around within the same pipeline — `networkIsolationPolicy: Permissive` does not override CFS restrictions set by MicroBuild. The solution is a dedicated release pipeline (like aspire's `release-publish-nuget.yml`) that has no MicroBuild/signing stages.
+
+Key requirements for the release pipeline:
+- `settings.networkIsolationPolicy: Permissive` at the 1ES template level (do NOT use `Permissive,CFSClean` — it also blocks NuGet.org)
 - `templateContext.type: releaseJob` with `isProduction: true` on the publish job
 - `useDotNetTask: false` (DotNetCoreCLI@2 doesn't support encrypted API keys)
-- `nuGetFeedType: external` with a `publishFeedCredentials` service connection (naming convention: `NuGet.org - dotnet/{repo}`)
+- `nuGetFeedType: external` with a `publishFeedCredentials` service connection
+- Pipeline resource referencing the build pipeline: `resources.pipelines` with `trigger: none` for manual releases
 
-**SBOM requirement (critical):** The `releaseJob` type triggers an SBOM validator that expects `_manifest/spdx_2.2/manifest.spdx.json` alongside the packages. Since `PackageArtifacts` is published by Arcade (not through 1ES `templateContext.outputs`), no SBOM is generated. **You must add a `PrepareArtifacts` job** that downloads the artifact and re-publishes it through `templateContext.outputs` — this generates the SBOM. The `PublishNuGet` job then consumes the SBOM-annotated artifact. Without this, the build fails with `manifest.spdx.json not found`.
+**SBOM requirement:** The `releaseJob` type triggers an SBOM validator that expects `_manifest/spdx_2.2/manifest.spdx.json` alongside the packages. Since `PackageArtifacts` is published by Arcade (not through 1ES `templateContext.outputs`), no SBOM is generated. **The release pipeline must have a `PrepareArtifacts` stage** that downloads artifacts from the build pipeline and re-publishes them through `templateContext.outputs` — this generates the SBOM. The `Release` stage then consumes the SBOM-annotated artifacts.
 
 Reference implementation: [dotnet/aspire release-publish-nuget.yml](https://github.com/dotnet/aspire/blob/main/eng/pipelines/release-publish-nuget.yml). See [references/pipeline-templates.md](references/pipeline-templates.md#nugetorg-publishing-with-1espublishnuget1) for the full template.
