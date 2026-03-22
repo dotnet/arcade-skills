@@ -28,14 +28,16 @@ covers finding those artifacts, downloading them, and analyzing the dump.
 
 ## Step 1: Identify the Crashed Work Item
 
-Use the ci-analysis script to find failing Helix jobs from a PR number or build ID:
+Use this plugin's `ci-analysis` skill's `Get-CIStatus.ps1` script to find failing Helix jobs:
 ```
-./scripts/Get-CIStatus.ps1 -PRNumber <PR> -Repository "dotnet/runtime" -ShowLogs
-./scripts/Get-CIStatus.ps1 -BuildId <BuildId> -ShowLogs
+Get-CIStatus.ps1 -PRNumber <PR> -Repository "dotnet/runtime" -ShowLogs
+Get-CIStatus.ps1 -BuildId <BuildId> -ShowLogs
 ```
 
 A crash shows as "Work item X in job Y has failed" (entire work item). Individual test name
-failures indicate assertion failures, not crashes.
+failures indicate assertion failures, not crashes. A PR may have many failures — look
+specifically for work items with dump files. If multiple work items crashed, list them
+and ask the user which one to investigate.
 
 ## Step 2: Query the Work Item for Crash Evidence
 
@@ -48,6 +50,8 @@ The response includes `ExitCode` and a `Files` array (each with `FileName` and `
 
 **Crash vs. normal failure:** Crashes have a negative or large `ExitCode` and `.dmp` files
 in the `Files` array. Normal failures have `ExitCode: 1` and no dump files.
+**If there are no dump files, stop here** — this is a normal test failure, not a crash.
+Report the failure details to the user and suggest using the `ci-analysis` skill instead.
 
 Common crash exit codes:
 
@@ -63,14 +67,15 @@ Common crash exit codes:
 
 Download all files from the `Files` array. Each entry has a `Uri` to a blob.
 
-Alternatively, [runfo](https://github.com/jaredpar/runfo) downloads the full payload
+If the `Files` URIs are inaccessible (expired, 403, etc.), fall back to
+[runfo](https://github.com/jaredpar/runfo) which downloads the full payload
 including runtime binaries: `runfo get-helix-payload -j <jobId> -w <workItem> -o <dir>`.
 
 > **Internal Helix jobs** (identified by the org `dnceng` rather than `dnceng-public` in URLs,
 > or when the Helix API returns 401/403) require authentication that the agent does not have.
 > Report the job ID and work item name to the user and ask them to download manually.
 
-Extract any ZIP files in the downloaded payload.
+Extract any archive files (`.zip`, `.tar.gz`) in the downloaded payload.
 
 ## Step 4: Debug the Dump
 
@@ -118,11 +123,20 @@ Setup: [LLDB for .NET](https://github.com/dotnet/diagnostics/blob/main/documenta
 
 ### NativeAOT crashes
 
+The CI job name will contain "NativeAOT" (e.g., "osx-arm64 Release NativeAOT_Libraries").
 SOS does not work with NativeAOT. Use `cdb` or `lldb` directly.
+
+## After Loading the Dump
+
+Getting the dump loaded in a debugger is just the starting point. Use the backtrace, exception
+info, heap state, etc. together with the PR's code changes to understand *why* the crash
+happened. Correlate the crash location with what was changed — a crash in code touched by the
+PR is likely caused by it; a crash elsewhere may be pre-existing or a side effect. Use your
+judgement and knowledge of the codebase to form a diagnosis and suggest a fix.
 
 ## Common Pitfalls
 
-- **Helix artifacts expire after ~30 days.** Download promptly.
+- **Helix artifacts expire after ~30 days.** If downloads fail with 404, the artifacts have likely expired — tell the user.
 - **`dotnet-dump` only handles managed state.** For native crashes, use `cdb`/`lldb` on matching OS.
 - **32-bit dumps on 64-bit OS:** Use 32-bit dotnet SDK to install dotnet-dump.
 - **Mobile/WASM dumps** are not covered — report the dump location and hand off.
