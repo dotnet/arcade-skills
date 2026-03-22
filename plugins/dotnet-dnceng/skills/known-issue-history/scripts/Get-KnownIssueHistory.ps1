@@ -81,15 +81,18 @@ function Get-IssueEditHistory {
     param(
         [string]$Owner,
         [string]$RepoName,
-        [int]$Number
+        [int]$Number,
+        [int]$MaxPages = 50
     )
 
     $allNodes = @()
     $totalCount = 0
     $hasNextPage = $true
     $endCursor = $null
+    $pageCount = 0
+    $truncated = $false
 
-    # Paginate through all edits (API returns max 100 per page)
+    # Paginate through edits (API returns max 100 per page)
     while ($hasNextPage) {
         $afterClause = if ($endCursor) { ", after: `"$endCursor`"" } else { "" }
         $query = @"
@@ -130,15 +133,23 @@ function Get-IssueEditHistory {
         $allNodes += $edits.nodes
         $hasNextPage = $edits.pageInfo.hasNextPage
         $endCursor = $edits.pageInfo.endCursor
+        $pageCount++
+
+        if ($hasNextPage -and $pageCount -ge $MaxPages) {
+            $hasNextPage = $false
+            $truncated = $true
+            Write-Warning "Issue #$Number has more than $($pageCount * 100) edits; results truncated to $($allNodes.Count) edits."
+        }
     }
 
     return @{
-        Title     = $issue.title
-        CreatedAt = $issue.createdAt
-        State     = $issue.state
-        Labels    = @($issue.labels.nodes | ForEach-Object { $_.name })
-        Edits     = @($allNodes | Sort-Object { $_.editedAt })
+        Title      = $issue.title
+        CreatedAt  = $issue.createdAt
+        State      = $issue.state
+        Labels     = @($issue.labels.nodes | ForEach-Object { $_.name })
+        Edits      = @($allNodes | Sort-Object { $_.editedAt })
         TotalEdits = $totalCount
+        Truncated  = $truncated
     }
 }
 
@@ -448,7 +459,7 @@ function Invoke-ListActive {
             $lastFailureDisplay = if ($lastFailure) {
                 $d = ConvertTo-UtcDateTime $lastFailure
                 $d.ToString("yyyy-MM-dd")
-            } else { "never" }
+            } elseif ($SinceDate) { "none since $SinceDate" } else { "never" }
 
             $results += [PSCustomObject]@{
                 Number        = $num
