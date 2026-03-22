@@ -6,4 +6,4 @@
 
 # Skills
 /plugins/dotnet-dnceng/skills/ci-analysis/ @lewing @danmoseley
-/plugins/dotnet-dnceng/skills/ci-crash-dump/ @danmoseley @lewing
+/plugins/dotnet-dnceng/skills/ci-crash-dump/ @lewing @danmoseley

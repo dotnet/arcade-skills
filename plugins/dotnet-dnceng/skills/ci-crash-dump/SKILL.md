@@ -134,7 +134,9 @@ The dump needs matching runtime binaries (DAC, SOS) from the payload at
 > **`dotnet-dump` version must match the runtime version of the dump.** A .NET 9.0
 > `dotnet-dump` cannot load a .NET 11.0 DAC (fails with `0x80004002`). If DAC load fails,
 > update to match: `dotnet tool update -g dotnet-dump --prerelease` or install a specific
-> version: `dotnet tool install -g dotnet-dump --version '<major>.*'`.
+> version, for example: `dotnet tool install -g dotnet-dump --version 9.0.123` (replace
+> `9.0.123` with the exact version that matches your runtime; see available versions on
+> https://www.nuget.org/packages/dotnet-dump or via `dotnet tool search dotnet-dump`).
 
 Determine the dump's platform from the CI job name (e.g., "windows-x64", "linux-arm64").
 
