@@ -50,8 +50,10 @@ and ask the user which one to investigate.
 Before downloading any dump files, check the work item's `ConsoleOutputUri` (from the Details
 endpoint response). The Helix crash handler runs `cdb` (or equivalent) on the machine before
 uploading, so the console log often already contains symbolicated native stacks (`~*k`) and
-managed stacks (`!clrstack -all`). If these stacks are present, dump download is unnecessary
-for diagnosis — analyze the console log stacks directly.
+managed stacks (`!clrstack -all`). If these stacks are present and symbols are resolved
+(function names, not just hex addresses), analyze them directly — dump download is
+unnecessary. If the stacks are missing, truncated, or show only unresolved addresses,
+proceed to download the dump.
 
 ## Step 3: Query the Work Item for Crash Evidence
 
