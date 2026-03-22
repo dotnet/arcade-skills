@@ -148,9 +148,14 @@ SOS does not work with NativeAOT. Use `cdb` or `lldb` directly.
 
 ## After Loading the Dump
 
-**Always include the crashing thread's call stack (and any other relevant threads) in your
-report to the user**, with symbols resolved as far as possible. This is the most important
-output of the analysis — without it the user cannot verify your interpretation or dig deeper.
+**Always include the following in your report to the user:**
+- The **exit code** and its meaning (e.g., `0xC0000005` = access violation)
+- The **crashing thread's call stack** (and any other relevant threads), with symbols resolved
+  as far as possible — this is the most important output
+- Any **managed exception** type, message, and inner exception stack (use `pe`) if different
+  from the native crash stack
+
+Without these the user cannot verify your interpretation or dig deeper.
 
 Use the backtrace, exception info, heap state, etc. together with the PR's code changes to
 understand *why* the crash happened. Correlate the crash location with what was changed — a
