@@ -55,6 +55,7 @@ param(
     [switch]$ListActive,
 
     [Parameter(ParameterSetName = 'ListActive')]
+    [ValidateRange(1, 100)]
     [int]$MaxIssues = 50,
 
     [Parameter()]
@@ -68,12 +69,21 @@ $ErrorActionPreference = 'Stop'
 
 function Split-Repository {
     param([string]$Repo)
-    $parts = $Repo -split '/'
-    if ($parts.Count -ne 2) {
-        Write-Error "Invalid repository format '$Repo'. Expected 'owner/repo'."
-        return $null
+    if ($Repo -notmatch '^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$') {
+        throw "Invalid repository format '$Repo'. Expected 'owner/repo' with alphanumeric, hyphen, underscore, or dot characters."
     }
+    $parts = $Repo -split '/'
     return @{ Owner = $parts[0]; Name = $parts[1] }
+}
+
+function Assert-GitHubCli {
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+        throw "GitHub CLI (gh) is not installed or not in PATH. Install it from https://cli.github.com/"
+    }
+    $authStatus = gh auth status 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "GitHub CLI is not authenticated. Run 'gh auth login' first."
+    }
 }
 
 function Get-IssueEditHistory {
@@ -154,51 +164,57 @@ function Parse-HitCounts {
         $editor = if ($edit.editor) { $edit.editor.login } else { "unknown" }
         $diff = if ($edit.diff) { $edit.diff } else { "" }
 
-        # Match only standalone hit count data rows (full line of |N|N|N|)
-        # Uses multiline mode to avoid false positives from prose containing |N|N|N|
-        $matches = [regex]::Matches($diff, '(?m)^\|(\d+)\|(\d+)\|(\d+)\|\s*$')
+        # userContentEdits.diff is a unified diff; lines start with '+' (added), '-' (removed),
+        # or ' ' (context). Match only added lines to get the new snapshot and avoid
+        # double-counting when both the removed and added rows would otherwise match.
+        $hitCountMatches = [regex]::Matches($diff, '(?m)^\+\|(\d+)\|(\d+)\|(\d+)\|\s*$')
 
-        foreach ($m in $matches) {
-            $h24 = [int]$m.Groups[1].Value
-            $h7d = [int]$m.Groups[2].Value
-            $h1mo = [int]$m.Groups[3].Value
+        # Use only the last matching row per edit to produce one snapshot per edit
+        if ($hitCountMatches.Count -eq 0) { continue }
+        $m = $hitCountMatches[$hitCountMatches.Count - 1]
+        $h24 = [int]$m.Groups[1].Value
+        $h7d = [int]$m.Groups[2].Value
+        $h1mo = [int]$m.Groups[3].Value
 
-            $event = "update"
-            if ($null -eq $prev24h -and $h24 -gt 0) {
-                # First edit with hit counts and 24h > 0 — treat as initial failure
-                $event = "new_failure"
-            }
-            elseif ($null -ne $prev24h -and $h24 -gt 0 -and $prev24h -eq 0) {
-                $event = "new_failure"
-            }
-            elseif ($null -ne $prev24h -and $h24 -gt $prev24h) {
-                $event = "additional_failure"
-            }
-            elseif ($h24 -eq 0 -and $h7d -eq 0 -and $h1mo -eq 0) {
-                $event = "all_clear"
-            }
-
-            $entry = [PSCustomObject]@{
-                Date    = $date
-                Editor  = $editor
-                Hit24h  = $h24
-                Hit7d   = $h7d
-                Hit1mo  = $h1mo
-                Event   = $event
-            }
-
-            $prev24h = $h24
-            $timeline += $entry
+        $event = "update"
+        if ($null -eq $prev24h -and $h24 -gt 0) {
+            # First edit with hit counts and 24h > 0 — treat as initial failure
+            $event = "new_failure"
         }
+        elseif ($null -ne $prev24h -and $h24 -gt 0 -and $prev24h -eq 0) {
+            $event = "new_failure"
+        }
+        elseif ($null -ne $prev24h -and $h24 -gt $prev24h) {
+            $event = "additional_failure"
+        }
+        elseif ($h24 -eq 0 -and $h7d -eq 0 -and $h1mo -eq 0) {
+            $event = "all_clear"
+        }
+
+        $entry = [PSCustomObject]@{
+            Date    = $date
+            Editor  = $editor
+            Hit24h  = $h24
+            Hit7d   = $h7d
+            Hit1mo  = $h1mo
+            Event   = $event
+        }
+
+        $prev24h = $h24
+        $timeline += $entry
     }
 
     # Apply -Since filter
     if ($SinceDate) {
-        $sinceDateTime = [DateTime]::Parse(
+        $sinceDateTime = $null
+        if (-not [DateTime]::TryParse(
             $SinceDate,
             [System.Globalization.CultureInfo]::InvariantCulture,
-            [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal
-        )
+            [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal,
+            [ref]$sinceDateTime
+        )) {
+            throw "Invalid -Since date '$SinceDate'. Expected ISO 8601 format, e.g. '2025-01-01'."
+        }
         $timeline = @($timeline | Where-Object {
             $entryDate = if ($_.Date -is [datetime]) { $_.Date.ToUniversalTime() } else {
                 [DateTime]::Parse(
@@ -416,13 +432,8 @@ function Invoke-ListActive {
     Write-Host "Scanning open 'Known Build Error' issues in $Owner/$RepoName..."
     Write-Host ""
 
-    # Fetch open issues with the label (GitHub API caps per_page at 100)
-    $perPage = $Max
-    if ($Max -gt 100) {
-        Write-Warning "MaxIssues ($Max) exceeds GitHub API per_page limit of 100. Only the first 100 issues will be analyzed."
-        $perPage = 100
-    }
-    $issues = gh api "repos/$Owner/$RepoName/issues?labels=Known+Build+Error&state=open&per_page=$perPage&sort=updated&direction=desc" 2>&1
+    # Fetch open issues with the label, sorted by most recently updated
+    $issues = gh api "repos/$Owner/$RepoName/issues?labels=Known+Build+Error&state=open&per_page=$Max&sort=updated&direction=desc" 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Failed to list issues: $issues"
         return
@@ -500,8 +511,9 @@ function Invoke-ListActive {
 # Main
 # =============================================================================
 
+Assert-GitHubCli
+
 $repo = Split-Repository -Repo $Repository
-if (-not $repo) { return }
 
 if ($ListActive) {
     Invoke-ListActive -Owner $repo.Owner -RepoName $repo.Name -Max $MaxIssues -SinceDate $Since
