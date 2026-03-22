@@ -25,7 +25,9 @@
     Maximum number of issues to scan when using -ListActive. Default: 50
 
 .PARAMETER Since
-    Only show failure events after this date (ISO 8601 format, e.g. 2025-01-01).
+    Only show failure events and periods on or after this date (ISO 8601 format,
+    e.g. 2025-01-01). Failure periods are included if their End date is on or after
+    the filter date, even if their Start date is earlier.
 
 .PARAMETER Json
     Output structured JSON summary instead of human-readable table.
@@ -367,6 +369,7 @@ function Format-Timeline {
 function Build-JsonSummary {
     param(
         [hashtable]$IssueData,
+        [array]$FullTimeline,
         [array]$Timeline,
         [array]$FailureEvents,
         [array]$FailurePeriods,
@@ -380,8 +383,8 @@ function Build-JsonSummary {
         [math]::Floor(([DateTime]::UtcNow - $lastDate).TotalDays)
     } else { $null }
 
-    # Current counts from most recent timeline entry
-    $current = if ($Timeline.Count -gt 0) { $Timeline[-1] } else { $null }
+    # Current counts from most recent entry in full (unfiltered) timeline
+    $current = if ($FullTimeline.Count -gt 0) { $FullTimeline[-1] } else { $null }
 
     $summary = [ordered]@{
         issueNumber       = $IssueNum
@@ -523,18 +526,19 @@ if ($issueData.Labels -notcontains 'Known Build Error') {
     Write-Warning "Issue #$IssueNumber does not have the 'Known Build Error' label. Results may not be meaningful."
 }
 
-$timeline = Parse-HitCounts -Edits $issueData.Edits
-$failureEvents = Get-FailureEvents -Timeline $timeline
-$failurePeriods = Get-FailurePeriods -Timeline $timeline
+$fullTimeline = Parse-HitCounts -Edits $issueData.Edits
+$failureEvents = Get-FailureEvents -Timeline $fullTimeline
+$failurePeriods = Get-FailurePeriods -Timeline $fullTimeline
 
 # Apply -Since filter after analysis so periods are computed on full data
-$timeline = Filter-Since -Items $timeline -SinceDate $Since
+$timeline = Filter-Since -Items $fullTimeline -SinceDate $Since
 $failureEvents = Filter-Since -Items $failureEvents -SinceDate $Since
 $failurePeriods = Filter-Since -Items $failurePeriods -SinceDate $Since -DateProperty 'End'
 
 if ($Json) {
     $summary = Build-JsonSummary `
         -IssueData $issueData `
+        -FullTimeline $fullTimeline `
         -Timeline $timeline `
         -FailureEvents $failureEvents `
         -FailurePeriods $failurePeriods `
