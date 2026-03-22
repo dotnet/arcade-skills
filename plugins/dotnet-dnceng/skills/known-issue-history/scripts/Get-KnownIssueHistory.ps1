@@ -98,7 +98,7 @@ function Get-IssueEditHistory {
       title
       createdAt
       state
-      labels(first: 10) { nodes { name } }
+      labels(first: 100) { nodes { name } }
       userContentEdits(first: 100$afterClause) {
         totalCount
         pageInfo { hasNextPage endCursor }
@@ -194,10 +194,18 @@ function Parse-HitCounts {
 
     # Apply -Since filter
     if ($SinceDate) {
-        $sinceDateTime = [DateTime]::Parse($SinceDate, [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AdjustToUniversal)
+        $sinceDateTime = [DateTime]::Parse(
+            $SinceDate,
+            [System.Globalization.CultureInfo]::InvariantCulture,
+            [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal
+        )
         $timeline = @($timeline | Where-Object {
             $entryDate = if ($_.Date -is [datetime]) { $_.Date.ToUniversalTime() } else {
-                [DateTime]::Parse($_.Date, [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AdjustToUniversal)
+                [DateTime]::Parse(
+                    $_.Date,
+                    [System.Globalization.CultureInfo]::InvariantCulture,
+                    [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal
+                )
             }
             $entryDate -ge $sinceDateTime
         })
@@ -408,8 +416,13 @@ function Invoke-ListActive {
     Write-Host "Scanning open 'Known Build Error' issues in $Owner/$RepoName..."
     Write-Host ""
 
-    # Fetch open issues with the label
-    $issues = gh api "repos/$Owner/$RepoName/issues?labels=Known+Build+Error&state=open&per_page=$Max" 2>&1
+    # Fetch open issues with the label (GitHub API caps per_page at 100)
+    $perPage = $Max
+    if ($Max -gt 100) {
+        Write-Warning "MaxIssues ($Max) exceeds GitHub API per_page limit of 100. Only the first 100 issues will be analyzed."
+        $perPage = 100
+    }
+    $issues = gh api "repos/$Owner/$RepoName/issues?labels=Known+Build+Error&state=open&per_page=$perPage" 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Failed to list issues: $issues"
         return
