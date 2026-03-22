@@ -519,7 +519,7 @@ $failurePeriods = Get-FailurePeriods -Timeline $timeline
 # Apply -Since filter after analysis so periods are computed on full data
 $timeline = Filter-Since -Items $timeline -SinceDate $Since
 $failureEvents = Filter-Since -Items $failureEvents -SinceDate $Since
-$failurePeriods = Filter-Since -Items $failurePeriods -SinceDate $Since -DateProperty 'Start'
+$failurePeriods = Filter-Since -Items $failurePeriods -SinceDate $Since -DateProperty 'End'
 
 if ($Json) {
     $summary = Build-JsonSummary `
