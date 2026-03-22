@@ -31,8 +31,8 @@ covers finding those artifacts, downloading them, and analyzing the dump.
 **If pointed at a PR**, use this plugin's `ci-analysis` skill's `Get-CIStatus.ps1` script to
 find failing Helix jobs in the PR's validation builds:
 ```
-Get-CIStatus.ps1 -PRNumber <PR> -Repository "dotnet/runtime" -ShowLogs
-Get-CIStatus.ps1 -BuildId <BuildId> -ShowLogs
+./scripts/Get-CIStatus.ps1 -PRNumber <PR> -Repository "dotnet/runtime" -ShowLogs
+./scripts/Get-CIStatus.ps1 -BuildId <BuildId> -ShowLogs
 ```
 
 **If pointed at an issue** (not a PR), look at the issue comments for linked AzDO build URLs.
@@ -51,7 +51,16 @@ Query the Helix API for work item details:
 GET https://helix.dot.net/api/2019-06-17/jobs/{jobId}/workitems/{workItemName}
 ```
 
+> The work item name often contains spaces, parentheses, or other special characters.
+> URL-encode it (e.g., `[uri]::EscapeDataString($workItemName)` in PowerShell) or the
+> request will 404.
+
 The response includes `ExitCode` and a `Files` array (each with `FileName` and `Uri`).
+However, the `Files` URIs from the Details endpoint can be broken for subdirectory or unicode
+filenames. To get reliable download URIs, use the separate ListFiles endpoint:
+```
+GET https://helix.dot.net/api/2019-06-17/jobs/{jobId}/workitems/{workItemName}/files
+```
 
 **Crash vs. normal failure:** Crashes have a negative or large `ExitCode` and crash artifacts
 in the `Files` array: `.dmp` files (Windows) or `.crashreport.json` files (macOS/Linux).
@@ -75,10 +84,9 @@ Common crash exit codes:
 
 ## Step 3: Download Artifacts
 
-Download files from the `Files` array. Each entry has a `Uri` to a blob. Start with
-`.crashreport.json` files (contain stack traces, especially useful for macOS) and `.dmp`
-files — these are directly downloadable and often sufficient for initial analysis without
-needing the full payload.
+Download files using the ListFiles endpoint URIs. Start with `.crashreport.json` files
+(contain stack traces, especially useful for macOS) and `.dmp` files — these are directly
+downloadable and often sufficient for initial analysis without needing the full payload.
 
 Download the remaining payload files (runtime binaries, test binaries) if you need to load
 the dump in a debugger. If the `Files` URIs are inaccessible (expired, 403, etc.), fall back
@@ -154,11 +162,15 @@ SOS does not work with NativeAOT. Use `cdb` or `lldb` directly.
 ## After Loading the Dump
 
 **Always include the following in your report to the user:**
+- A **link to the PR or build** that was analyzed
 - The **exit code** and its meaning (e.g., `0xC0000005` = access violation)
 - The **crashing thread's call stack** (and any other relevant threads), with symbols resolved
   as far as possible — this is the most important output
 - Any **managed exception** type, message, and inner exception stack (use `pe`) if different
   from the native crash stack
+- **Links to existing issues** that match this crash — search the repo for open issues (and
+  also closed issues) with matching crash signatures, stack frames, or error messages. If
+  found, link them so the user can see prior context and whether this is a known problem.
 
 Without these the user cannot verify your interpretation or dig deeper.
 
