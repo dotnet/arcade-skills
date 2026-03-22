@@ -185,6 +185,11 @@ For mixed native+managed: `.loadby sos coreclr`, then `!setclrpath`, `!pe`, `!cl
 Use `lldb`. Point it at the dump, the dotnet host binary from the payload, and use
 `setclrpath` / `setsymbolserver` as with dotnet-dump. Key commands: `bt all`, `pe`, `clrstack -all`.
 
+For native symbol resolution: runtime binaries in CI are stripped (only `.dynsym` exports).
+Use `dotnet-symbol --host-only --debugging <path-to-libcoreclr.so>` to download the matching
+`.dbg` files, which resolve internal function names. Without these, native frames show only
+as offsets between exported symbols.
+
 Setup: [LLDB for .NET](https://github.com/dotnet/diagnostics/blob/main/documentation/lldb/linux-instructions.md).
 
 ### NativeAOT crashes
