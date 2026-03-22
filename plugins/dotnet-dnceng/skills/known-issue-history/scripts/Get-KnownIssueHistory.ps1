@@ -46,6 +46,7 @@
 [CmdletBinding(DefaultParameterSetName = 'SingleIssue')]
 param(
     [Parameter(Mandatory, ParameterSetName = 'SingleIssue', Position = 0)]
+    [ValidateRange(1, [int]::MaxValue)]
     [int]$IssueNumber,
 
     [Parameter()]
@@ -117,7 +118,7 @@ function Get-IssueEditHistory {
             throw "GraphQL query failed: $result"
         }
 
-        $data = $result | ConvertFrom-Json
+        $data = ($result -join "`n") | ConvertFrom-Json
         $issue = $data.data.repository.issue
 
         if (-not $issue) {
@@ -142,7 +143,7 @@ function Get-IssueEditHistory {
 }
 
 function Parse-HitCounts {
-    param([array]$Edits, [string]$SinceDate)
+    param([array]$Edits)
 
     $timeline = @()
     $prev24h = $null
@@ -190,26 +191,24 @@ function Parse-HitCounts {
         }
     }
 
-    # Apply -Since filter
-    if ($SinceDate) {
-        $sinceDateTime = [DateTime]::Parse(
-            $SinceDate,
-            [System.Globalization.CultureInfo]::InvariantCulture,
-            [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal
-        )
-        $timeline = @($timeline | Where-Object {
-            $entryDate = if ($_.Date -is [datetime]) { $_.Date.ToUniversalTime() } else {
-                [DateTime]::Parse(
-                    $_.Date,
-                    [System.Globalization.CultureInfo]::InvariantCulture,
-                    [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal
-                )
-            }
-            $entryDate -ge $sinceDateTime
-        })
-    }
-
     return $timeline
+}
+
+function ConvertTo-UtcDateTime {
+    param([object]$Value)
+    if ($Value -is [datetime]) { return $Value.ToUniversalTime() }
+    return [DateTime]::Parse(
+        $Value,
+        [System.Globalization.CultureInfo]::InvariantCulture,
+        [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal
+    )
+}
+
+function Filter-Since {
+    param([array]$Items, [string]$SinceDate, [string]$DateProperty = 'Date')
+    if (-not $SinceDate) { return $Items }
+    $sinceDateTime = ConvertTo-UtcDateTime $SinceDate
+    return @($Items | Where-Object { (ConvertTo-UtcDateTime $_.$DateProperty) -ge $sinceDateTime })
 }
 
 function Get-FailureEvents {
@@ -306,9 +305,7 @@ function Format-Timeline {
         $lastFailure = $FailureEvents[-1]
         [void]$sb.AppendLine("Last failure:          $($lastFailure.Date)")
 
-        $lastDate = if ($lastFailure.Date -is [datetime]) { $lastFailure.Date.ToUniversalTime() } else {
-            [DateTime]::Parse($lastFailure.Date, [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AdjustToUniversal)
-        }
+        $lastDate = ConvertTo-UtcDateTime $lastFailure.Date
         $daysSince = [math]::Floor(([DateTime]::UtcNow - $lastDate).TotalDays)
         [void]$sb.AppendLine("Days since last:       $daysSince")
     }
@@ -368,9 +365,7 @@ function Build-JsonSummary {
 
     $lastFailure = if ($FailureEvents.Count -gt 0) { $FailureEvents[-1].Date } else { $null }
     $daysSince = if ($lastFailure) {
-        $lastDate = if ($lastFailure -is [datetime]) { $lastFailure.ToUniversalTime() } else {
-            [DateTime]::Parse($lastFailure, [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AdjustToUniversal)
-        }
+        $lastDate = ConvertTo-UtcDateTime $lastFailure
         [math]::Floor(([DateTime]::UtcNow - $lastDate).TotalDays)
     } else { $null }
 
@@ -419,7 +414,7 @@ function Invoke-ListActive {
         throw "Failed to list issues: $issues"
     }
 
-    $issueList = $issues | ConvertFrom-Json
+    $issueList = ($issues -join "`n") | ConvertFrom-Json
 
     if ($issueList.Count -eq 0) {
         Write-Host "No open 'Known Build Error' issues found."
@@ -440,21 +435,18 @@ function Invoke-ListActive {
             $issueData = Get-IssueEditHistory -Owner $Owner -RepoName $RepoName -Number $num
             if (-not $issueData) { continue }
 
-            $timeline = Parse-HitCounts -Edits $issueData.Edits -SinceDate $SinceDate
+            $timeline = Parse-HitCounts -Edits $issueData.Edits
             $failureEvents = Get-FailureEvents -Timeline $timeline
+            $failureEvents = Filter-Since -Items $failureEvents -SinceDate $SinceDate
 
             $lastFailure = if ($failureEvents.Count -gt 0) { $failureEvents[-1].Date } else { $null }
             $daysSince = if ($lastFailure) {
-                $lastDate = if ($lastFailure -is [datetime]) { $lastFailure.ToUniversalTime() } else {
-                    [DateTime]::Parse($lastFailure, [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AdjustToUniversal)
-                }
+                $lastDate = ConvertTo-UtcDateTime $lastFailure
                 [math]::Floor(([DateTime]::UtcNow - $lastDate).TotalDays)
             } else { 99999 }
 
             $lastFailureDisplay = if ($lastFailure) {
-                $d = if ($lastFailure -is [datetime]) { $lastFailure.ToUniversalTime() } else {
-                    [DateTime]::Parse($lastFailure, [System.Globalization.CultureInfo]::InvariantCulture, [System.Globalization.DateTimeStyles]::AdjustToUniversal)
-                }
+                $d = ConvertTo-UtcDateTime $lastFailure
                 $d.ToString("yyyy-MM-dd")
             } else { "never" }
 
@@ -520,9 +512,14 @@ if ($issueData.Labels -notcontains 'Known Build Error') {
     Write-Warning "Issue #$IssueNumber does not have the 'Known Build Error' label. Results may not be meaningful."
 }
 
-$timeline = Parse-HitCounts -Edits $issueData.Edits -SinceDate $Since
+$timeline = Parse-HitCounts -Edits $issueData.Edits
 $failureEvents = Get-FailureEvents -Timeline $timeline
 $failurePeriods = Get-FailurePeriods -Timeline $timeline
+
+# Apply -Since filter after analysis so periods are computed on full data
+$timeline = Filter-Since -Items $timeline -SinceDate $Since
+$failureEvents = Filter-Since -Items $failureEvents -SinceDate $Since
+$failurePeriods = Filter-Since -Items $failurePeriods -SinceDate $Since -DateProperty 'Start'
 
 if ($Json) {
     $summary = Build-JsonSummary `
