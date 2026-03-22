@@ -48,10 +48,15 @@ GET https://helix.dot.net/api/2019-06-17/jobs/{jobId}/workitems/{workItemName}
 
 The response includes `ExitCode` and a `Files` array (each with `FileName` and `Uri`).
 
-**Crash vs. normal failure:** Crashes have a negative or large `ExitCode` and `.dmp` files
-in the `Files` array. Normal failures have `ExitCode: 1` and no dump files.
-**If there are no dump files, stop here** — this is a normal test failure, not a crash.
-Report the failure details to the user and suggest using the `ci-analysis` skill instead.
+**Crash vs. normal failure:** Crashes have a negative or large `ExitCode` and crash artifacts
+in the `Files` array: `.dmp` files (Windows) or `.crashreport.json` files (macOS/Linux).
+Normal failures have `ExitCode: 1` and no crash artifacts.
+**If there are no dump or crashreport files, stop here** — this is a normal test failure,
+not a crash. Report the failure details to the user and suggest using the `ci-analysis`
+skill instead.
+
+> **macOS `.crashreport.json` files contain full native call stacks** and are often the most
+> useful data source for macOS crashes — check these first before attempting to load the dump.
 
 Common crash exit codes:
 
@@ -65,11 +70,15 @@ Common crash exit codes:
 
 ## Step 3: Download Artifacts
 
-Download all files from the `Files` array. Each entry has a `Uri` to a blob.
+Download files from the `Files` array. Each entry has a `Uri` to a blob. Start with
+`.crashreport.json` files (contain stack traces, especially useful for macOS) and `.dmp`
+files — these are directly downloadable and often sufficient for initial analysis without
+needing the full payload.
 
-If the `Files` URIs are inaccessible (expired, 403, etc.), fall back to
-[runfo](https://github.com/jaredpar/runfo) which downloads the full payload
-including runtime binaries: `runfo get-helix-payload -j <jobId> -w <workItem> -o <dir>`.
+Download the remaining payload files (runtime binaries, test binaries) if you need to load
+the dump in a debugger. If the `Files` URIs are inaccessible (expired, 403, etc.), fall back
+to [runfo](https://github.com/jaredpar/runfo) which downloads the full payload including
+runtime binaries: `runfo get-helix-payload -j <jobId> -w <workItem> -o <dir>`.
 
 > **Internal Helix jobs** (identified by the org `dnceng` rather than `dnceng-public` in URLs,
 > or when the Helix API returns 401/403) require authentication that the agent does not have.
@@ -91,8 +100,18 @@ Determine the dump's platform from the CI job name (e.g., "windows-x64", "linux-
 | Dump OS | Agent on Windows | Agent on Linux | Agent on macOS |
 |---------|-----------------|----------------|----------------|
 | Windows | ✅ `dotnet-dump`, `cdb` | ⚠️ `dotnet-dump` managed-only | ⚠️ `dotnet-dump` managed-only |
-| Linux | ⚠️ `dotnet-dump` managed-only (needs Cross DAC binaries — `CoreCLRCrossDacArtifacts` artifact from the same AzDO build, copied into the runtime dir) | ✅ `dotnet-dump`, `lldb` | ⚠️ `dotnet-dump` managed-only |
-| macOS | ❌ Report dump location only | ❌ Report dump location only | ✅ `lldb` |
+| Linux | ⚠️ `dotnet-dump` managed-only (needs Cross DAC — see below) | ✅ `dotnet-dump`, `lldb` | ⚠️ `dotnet-dump` managed-only |
+| macOS | ⚠️ Use `.crashreport.json` stacks only | ⚠️ Use `.crashreport.json` stacks only | ✅ `lldb` |
+
+> **Cross DAC for Linux dumps on Windows**: `dotnet-dump` needs the cross-DAC binaries to read
+> Linux ELF core dumps. Search the AzDO build artifacts for names containing `CrossDac` (the
+> exact artifact name varies by build — e.g., `CoreCLRCrossDacArtifacts`). Copy the matching
+> architecture's binaries into the runtime dir alongside the payload. If no cross-DAC artifact
+> is found, report this to the user.
+>
+> **macOS Mach-O core dumps** generally cannot be loaded by `dotnet-dump` even with cross-DAC.
+> The `.crashreport.json` files from the Helix `Files` array contain full native stacks and
+> are the primary analysis path for macOS crashes on non-macOS agents.
 
 If the agent cannot fully analyze the dump (OS mismatch), report the crash type, exit code,
 dump file path, and runtime binaries path, and suggest the user debug manually.
