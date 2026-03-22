@@ -40,6 +40,12 @@ build URLs. Multiple builds may be listed — start with the most recent, as old
 have expired from AzDO retention policies. Pass its build ID to `Get-CIStatus.ps1`.
 There is no associated PR in this scenario — skip PR correlation in your analysis.
 
+> **Stacks already in the issue/PR:** The issue or PR may already contain a pasted stack trace.
+> Do not simply repeat it — always perform your own independent analysis from the console log
+> and/or dump. You may get better symbol resolution, find additional threads, or identify
+> details the original poster missed. Use any existing stacks as a cross-reference, not a
+> substitute.
+
 A crash shows as "Work item X in job Y has failed" (entire work item). Individual test name
 failures indicate assertion failures, not crashes. A PR may have many failures — look
 specifically for work items with dump files. If multiple work items crashed, list them
