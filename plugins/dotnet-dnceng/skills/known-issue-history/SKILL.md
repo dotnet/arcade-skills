@@ -16,6 +16,22 @@ Use this skill when:
 - Deciding whether to close a known issue that appears inactive
 - Scanning all open known issues to find the most problematic ones
 
+## Workflow Steps
+
+### Single Issue Analysis
+
+1. Determine the issue number and repository from the user's request
+2. Run the script: `./scripts/Get-KnownIssueHistory.ps1 -IssueNumber <N> -Repository <owner/repo>`
+3. Add `-Since <date>` if the user only wants recent failures, or `-Json` for structured output
+4. Summarize the results: total failure events, failure periods, last failure date, and days since last failure
+5. If posting results to an issue or PR, include a link to this skill (see Posting Results below)
+
+### Scanning All Active Known Issues
+
+1. Run the script: `./scripts/Get-KnownIssueHistory.ps1 -ListActive -Repository <owner/repo>`
+2. Add `-MaxIssues <N>` to limit scope (default 50, max 100)
+3. Summarize the ranked table highlighting the most actively failing issues and any dormant candidates for closing
+
 ## Quick Start
 
 ```powershell
