@@ -124,6 +124,12 @@ function Get-IssueEditHistory {
         }
 
         $data = ($result -join "`n") | ConvertFrom-Json
+
+        if ($data.errors) {
+            $msgs = ($data.errors | ForEach-Object { $_.message }) -join '; '
+            throw "GraphQL errors for issue #$Number in $Owner/$RepoName: $msgs"
+        }
+
         $issue = $data.data.repository.issue
 
         if (-not $issue) {
@@ -448,7 +454,7 @@ function Invoke-ListActive {
         if ($title.Length -gt 60) { $title = $title.Substring(0, 57) + "..." }
 
         try {
-            $issueData = Get-IssueEditHistory -Owner $Owner -RepoName $RepoName -Number $num
+            $issueData = Get-IssueEditHistory -Owner $Owner -RepoName $RepoName -Number $num -MaxPages 5
             if (-not $issueData) { continue }
 
             $timeline = Parse-HitCounts -Edits $issueData.Edits
