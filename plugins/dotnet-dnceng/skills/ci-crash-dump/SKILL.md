@@ -148,10 +148,14 @@ SOS does not work with NativeAOT. Use `cdb` or `lldb` directly.
 
 ## After Loading the Dump
 
-Getting the dump loaded in a debugger is just the starting point. Use the backtrace, exception
-info, heap state, etc. together with the PR's code changes to understand *why* the crash
-happened. Correlate the crash location with what was changed — a crash in code touched by the
-PR is likely caused by it; a crash elsewhere may be pre-existing or a side effect.
+**Always include the crashing thread's call stack (and any other relevant threads) in your
+report to the user**, with symbols resolved as far as possible. This is the most important
+output of the analysis — without it the user cannot verify your interpretation or dig deeper.
+
+Use the backtrace, exception info, heap state, etc. together with the PR's code changes to
+understand *why* the crash happened. Correlate the crash location with what was changed — a
+crash in code touched by the PR is likely caused by it; a crash elsewhere may be pre-existing
+or a side effect.
 
 If the crash is in a native binary not part of the PR, report its version metadata
 (`lm v m <module>` in cdb, `image list <module>` in lldb) — the version helps identify
