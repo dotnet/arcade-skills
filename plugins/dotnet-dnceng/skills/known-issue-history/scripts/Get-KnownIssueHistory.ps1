@@ -166,14 +166,17 @@ function Parse-HitCounts {
         $editor = if ($edit.editor) { $edit.editor.login } else { "unknown" }
         $diff = if ($edit.diff) { $edit.diff } else { "" }
 
-        # Match only standalone hit count data rows (full line of |N|N|N|)
-        # Uses multiline mode to avoid false positives from prose containing |N|N|N|
-        $matches = [regex]::Matches($diff, '(?m)^\|(\d+)\|(\d+)\|(\d+)\|\s*$')
+        # Match hit count data rows, optionally prefixed with a unified diff marker (+, -, or space).
+        # Skip removed (-) rows so each edit contributes only the current/added snapshot.
+        $matches = [regex]::Matches($diff, '(?m)^([+ -])?\|(\d+)\|(\d+)\|(\d+)\|\s*$')
 
         foreach ($m in $matches) {
-            $h24 = [int]$m.Groups[1].Value
-            $h7d = [int]$m.Groups[2].Value
-            $h1mo = [int]$m.Groups[3].Value
+            $prefix = $m.Groups[1].Value
+            if ($prefix -eq '-') { continue }
+
+            $h24 = [int]$m.Groups[2].Value
+            $h7d = [int]$m.Groups[3].Value
+            $h1mo = [int]$m.Groups[4].Value
 
             $event = "update"
             if ($null -eq $prev24h -and $h24 -gt 0) {
@@ -370,7 +373,6 @@ function Build-JsonSummary {
     param(
         [hashtable]$IssueData,
         [array]$FullTimeline,
-        [array]$Timeline,
         [array]$FailureEvents,
         [array]$FailurePeriods,
         [int]$IssueNum,
@@ -539,7 +541,6 @@ if ($Json) {
     $summary = Build-JsonSummary `
         -IssueData $issueData `
         -FullTimeline $fullTimeline `
-        -Timeline $timeline `
         -FailureEvents $failureEvents `
         -FailurePeriods $failurePeriods `
         -IssueNum $IssueNumber `
