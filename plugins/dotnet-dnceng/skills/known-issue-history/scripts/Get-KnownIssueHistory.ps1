@@ -422,7 +422,7 @@ function Invoke-ListActive {
         Write-Warning "MaxIssues ($Max) exceeds GitHub API per_page limit of 100. Only the first 100 issues will be analyzed."
         $perPage = 100
     }
-    $issues = gh api "repos/$Owner/$RepoName/issues?labels=Known+Build+Error&state=open&per_page=$perPage" 2>&1
+    $issues = gh api "repos/$Owner/$RepoName/issues?labels=Known+Build+Error&state=open&per_page=$perPage&sort=updated&direction=desc" 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Failed to list issues: $issues"
         return
@@ -536,7 +536,7 @@ if ($Json) {
 
     Write-Host ""
     Write-Host "[KNOWN_ISSUE_HISTORY]"
-    $summary | ConvertTo-Json -Depth 5
+    Write-Host ($summary | ConvertTo-Json -Depth 5)
     Write-Host "[/KNOWN_ISSUE_HISTORY]"
 }
 else {
