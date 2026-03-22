@@ -35,8 +35,9 @@ find failing Helix jobs in the PR's validation builds:
 ./scripts/Get-CIStatus.ps1 -BuildId <BuildId> -ShowLogs
 ```
 
-**If pointed at an issue** (not a PR), look at the issue comments for linked AzDO build URLs.
-Use the most recent build linked in the issue and pass its build ID to `Get-CIStatus.ps1`.
+**If pointed at an issue** (not a PR), look at the issue body and comments for linked AzDO
+build URLs. Multiple builds may be listed — start with the most recent, as older builds may
+have expired from AzDO retention policies. Pass its build ID to `Get-CIStatus.ps1`.
 There is no associated PR in this scenario — skip PR correlation in your analysis.
 
 A crash shows as "Work item X in job Y has failed" (entire work item). Individual test name
@@ -44,7 +45,15 @@ failures indicate assertion failures, not crashes. A PR may have many failures �
 specifically for work items with dump files. If multiple work items crashed, list them
 and ask the user which one to investigate.
 
-## Step 2: Query the Work Item for Crash Evidence
+## Step 2: Check the Console Log First
+
+Before downloading any dump files, check the work item's `ConsoleOutputUri` (from the Details
+endpoint response). The Helix crash handler runs `cdb` (or equivalent) on the machine before
+uploading, so the console log often already contains symbolicated native stacks (`~*k`) and
+managed stacks (`!clrstack -all`). If these stacks are present, dump download is unnecessary
+for diagnosis — analyze the console log stacks directly.
+
+## Step 3: Query the Work Item for Crash Evidence
 
 Query the Helix API for work item details:
 ```
@@ -82,16 +91,26 @@ Common crash exit codes:
 | `134` (128+6) | SIGABRT | Linux/macOS |
 | `139` (128+11) | SIGSEGV | Linux/macOS |
 
-## Step 3: Download Artifacts
+## Step 4: Download Artifacts
+
+> **Check the console log first** (Step 2). If it already contains the crash stacks, you may
+> not need to download the dump at all. Only proceed with download if the console log doesn't
+> have sufficient detail.
 
 Download files using the ListFiles endpoint URIs. Start with `.crashreport.json` files
 (contain stack traces, especially useful for macOS) and `.dmp` files — these are directly
 downloadable and often sufficient for initial analysis without needing the full payload.
 
-Download the remaining payload files (runtime binaries, test binaries) if you need to load
-the dump in a debugger. If the `Files` URIs are inaccessible (expired, 403, etc.), fall back
-to [runfo](https://github.com/jaredpar/runfo) which downloads the full payload including
-runtime binaries: `runfo get-helix-payload -j <jobId> -w <workItem> -o <dir>`.
+> **Duplicate dumps:** Windows crashes may produce two similarly named dumps (e.g.,
+> `dotnet.exe.6524.dmp` and `dotnet.exe(1).6524.dmp`) — one from Windows Error Reporting and
+> one from `createdump`. The `createdump` dump (usually the `(1)` variant) is generally more
+> reliable for SOS/`dotnet-dump`.
+
+Download the remaining payload files (runtime binaries, test binaries) only if you need to
+load the dump in a debugger. Do not use `runfo get-helix-payload` unless you actually need
+the full payload — it downloads everything including large runtime binaries. If the `Files`
+URIs are inaccessible (expired, 403, etc.) and you do need the payload, fall back to
+[runfo](https://github.com/jaredpar/runfo): `runfo get-helix-payload -j <jobId> -w <workItem> -o <dir>`.
 
 > **Internal Helix jobs** (identified by the org `dnceng` rather than `dnceng-public` in URLs,
 > or when the Helix API returns 401/403) require authentication that the agent does not have.
@@ -99,10 +118,15 @@ runtime binaries: `runfo get-helix-payload -j <jobId> -w <workItem> -o <dir>`.
 
 Extract any archive files (`.zip`, `.tar.gz`) in the downloaded payload.
 
-## Step 4: Debug the Dump
+## Step 5: Debug the Dump
 
 The dump needs matching runtime binaries (DAC, SOS) from the payload at
 `shared/Microsoft.NETCore.App/<version>/`.
+
+> **`dotnet-dump` version must match the runtime version of the dump.** A .NET 9.0
+> `dotnet-dump` cannot load a .NET 11.0 DAC (fails with `0x80004002`). If DAC load fails,
+> update to match: `dotnet tool update -g dotnet-dump --prerelease` or install a specific
+> version: `dotnet tool install -g dotnet-dump --version '<major>.*'`.
 
 Determine the dump's platform from the CI job name (e.g., "windows-x64", "linux-arm64").
 
@@ -140,9 +164,10 @@ Start with `pe` (print exception) and `clrstack -all`. See [SOS command referenc
 
 ### Native crashes on Windows
 
-Use `cdb.exe` (command-line debugger from Debugging Tools for Windows, install via
-`winget install --id Microsoft.WinDbg`, located at
-`C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe`).
+Use `cdb.exe` (command-line debugger from Debugging Tools for Windows). Check for it at
+`C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe`. If not present, install
+the Windows SDK "Debugging Tools" component — note that `winget install --id Microsoft.WinDbg`
+installs the GUI WinDbgX, not the classic `cdb.exe`.
 
 Set up the Microsoft public symbol server: `.symfix+ c:\symbols`. Key commands: `!analyze -v` (automatic crash analysis), `kP` / `~*kP` (native stacks).
 For mixed native+managed: `.loadby sos coreclr`, then `!setclrpath`, `!pe`, `!clrstack`.
@@ -188,6 +213,7 @@ Use your judgement and knowledge of the codebase to form a diagnosis and suggest
 ## Common Pitfalls
 
 - **Helix artifacts expire after ~30 days.** If downloads fail with 404, the artifacts have likely expired — tell the user.
+- **AzDO builds also expire** due to retention policies. If a build returns "not found", try a more recent build. When multiple builds are listed (e.g., in an issue), start with the newest.
 - **`dotnet-dump` only handles managed state.** For native crashes, use `cdb`/`lldb` on matching OS.
 - **32-bit dumps on 64-bit OS:** Use 32-bit dotnet SDK to install dotnet-dump.
 - **Mobile/WASM dumps** are not covered — report the dump location and hand off.
