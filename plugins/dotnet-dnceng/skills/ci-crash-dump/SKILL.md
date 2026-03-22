@@ -28,11 +28,16 @@ covers finding those artifacts, downloading them, and analyzing the dump.
 
 ## Step 1: Identify the Crashed Work Item
 
-Use this plugin's `ci-analysis` skill's `Get-CIStatus.ps1` script to find failing Helix jobs:
+**If pointed at a PR**, use this plugin's `ci-analysis` skill's `Get-CIStatus.ps1` script to
+find failing Helix jobs in the PR's validation builds:
 ```
 Get-CIStatus.ps1 -PRNumber <PR> -Repository "dotnet/runtime" -ShowLogs
 Get-CIStatus.ps1 -BuildId <BuildId> -ShowLogs
 ```
+
+**If pointed at an issue** (not a PR), look at the issue comments for linked AzDO build URLs.
+Use the most recent build linked in the issue and pass its build ID to `Get-CIStatus.ps1`.
+There is no associated PR in this scenario — skip PR correlation in your analysis.
 
 A crash shows as "Work item X in job Y has failed" (entire work item). Individual test name
 failures indicate assertion failures, not crashes. A PR may have many failures — look
