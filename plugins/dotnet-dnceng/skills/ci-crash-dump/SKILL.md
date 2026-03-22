@@ -172,10 +172,10 @@ Start with `pe` (print exception) and `clrstack -all`. See [SOS command referenc
 
 ### Native crashes on Windows
 
-Use `cdb.exe` (command-line debugger from Debugging Tools for Windows). Check for it at
-`C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe`. If not present, install
-the Windows SDK "Debugging Tools" component — note that `winget install --id Microsoft.WinDbg`
-installs the GUI WinDbgX, not the classic `cdb.exe`.
+Use `cdb.exe` (command-line debugger). It may be at
+`C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe` (Windows SDK) or inside the
+WinDbg MSIX package (`winget install --id Microsoft.WinDbg`). If not found, search with
+`Get-ChildItem -Recurse -Filter cdb.exe -Path "$env:LOCALAPPDATA\Microsoft","$env:ProgramFiles*"`.
 
 Set up the Microsoft public symbol server: `.symfix+ c:\symbols`. Key commands: `!analyze -v` (automatic crash analysis), `kP` / `~*kP` (native stacks).
 For mixed native+managed: `.loadby sos coreclr`, then `!setclrpath`, `!pe`, `!clrstack`.
