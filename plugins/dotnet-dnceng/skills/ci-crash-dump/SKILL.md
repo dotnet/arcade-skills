@@ -132,8 +132,13 @@ SOS does not work with NativeAOT. Use `cdb` or `lldb` directly.
 Getting the dump loaded in a debugger is just the starting point. Use the backtrace, exception
 info, heap state, etc. together with the PR's code changes to understand *why* the crash
 happened. Correlate the crash location with what was changed — a crash in code touched by the
-PR is likely caused by it; a crash elsewhere may be pre-existing or a side effect. Use your
-judgement and knowledge of the codebase to form a diagnosis and suggest a fix.
+PR is likely caused by it; a crash elsewhere may be pre-existing or a side effect.
+
+If the crash is in a native binary not part of the PR, report its version metadata
+(`lm v m <module>` in cdb, `image list <module>` in lldb) — the version helps identify
+which build or package introduced it.
+
+Use your judgement and knowledge of the codebase to form a diagnosis and suggest a fix.
 
 ## Common Pitfalls
 
