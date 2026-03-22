@@ -102,6 +102,7 @@ dump file path, and runtime binaries path, and suggest the user debug manually.
 Use `dotnet-dump analyze`. The critical Helix-specific setup:
 - `setclrpath` — point to the runtime binaries from the payload
 - `setsymbolserver -directory` — same path, for symbols
+- `setsymbolserver` (no args) — also enables the Microsoft public symbol server for OS and framework symbols
 
 Start with `pe` (print exception) and `clrstack -all`. See [SOS command reference](https://learn.microsoft.com/dotnet/core/diagnostics/sos-debugging-extension) for further commands.
 
@@ -111,7 +112,7 @@ Use `cdb.exe` (command-line debugger from Debugging Tools for Windows, install v
 `winget install --id Microsoft.WinDbg`, located at
 `C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe`).
 
-Key commands: `!analyze -v` (automatic crash analysis), `kP` / `~*kP` (native stacks).
+Set up the Microsoft public symbol server: `.symfix+ c:\symbols`. Key commands: `!analyze -v` (automatic crash analysis), `kP` / `~*kP` (native stacks).
 For mixed native+managed: `.loadby sos coreclr`, then `!setclrpath`, `!pe`, `!clrstack`.
 
 ### Native crashes on Linux/macOS
