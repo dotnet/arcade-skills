@@ -494,9 +494,12 @@ function Invoke-ListActive {
 $repo = Split-Repository -Repo $Repository
 
 # Verify GitHub CLI is available and authenticated
+if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+    throw "GitHub CLI (gh) is not installed. See https://cli.github.com/ for installation instructions."
+}
 $null = gh auth status 2>&1
 if ($LASTEXITCODE -ne 0) {
-    throw "GitHub CLI (gh) is not installed or not authenticated. Run 'gh auth login' first."
+    throw "GitHub CLI is not authenticated. Run 'gh auth login' first."
 }
 
 if ($ListActive) {

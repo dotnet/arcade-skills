@@ -1,6 +1,10 @@
 ---
 name: known-issue-history
-description: Analyze historical failure rates for Known Build Error issues by mining the edit history of issue bodies. Use when asked "when did this last fail", "failure history", "failure rate", "is this issue still active", "flaky test history", "known issue activity", or "most active known issues".
+description: >
+  Analyze historical failure rates for Known Build Error issues by mining the
+  edit history of issue bodies. Use when asked "when did this last fail",
+  "failure history", "failure rate", "is this issue still active",
+  "flaky test history", "known issue activity", or "most active known issues".
 ---
 
 # Known Build Error History Analysis
