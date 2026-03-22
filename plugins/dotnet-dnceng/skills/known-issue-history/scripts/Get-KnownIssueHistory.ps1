@@ -55,6 +55,7 @@ param(
     [switch]$ListActive,
 
     [Parameter(ParameterSetName = 'ListActive')]
+    [ValidateRange(1,100)]
     [int]$MaxIssues = 50,
 
     [Parameter()]
@@ -68,11 +69,10 @@ $ErrorActionPreference = 'Stop'
 
 function Split-Repository {
     param([string]$Repo)
-    $parts = $Repo -split '/'
-    if ($parts.Count -ne 2) {
-        Write-Error "Invalid repository format '$Repo'. Expected 'owner/repo'."
-        return $null
+    if ($Repo -notmatch '^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$') {
+        throw "Invalid repository format '$Repo'. Expected 'owner/repo' (alphanumeric, dots, hyphens, underscores only)."
     }
+    $parts = $Repo -split '/'
     return @{ Owner = $parts[0]; Name = $parts[1] }
 }
 
@@ -114,16 +114,14 @@ function Get-IssueEditHistory {
 "@
         $result = gh api graphql -f "query=$query" 2>&1
         if ($LASTEXITCODE -ne 0) {
-            Write-Error "GraphQL query failed: $result"
-            return $null
+            throw "GraphQL query failed: $result"
         }
 
         $data = $result | ConvertFrom-Json
         $issue = $data.data.repository.issue
 
         if (-not $issue) {
-            Write-Error "Issue #$Number not found in $Owner/$RepoName"
-            return $null
+            throw "Issue #$Number not found in $Owner/$RepoName"
         }
 
         $edits = $issue.userContentEdits
@@ -416,16 +414,9 @@ function Invoke-ListActive {
     Write-Host "Scanning open 'Known Build Error' issues in $Owner/$RepoName..."
     Write-Host ""
 
-    # Fetch open issues with the label (GitHub API caps per_page at 100)
-    $perPage = $Max
-    if ($Max -gt 100) {
-        Write-Warning "MaxIssues ($Max) exceeds GitHub API per_page limit of 100. Only the first 100 issues will be analyzed."
-        $perPage = 100
-    }
-    $issues = gh api "repos/$Owner/$RepoName/issues?labels=Known+Build+Error&state=open&per_page=$perPage&sort=updated&direction=desc" 2>&1
+    $issues = gh api "repos/$Owner/$RepoName/issues?labels=Known+Build+Error&state=open&per_page=$Max&sort=updated&direction=desc" 2>&1
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "Failed to list issues: $issues"
-        return
+        throw "Failed to list issues: $issues"
     }
 
     $issueList = $issues | ConvertFrom-Json
@@ -501,7 +492,12 @@ function Invoke-ListActive {
 # =============================================================================
 
 $repo = Split-Repository -Repo $Repository
-if (-not $repo) { return }
+
+# Verify GitHub CLI is available and authenticated
+$null = gh auth status 2>&1
+if ($LASTEXITCODE -ne 0) {
+    throw "GitHub CLI (gh) is not installed or not authenticated. Run 'gh auth login' first."
+}
 
 if ($ListActive) {
     Invoke-ListActive -Owner $repo.Owner -RepoName $repo.Name -Max $MaxIssues -SinceDate $Since
