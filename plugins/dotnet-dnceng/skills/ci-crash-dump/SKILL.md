@@ -132,11 +132,13 @@ The dump needs matching runtime binaries (DAC, SOS) from the payload at
 `shared/Microsoft.NETCore.App/<version>/`.
 
 > **`dotnet-dump` version must match the runtime version of the dump.** A .NET 9.0
-> `dotnet-dump` cannot load a .NET 11.0 DAC (fails with `0x80004002`). If DAC load fails,
-> update to match: `dotnet tool update -g dotnet-dump --prerelease` or install a specific
-> version, for example: `dotnet tool install -g dotnet-dump --version 9.0.123` (replace
-> `9.0.123` with the exact version that matches your runtime; see available versions on
-> https://www.nuget.org/packages/dotnet-dump or via `dotnet tool search dotnet-dump`).
+> `dotnet-dump` cannot load a .NET 11.0 DAC (fails with `0x80004002`). Determine the
+> runtime major version from the payload's `shared/Microsoft.NETCore.App/<version>/`
+> directory (e.g., `11.0.0-preview.5.25263.2` → major version 11). If DAC load fails,
+> update to match: `dotnet tool update -g dotnet-dump --prerelease` (installs the latest,
+> usually sufficient) or install a specific major version: find the latest `<major>.0.*`
+> version on https://www.nuget.org/packages/dotnet-dump and install it, e.g.,
+> `dotnet tool install -g dotnet-dump --version 11.0.547801`.
 
 Determine the dump's platform from the CI job name (e.g., "windows-x64", "linux-arm64").
 
