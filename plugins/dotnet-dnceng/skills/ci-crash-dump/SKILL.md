@@ -31,13 +31,14 @@ covers finding those artifacts, downloading them, and analyzing the dump.
 **If pointed at a PR**, use this plugin's `ci-analysis` skill to find failing Helix jobs.
 The `ci-analysis` skill provides `Get-CIStatus.ps1`:
 ```
-Get-CIStatus.ps1 -PRNumber <PR> -Repository "dotnet/runtime" -ShowLogs
-Get-CIStatus.ps1 -BuildId <BuildId> -ShowLogs
+../ci-analysis/scripts/Get-CIStatus.ps1 -PRNumber <PR> -Repository "dotnet/runtime" -ShowLogs
+../ci-analysis/scripts/Get-CIStatus.ps1 -BuildId <BuildId> -ShowLogs
 ```
 
 **If pointed at an issue** (not a PR), look at the issue body and comments for linked AzDO
 build URLs. Multiple builds may be listed — start with the most recent, as older builds may
-have expired from AzDO retention policies. Pass its build ID to `Get-CIStatus.ps1`.
+have expired from AzDO retention policies. Pass its build ID to
+`../ci-analysis/scripts/Get-CIStatus.ps1`.
 There is no associated PR in this scenario — skip PR correlation in your analysis.
 
 > **Stacks already in the issue/PR:** The issue or PR may already contain a pasted stack trace.
@@ -53,7 +54,8 @@ and ask the user which one to investigate.
 
 ## Step 2: Check the Console Log First
 
-Before downloading any dump files, check the work item's console log. `Get-CIStatus.ps1 -ShowLogs`
+Before downloading any dump files, check the work item's console log.
+`../ci-analysis/scripts/Get-CIStatus.ps1 -ShowLogs`
 reports the `ConsoleOutputUri`, or find it in the Helix work item Details response.
 The Helix crash handler runs `cdb` (or equivalent) on the machine before
 uploading, so the console log often already contains symbolicated native stacks (`~*k`) and
