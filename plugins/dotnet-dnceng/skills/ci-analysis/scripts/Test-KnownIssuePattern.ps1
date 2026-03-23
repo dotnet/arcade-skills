@@ -68,46 +68,47 @@ $ErrorActionPreference = "Stop"
 # --- Input validation ---
 
 if ($ErrorMessage -and $ErrorPattern) {
-    Write-Error "Specify either -ErrorMessage or -ErrorPattern, not both."
-    return
+    throw "Specify either -ErrorMessage or -ErrorPattern, not both."
 }
 
 if (-not $ErrorMessage -and -not $ErrorPattern) {
-    Write-Error "Specify either -ErrorMessage or -ErrorPattern."
-    return
+    throw "Specify either -ErrorMessage or -ErrorPattern."
 }
 
 if ($LogFile -and $LogContent) {
-    Write-Error "Specify either -LogFile or -LogContent, not both."
-    return
+    throw "Specify either -LogFile or -LogContent, not both."
 }
 
 if (-not $LogFile -and -not $LogContent) {
-    Write-Error "Specify either -LogFile or -LogContent."
-    return
+    throw "Specify either -LogFile or -LogContent."
 }
 
 $useRegex = [bool]$ErrorPattern
 $patterns = @(if ($useRegex) { $ErrorPattern } else { $ErrorMessage })
+
+for ($i = 0; $i -lt $patterns.Count; $i++) {
+    if ([string]::IsNullOrWhiteSpace($patterns[$i])) {
+        $parameterName = if ($useRegex) { 'ErrorPattern' } else { 'ErrorMessage' }
+        throw "-$parameterName contains a null, empty, or whitespace-only entry at position $i."
+    }
+}
+
 $isMultiLine = $patterns.Count -gt 1
 
 # Load log lines - use streaming for file input to avoid high memory usage on large logs
 if ($LogFile) {
     if (-not (Test-Path $LogFile)) {
-        Write-Error "Log file not found: $LogFile"
-        return
+        throw "Log file not found: $LogFile"
     }
     $resolvedPath = (Resolve-Path $LogFile).Path
     if ((Get-Item $resolvedPath).Length -eq 0) {
-        Write-Error "Log file is empty."
-        return
+        throw "Log file is empty."
     }
     $logLineSource = [System.IO.File]::ReadLines($resolvedPath)
 } else {
     $logLineSource = @($LogContent -split "`n")
     if ($logLineSource.Count -eq 0) {
-        Write-Error "Log content is empty."
-        return
+        throw "Log content is empty."
     }
 }
 

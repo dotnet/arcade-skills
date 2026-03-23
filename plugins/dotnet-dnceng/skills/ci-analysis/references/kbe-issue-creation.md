@@ -48,7 +48,7 @@ Also check the `knownIssues` array from the `[CI_ANALYSIS_SUMMARY]` JSON — Bui
 
 The issue body must contain a `## Build Information` section and a `## Error Message` section with a JSON blob that Build Analysis parses for matching.
 
-```markdown
+````markdown
 ## Build Information
 Build: <!-- Link to the AzDO build with the error -->
 Leg Name: <!-- Name of the failing job/leg -->
@@ -63,7 +63,7 @@ Leg Name: <!-- Name of the failing job/leg -->
     "ExcludeConsoleLog": false
 }
 ```
-```
+````
 
 **Required label:** `Known Build Error`
 

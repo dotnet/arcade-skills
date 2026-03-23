@@ -85,7 +85,7 @@ Then follow the detailed workflow in [references/analysis-workflow.md](reference
 2. **Check Build Analysis status** — Green = all failures matched known issues. Red = some unmatched. Never claim "all known issues" when Build Analysis is red.
 3. **Correlate with PR changes** — same files failing = likely PR-related.
 4. **Verify before claiming** — don't call it "infrastructure" without Build Analysis match or target-branch verification. Don't call it "safe to retry" unless ALL failures are accounted for.
-5. **Suggest filing KBE issues for unmatched failures** — If Build Analysis is red and a failure is confirmed not PR-related (target-branch comparison, no PR correlation), offer to help the user file a Known Build Error issue. Use `Test-KnownIssuePattern.ps1` to validate the error pattern against the failure log, then present a draft `gh issue create` command. See [references/kbe-issue-creation.md](references/kbe-issue-creation.md). **Never auto-create issues — always present the draft for user approval.**
+5. **Suggest filing KBE issues for unmatched failures** — If Build Analysis is red and a failure is confirmed not PR-related (target-branch comparison, no PR correlation), offer to help the user file a Known Build Error issue. Use `scripts/Test-KnownIssuePattern.ps1` to validate the error pattern against the failure log, then present a draft `gh issue create` command. See [references/kbe-issue-creation.md](references/kbe-issue-creation.md). **Never auto-create issues — always present the draft for user approval.**
 
 For interpreting error categories, crash recovery, and canceled jobs: [references/failure-interpretation.md](references/failure-interpretation.md)
 
