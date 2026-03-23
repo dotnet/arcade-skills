@@ -191,8 +191,8 @@ For mixed native+managed: `.loadby sos coreclr`, then `!setclrpath`, `!pe`, `!cl
 ### Native crashes on Linux/macOS
 
 Use `lldb` with the SOS plugin for combined native + managed debugging. Point it at the dump
-and the dotnet host binary from the payload. Native commands: `bt all` (native stacks).
-After loading the SOS plugin, use `setclrpath` / `setsymbolserver`, then `pe`, `clrstack -all`
+and the dotnet host binary from the payload. Native commands: `bt` (backtrace), `bt all`
+(all threads), `frame variable` (locals). After loading the SOS plugin, use `setclrpath` /`setsymbolserver`, then `pe`, `clrstack -all`
 for managed state — these SOS commands work inside `lldb` the same as in `dotnet-dump`.
 
 For native symbol resolution: runtime binaries in CI are stripped (only `.dynsym` exports).
