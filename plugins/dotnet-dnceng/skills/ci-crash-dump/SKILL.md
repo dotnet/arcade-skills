@@ -136,13 +136,26 @@ The dump needs matching runtime binaries (DAC, SOS) from the payload at
 `shared/Microsoft.NETCore.App/<version>/`.
 
 > **`dotnet-dump` version must match the runtime version of the dump.** A .NET 9.0
-> `dotnet-dump` cannot load a .NET 11.0 DAC (fails with `0x80004002`). Determine the
-> runtime major version from the payload's `shared/Microsoft.NETCore.App/<version>/`
-> directory (e.g., `11.0.0-preview.5.25263.2` → major version 11). If DAC load fails,
-> update to match: `dotnet tool update -g dotnet-dump --prerelease` (installs the latest,
-> usually sufficient) or install a specific major version: find the latest `<major>.0.*`
-> version on https://www.nuget.org/packages/dotnet-dump and install it, e.g.,
+> `dotnet-dump` cannot load a .NET 11.0 DAC (fails with `0x80004002` or
+> `No CLR runtime found`). Determine the runtime major version from the payload's
+> `shared/Microsoft.NETCore.App/<version>/` directory (e.g., `11.0.0-preview.5.25263.2`
+> → major version 11). If DAC load fails, update to match:
+> `dotnet tool update -g dotnet-dump --prerelease` (installs the latest, usually sufficient)
+> or install a specific major version: find the latest `<major>.0.*` version on
+> https://www.nuget.org/packages/dotnet-dump and install it, e.g.,
 > `dotnet tool install -g dotnet-dump --version 11.0.547801`.
+>
+> **If a matching dotnet-dump version is not available** (common for unreleased .NET versions
+> where no package exists on NuGet or dev feeds), **skip dotnet-dump and use `cdb` instead**
+> (see "Native crashes on Windows" below). `cdb` does not have the DAC version coupling
+> problem — its `!analyze -v` and `kn` commands produce native + managed stacks without
+> needing a matching SOS/DAC version.
+>
+> **When DAC loading fails**, run `modules -v` inside `dotnet-dump analyze` as a first
+> diagnostic step. This command works without the DAC and shows the full paths of all loaded
+> modules, including the exact `coreclr.dll` and `System.Private.CoreLib.dll` that were in
+> use. This tells you which runtime build produced the dump and where to find the matching
+> DAC. Use `setclrpath` to point to that directory.
 
 Determine the dump's platform from the CI job name (e.g., "windows-x64", "linux-arm64").
 
@@ -180,10 +193,21 @@ Start with `pe` (print exception) and `clrstack -all`. See [SOS command referenc
 
 ### Native crashes on Windows
 
-Use `cdb.exe` (command-line debugger). It may be at
-`C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe` (Windows SDK) or inside the
-WinDbg MSIX package (`winget install --id Microsoft.WinDbg`). If not found, search with
-`Get-ChildItem -Recurse -Filter cdb.exe -Path "$env:LOCALAPPDATA\Microsoft","$env:ProgramFiles*"`.
+Use `cdb.exe` (command-line debugger) for native crashes, or as a **fallback when
+`dotnet-dump` cannot load the DAC** (e.g., unreleased .NET versions). `cdb` does not depend
+on SOS/DAC version matching for native stacks and `!analyze -v`.
+
+`cdb.exe` may be at `C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe`
+(Windows SDK) or inside the WinDbg MSIX package (`winget install --id Microsoft.WinDbg`).
+To find it in the MSIX package:
+```powershell
+$pkg = Get-AppxPackage -Name "*WinDbg*"
+$cdb = Join-Path $pkg.InstallLocation "amd64\cdb.exe"
+```
+
+> **MSIX sandbox limitation:** `cdb.exe` from the WinDbg MSIX package may not be able to
+> access files at arbitrary paths (e.g., `C:\dumps`). If it reports "file not found" for a
+> dump that exists, copy the dump to `$env:TEMP` and open it from there.
 
 Set up the Microsoft public symbol server: `.symfix+ c:\symbols`. Key commands: `!analyze -v` (automatic crash analysis), `kP` / `~*kP` (native stacks).
 For mixed native+managed: `.loadby sos coreclr`, then `!setclrpath`, `!pe`, `!clrstack`.
