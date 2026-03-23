@@ -13,7 +13,7 @@
     to paste into a Known Build Error GitHub issue.
 
 .PARAMETER ErrorMessage
-    String or string array for String.Contains matching (case-insensitive).
+    String or string array for String.Contains matching (case-sensitive).
     Use for exact substring matching. Cannot be combined with -ErrorPattern.
 
 .PARAMETER ErrorPattern
