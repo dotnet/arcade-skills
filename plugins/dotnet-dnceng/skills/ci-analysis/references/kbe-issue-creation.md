@@ -145,9 +145,15 @@ Use GitHub's issue preview tab to validate — invalid JSON is highlighted.
 
 For regex patterns, remember **double escaping**: a literal dot needs `\\.` in the JSON value (the JSON parser consumes one backslash, leaving `\.` for the regex engine).
 
-## Validating Patterns Before Filing
+## Validating Patterns Before Filing (MANDATORY)
 
-Use the validation script to test your pattern against actual failure logs before creating the issue:
+> 🚨 **This step is NOT optional.** You MUST validate every pattern against the actual failure log before drafting a KBE issue. Patterns that appear correct frequently fail due to invisible characters, inconsistent whitespace, log line prefixes, or timestamp formatting. Never draft a `gh issue create` command without a `RESULT: PASS` from this script.
+
+**Steps:**
+1. Download or extract the failure log (from Helix console log, AzDO build log, or script output saved to a file)
+2. Run the validation script with the candidate pattern and log file
+3. If `RESULT: FAIL` — refine the pattern and re-test (the script shows what didn't match)
+4. If `RESULT: PASS` — use the script's "Validated JSON blob" and "Issue body template" output directly
 
 ```powershell
 # Test string matching against a log file
@@ -166,7 +172,9 @@ The script uses the **same matching logic** as Build Analysis (case-sensitive `S
 
 ## Filing the Issue
 
-Once the pattern is validated:
+> 🚨 **NEVER run `gh issue create` directly.** Always present the full `gh issue create` command to the user as a draft and **wait for their explicit approval** before executing it. The user must review the title, labels, target repo, and JSON blob before any issue is created on GitHub.
+
+Once the pattern is validated, **present** the following command to the user for review (do NOT execute it):
 
 ```bash
 # Repository issue

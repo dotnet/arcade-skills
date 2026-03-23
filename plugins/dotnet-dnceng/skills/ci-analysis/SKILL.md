@@ -113,6 +113,8 @@ Lead with a 1-2 sentence verdict, then the summary table, then detail bullets (o
 
 > ❌ **Don't say "safe to retry" with Build Analysis red.** Map each failing job to a specific known issue first.
 
+> ❌ **Don't execute `gh issue create` without explicit user approval.** Always present the draft command as text and ask the user to confirm before running it. This applies to KBE issues and any other GitHub issue creation.
+
 > ❌ **Don't use `Invoke-RestMethod` or `curl` for AzDO/Helix when MCP tools are available.** Check your available tools for Azure DevOps and Helix operations first. REST API fallback is for when MCP tools are genuinely unavailable, not a first resort.
 
 ## References
