@@ -47,22 +47,28 @@ There is no associated PR in this scenario — skip PR correlation in your analy
 > details the original poster missed. Use any existing stacks as a cross-reference, not a
 > substitute.
 
-A crash shows as "Work item X in job Y has failed" (entire work item). Individual test name
-failures indicate assertion failures, not crashes. A PR may have many failures — look
-specifically for work items with dump files. If multiple work items crashed, list them
-and ask the user which one to investigate.
+Crashes are reported at the work item level. Look for work items that have dump files in
+their artifacts. Note that even individual test-name failures can be crashes (not just
+assertion failures) — for example, in dotnet/runtime test crashes are often attributed to
+individual tests. A single work item may also contain multiple crashes (e.g., tests using
+`RemoteExecutor` or process isolation). A PR may have many failures — look specifically
+for work items with dump files. If multiple work items crashed, list them and ask the user
+which one to investigate.
 
 ## Step 2: Check the Console Log First
 
 Before downloading any dump files, check the work item's console log.
 `../ci-analysis/scripts/Get-CIStatus.ps1 -ShowLogs`
 reports the `ConsoleOutputUri`, or find it in the Helix work item Details response.
-The Helix crash handler runs `cdb` (or equivalent) on the machine before
-uploading, so the console log often already contains symbolicated native stacks (`~*k`) and
-managed stacks (`!clrstack -all`). If these stacks are present and symbols are resolved
-(function names, not just hex addresses), analyze them directly — dump download is
-unnecessary. If the stacks are missing, truncated, or show only unresolved addresses,
-proceed to download the dump.
+In **dotnet/runtime**, the crash handler runs `cdb` (or equivalent) on the machine before
+uploading, so the console log may contain symbolicated native stacks (`~*k`) and
+managed stacks (`!clrstack -all`). Other repos may not have this — the console log may only
+show test output. If crash stacks are present and symbols are resolved (function names, not
+just hex addresses), use them as a starting point for analysis. However, stacks alone may
+not be sufficient — for corruption, heap issues, or cases where managed exceptions are
+caught by the test framework (common in libs tests using xunit), downloading and analyzing
+the dump provides deeper insight. If the stacks are missing, truncated, or show only
+unresolved addresses, proceed directly to download the dump.
 
 ## Step 3: Query the Work Item for Crash Evidence
 
@@ -89,8 +95,9 @@ Normal failures have `ExitCode: 1` and no crash artifacts.
 not a crash. Report the failure details to the user and suggest using the `ci-analysis`
 skill instead.
 
-> **macOS `.crashreport.json` files contain full native call stacks** and are often the most
-> useful data source for macOS crashes — check these first before attempting to load the dump.
+> **`.crashreport.json` files** are generated on macOS and Linux (there is no Windows
+> equivalent). They contain full native call stacks and are often the most useful starting
+> point for crash analysis — check these first before attempting to load the dump.
 
 Common crash exit codes:
 
