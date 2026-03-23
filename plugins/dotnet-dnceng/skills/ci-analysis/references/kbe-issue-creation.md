@@ -96,7 +96,7 @@ Use only the stable part:
 
 ### Regex Matching (`ErrorPattern`)
 
-Build Analysis uses `Regex` with options: **Singleline**, **IgnoreCase**, **NonBacktracking**, and a 20ms timeout per line.
+Build Analysis uses `Regex` with options: **Singleline**, **IgnoreCase**, **NonBacktracking**, and a 50ms timeout per line.
 
 ```json
 {
