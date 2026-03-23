@@ -109,10 +109,12 @@ Download files using the ListFiles endpoint URIs. Start with `.crashreport.json`
 (contain stack traces, especially useful for macOS) and `.dmp` files — these are directly
 downloadable and often sufficient for initial analysis without needing the full payload.
 
-> **Duplicate dumps:** Windows crashes may produce two similarly named dumps (e.g.,
-> `dotnet.exe.6524.dmp` and `dotnet.exe(1).6524.dmp`) — one from Windows Error Reporting and
-> one from `createdump`. The `createdump` dump (usually the `(1)` variant) is generally more
-> reliable for SOS/`dotnet-dump`.
+> **Duplicate dumps:** Crashes often produce multiple dump files for the same crash.
+> On Windows you may see e.g. `dotnet.exe.6524.dmp` and `dotnet.exe(1).6524.dmp` — one from
+> Windows Error Reporting and one from `createdump`. On Linux you may see e.g. `core.1000.33`
+> and `coredump.33.dmp` for the same crash. In either case, pick one dump to analyze (the
+> `createdump` variant is generally more reliable for SOS/`dotnet-dump`) and ignore the
+> duplicate.
 
 Download the remaining payload files (runtime binaries, test binaries) only if you need to
 load the dump in a debugger. Do not use `runfo get-helix-payload` unless you actually need
