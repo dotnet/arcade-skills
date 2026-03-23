@@ -28,11 +28,11 @@ covers finding those artifacts, downloading them, and analyzing the dump.
 
 ## Step 1: Identify the Crashed Work Item
 
-**If pointed at a PR**, use this plugin's `ci-analysis` skill's `Get-CIStatus.ps1` script to
-find failing Helix jobs in the PR's validation builds:
+**If pointed at a PR**, use this plugin's `ci-analysis` skill to find failing Helix jobs.
+The `ci-analysis` skill provides `Get-CIStatus.ps1`:
 ```
-./scripts/Get-CIStatus.ps1 -PRNumber <PR> -Repository "dotnet/runtime" -ShowLogs
-./scripts/Get-CIStatus.ps1 -BuildId <BuildId> -ShowLogs
+Get-CIStatus.ps1 -PRNumber <PR> -Repository "dotnet/runtime" -ShowLogs
+Get-CIStatus.ps1 -BuildId <BuildId> -ShowLogs
 ```
 
 **If pointed at an issue** (not a PR), look at the issue body and comments for linked AzDO
@@ -53,8 +53,9 @@ and ask the user which one to investigate.
 
 ## Step 2: Check the Console Log First
 
-Before downloading any dump files, check the work item's `ConsoleOutputUri` (from the Details
-endpoint response). The Helix crash handler runs `cdb` (or equivalent) on the machine before
+Before downloading any dump files, check the work item's console log. `Get-CIStatus.ps1 -ShowLogs`
+reports the `ConsoleOutputUri`, or find it in the Helix work item Details response.
+The Helix crash handler runs `cdb` (or equivalent) on the machine before
 uploading, so the console log often already contains symbolicated native stacks (`~*k`) and
 managed stacks (`!clrstack -all`). If these stacks are present and symbols are resolved
 (function names, not just hex addresses), analyze them directly — dump download is
@@ -73,7 +74,7 @@ GET https://helix.dot.net/api/2019-06-17/jobs/{jobId}/workitems/{workItemName}
 > request will 404.
 
 The response includes `ExitCode` and a `Files` array (each with `FileName` and `Uri`).
-However, the `Files` URIs from the Details endpoint can be broken for subdirectory or unicode
+However, the `Files` URIs from the Details endpoint can be broken for subdirectory or Unicode
 filenames. To get reliable download URIs, use the separate ListFiles endpoint:
 ```
 GET https://helix.dot.net/api/2019-06-17/jobs/{jobId}/workitems/{workItemName}/files
@@ -189,8 +190,10 @@ For mixed native+managed: `.loadby sos coreclr`, then `!setclrpath`, `!pe`, `!cl
 
 ### Native crashes on Linux/macOS
 
-Use `lldb`. Point it at the dump, the dotnet host binary from the payload, and use
-`setclrpath` / `setsymbolserver` as with dotnet-dump. Key commands: `bt all`, `pe`, `clrstack -all`.
+Use `lldb` with the SOS plugin for combined native + managed debugging. Point it at the dump
+and the dotnet host binary from the payload. Native commands: `bt all` (native stacks).
+After loading the SOS plugin, use `setclrpath` / `setsymbolserver`, then `pe`, `clrstack -all`
+for managed state — these SOS commands work inside `lldb` the same as in `dotnet-dump`.
 
 For native symbol resolution: runtime binaries in CI are stripped (only `.dynsym` exports).
 Use `dotnet-symbol --host-only --debugging <path-to-libcoreclr.so>` to download the matching
