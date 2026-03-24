@@ -292,6 +292,12 @@ function Get-FailurePeriods {
     return $periods
 }
 
+function Format-ShortDate {
+    param([object]$Value)
+    $dt = ConvertTo-UtcDateTime $Value
+    return $dt.ToString("yyyy-MM-dd")
+}
+
 function Format-Timeline {
     param(
         [hashtable]$IssueData,
@@ -333,7 +339,7 @@ function Format-Timeline {
 
     if ($FailureEvents.Count -gt 0) {
         $lastFailure = $FailureEvents[-1]
-        [void]$sb.AppendLine("Last failure:          $($lastFailure.Date)")
+        [void]$sb.AppendLine("Last failure:          $(Format-ShortDate $lastFailure.Date)")
 
         $lastDate = ConvertTo-UtcDateTime $lastFailure.Date
         $daysSince = [math]::Floor(([DateTime]::UtcNow - $lastDate).TotalDays)
@@ -351,12 +357,12 @@ function Format-Timeline {
         [void]$sb.AppendLine("FAILURE PERIODS")
         [void]$sb.AppendLine("-" * 70)
         [void]$sb.AppendLine("")
-        [void]$sb.AppendLine(("{0,-4} {1,-28} {2,-28} {3,10} {4,10}" -f "#", "Start", "End", "Peak 24h", "Peak 1mo"))
-        [void]$sb.AppendLine(("{0,-4} {1,-28} {2,-28} {3,10} {4,10}" -f "---", "---", "---", "---", "---"))
+        [void]$sb.AppendLine(("{0,-4} {1,-14} {2,-14} {3,10} {4,10}" -f "#", "Start", "End", "Peak 24h", "Peak 1mo"))
+        [void]$sb.AppendLine(("{0,-4} {1,-14} {2,-14} {3,10} {4,10}" -f "---", "---", "---", "---", "---"))
 
         $i = 1
         foreach ($p in $FailurePeriods) {
-            [void]$sb.AppendLine(("{0,-4} {1,-28} {2,-28} {3,10} {4,10}" -f $i, $p.Start, $p.End, $p.PeakHit24h, $p.PeakHit1mo))
+            [void]$sb.AppendLine(("{0,-4} {1,-14} {2,-14} {3,10} {4,10}" -f $i, (Format-ShortDate $p.Start), (Format-ShortDate $p.End), $p.PeakHit24h, $p.PeakHit1mo))
             $i++
         }
         [void]$sb.AppendLine("")
@@ -463,6 +469,9 @@ function Invoke-ListActive {
     $results = @()
 
     foreach ($issue in $issueList) {
+        # REST issues endpoint can return PRs; skip them
+        if ($issue.pull_request) { continue }
+
         $num = $issue.number
         $title = $issue.title
         if ($title.Length -gt 60) { $title = $title.Substring(0, 57) + "..." }
