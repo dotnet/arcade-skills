@@ -134,7 +134,7 @@ if ($useRegex) {
         } catch {
             Write-Host "FAIL: Invalid regex at position $($i): $($patterns[$i])" -ForegroundColor Red
             Write-Host "  Error: $_" -ForegroundColor Red
-            return
+            exit 1
         }
     }
     Write-Host "Regex validation: OK" -ForegroundColor Green
