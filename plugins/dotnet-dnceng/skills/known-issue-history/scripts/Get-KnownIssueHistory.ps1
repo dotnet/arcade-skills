@@ -87,7 +87,7 @@ function Get-IssueEditHistory {
         [int]$MaxPages = 50
     )
 
-    $allNodes = @()
+    $allNodes = [System.Collections.Generic.List[object]]::new()
     $totalCount = 0
     $hasNextPage = $true
     $endCursor = $null
@@ -138,7 +138,7 @@ function Get-IssueEditHistory {
 
         $edits = $issue.userContentEdits
         if ($totalCount -eq 0) { $totalCount = $edits.totalCount }
-        $allNodes += $edits.nodes
+        $allNodes.AddRange(@($edits.nodes))
         $hasNextPage = $edits.pageInfo.hasNextPage
         $endCursor = $edits.pageInfo.endCursor
         $pageCount++
@@ -164,7 +164,7 @@ function Get-IssueEditHistory {
 function Parse-HitCounts {
     param([array]$Edits)
 
-    $timeline = @()
+    $timeline = [System.Collections.Generic.List[object]]::new()
     $prev24h = $null
 
     foreach ($edit in $Edits) {
@@ -209,7 +209,7 @@ function Parse-HitCounts {
             }
 
             $prev24h = $h24
-            $timeline += $entry
+            $timeline.Add($entry)
         }
     }
 
