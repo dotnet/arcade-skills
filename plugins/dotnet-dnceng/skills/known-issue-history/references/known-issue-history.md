@@ -16,7 +16,7 @@ The dotnet Build Analysis bot periodically edits Known Build Error issue bodies 
 |0|0|0|
 ```
 
-Each edit is a snapshot of the current hit counts. GitHub stores the full revision history via the GraphQL `userContentEdits` API.
+GitHub stores the revision history via the GraphQL `userContentEdits` API. Each edit includes a diff showing what changed in the issue body; the script parses hit-count table rows from these diffs to reconstruct snapshots over time.
 
 ### Failure Detection
 
