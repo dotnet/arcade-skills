@@ -299,10 +299,14 @@ function Format-Timeline {
         [array]$FailureEvents,
         [array]$FailurePeriods,
         [int]$IssueNum,
-        [string]$Repo
+        [string]$Repo,
+        [string]$SinceFilter,
+        [int]$TotalFailureEvents,
+        [int]$TotalFailurePeriods
     )
 
     $sb = [System.Text.StringBuilder]::new()
+    $suffix = if ($SinceFilter) { " (since $SinceFilter)" } else { "" }
 
     [void]$sb.AppendLine("=" * 70)
     [void]$sb.AppendLine("KNOWN ISSUE FAILURE HISTORY")
@@ -317,11 +321,15 @@ function Format-Timeline {
 
     # Summary
     [void]$sb.AppendLine("-" * 70)
-    [void]$sb.AppendLine("FAILURE SUMMARY")
+    [void]$sb.AppendLine("FAILURE SUMMARY$suffix")
     [void]$sb.AppendLine("-" * 70)
     [void]$sb.AppendLine("")
-    [void]$sb.AppendLine("Total failure events:  $($FailureEvents.Count)")
-    [void]$sb.AppendLine("Failure periods:       $($FailurePeriods.Count)")
+    [void]$sb.AppendLine("Failure events:        $($FailureEvents.Count)$suffix")
+    [void]$sb.AppendLine("Failure periods:       $($FailurePeriods.Count)$suffix")
+    if ($SinceFilter) {
+        [void]$sb.AppendLine("Total failure events:  $TotalFailureEvents (all time)")
+        [void]$sb.AppendLine("Total failure periods:  $TotalFailurePeriods (all time)")
+    }
 
     if ($FailureEvents.Count -gt 0) {
         $lastFailure = $FailureEvents[-1]
@@ -382,7 +390,10 @@ function Build-JsonSummary {
         [array]$FailureEvents,
         [array]$FailurePeriods,
         [int]$IssueNum,
-        [string]$Repo
+        [string]$Repo,
+        [string]$SinceFilter,
+        [int]$TotalFailureEvents,
+        [int]$TotalFailurePeriods
     )
 
     $lastFailure = if ($FailureEvents.Count -gt 0) { $FailureEvents[-1].Date } else { $null }
@@ -395,23 +406,26 @@ function Build-JsonSummary {
     $current = if ($FullTimeline.Count -gt 0) { $FullTimeline[-1] } else { $null }
 
     $summary = [ordered]@{
-        issueNumber       = $IssueNum
-        repository        = $Repo
-        title             = $IssueData.Title
-        state             = $IssueData.State
-        createdAt         = $IssueData.CreatedAt
-        totalEdits        = $IssueData.TotalEdits
-        totalFailureEvents = $FailureEvents.Count
-        failurePeriods    = $FailurePeriods.Count
-        lastFailureDate   = $lastFailure
-        daysSinceLastFailure = $daysSince
-        currentHitCounts  = if ($current) {
+        issueNumber            = $IssueNum
+        repository             = $Repo
+        title                  = $IssueData.Title
+        state                  = $IssueData.State
+        createdAt              = $IssueData.CreatedAt
+        totalEdits             = $IssueData.TotalEdits
+        sinceFilter            = $SinceFilter
+        failureEvents          = $FailureEvents.Count
+        failurePeriodCount     = $FailurePeriods.Count
+        totalFailureEvents     = $TotalFailureEvents
+        totalFailurePeriods    = $TotalFailurePeriods
+        lastFailureDate        = $lastFailure
+        daysSinceLastFailure   = $daysSince
+        currentHitCounts       = if ($current) {
             [ordered]@{ h24 = $current.Hit24h; h7d = $current.Hit7d; h1mo = $current.Hit1mo }
         } else { $null }
-        failureTimeline   = @($FailureEvents | ForEach-Object {
+        failureTimeline        = @($FailureEvents | ForEach-Object {
             [ordered]@{ date = $_.Date; hit24h = $_.Hit24h; hit7d = $_.Hit7d; hit1mo = $_.Hit1mo }
         })
-        periods           = @($FailurePeriods | ForEach-Object {
+        periods                = @($FailurePeriods | ForEach-Object {
             [ordered]@{ start = $_.Start; end = $_.End; peakHit24h = $_.PeakHit24h; peakHit1mo = $_.PeakHit1mo }
         })
     }
@@ -535,13 +549,13 @@ if ($issueData.Labels -notcontains 'Known Build Error') {
 }
 
 $fullTimeline = Parse-HitCounts -Edits $issueData.Edits
-$failureEvents = Get-FailureEvents -Timeline $fullTimeline
-$failurePeriods = Get-FailurePeriods -Timeline $fullTimeline
+$allFailureEvents = Get-FailureEvents -Timeline $fullTimeline
+$allFailurePeriods = Get-FailurePeriods -Timeline $fullTimeline
 
 # Apply -Since filter after analysis so periods are computed on full data
 $timeline = Filter-Since -Items $fullTimeline -SinceDate $Since
-$failureEvents = Filter-Since -Items $failureEvents -SinceDate $Since
-$failurePeriods = Filter-Since -Items $failurePeriods -SinceDate $Since -DateProperty 'End'
+$failureEvents = Filter-Since -Items $allFailureEvents -SinceDate $Since
+$failurePeriods = Filter-Since -Items $allFailurePeriods -SinceDate $Since -DateProperty 'End'
 
 if ($Json) {
     $summary = Build-JsonSummary `
@@ -550,7 +564,10 @@ if ($Json) {
         -FailureEvents $failureEvents `
         -FailurePeriods $failurePeriods `
         -IssueNum $IssueNumber `
-        -Repo $Repository
+        -Repo $Repository `
+        -SinceFilter $Since `
+        -TotalFailureEvents $allFailureEvents.Count `
+        -TotalFailurePeriods $allFailurePeriods.Count
 
     Write-Host ""
     Write-Host "[KNOWN_ISSUE_HISTORY]"
@@ -564,7 +581,10 @@ else {
         -FailureEvents $failureEvents `
         -FailurePeriods $failurePeriods `
         -IssueNum $IssueNumber `
-        -Repo $Repository
+        -Repo $Repository `
+        -SinceFilter $Since `
+        -TotalFailureEvents $allFailureEvents.Count `
+        -TotalFailurePeriods $allFailurePeriods.Count
 
     Write-Host $output
 }
