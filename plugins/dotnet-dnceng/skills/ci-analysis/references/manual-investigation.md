@@ -38,7 +38,7 @@ $logContent | Select-String -Pattern "error|FAIL" -Context 2,5
 
 ## Search Helix Logs and Artifacts Remotely
 
-> 💡 **Prefer remote search over download.** Search Helix console logs and uploaded files in place — find errors without downloading first. Only fall back to full log retrieval or file download when remote search isn't sufficient.
+> 💡 Search logs remotely before downloading.
 
 Use your Helix MCP tools to:
 - **Search a work item's console log** for error patterns (with context lines)

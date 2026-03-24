@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Retrieves test failures from Azure DevOps builds and Helix test runs.
 
