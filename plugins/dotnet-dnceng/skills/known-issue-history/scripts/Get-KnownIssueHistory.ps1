@@ -127,7 +127,7 @@ function Get-IssueEditHistory {
 
         if ($data.errors) {
             $msgs = ($data.errors | ForEach-Object { $_.message }) -join '; '
-            throw "GraphQL errors for issue #$Number in $Owner/$RepoName: $msgs"
+            throw "GraphQL errors for issue #$Number in ${Owner}/${RepoName}: $msgs"
         }
 
         $issue = $data.data.repository.issue
@@ -502,9 +502,9 @@ function Invoke-ListActive {
     # Sort by most recent failure
     $results = $results | Sort-Object DaysSince
 
-    Write-Host "=" * 70
+    Write-Host ("=" * 70)
     Write-Host "KNOWN BUILD ERROR ACTIVITY REPORT"
-    Write-Host "=" * 70
+    Write-Host ("=" * 70)
     Write-Host ""
     Write-Host ("{0,-8} {1,8} {2,12} {3,-12} {4}" -f "Issue", "Failures", "Last Failure", "Days Ago", "Title")
     Write-Host ("{0,-8} {1,8} {2,12} {3,-12} {4}" -f "---", "---", "---", "---", "---")
