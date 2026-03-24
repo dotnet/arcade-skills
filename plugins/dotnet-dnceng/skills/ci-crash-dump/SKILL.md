@@ -146,13 +146,10 @@ The dump needs matching runtime binaries (DAC, SOS) from the payload at
 
 > **`dotnet-dump` version must match the runtime version of the dump.** A .NET 9.0
 > `dotnet-dump` cannot load a .NET 11.0 DAC (fails with `0x80004002` or
-> `No CLR runtime found`). Determine the runtime major version from the payload's
-> `shared/Microsoft.NETCore.App/<version>/` directory (e.g., `11.0.0-preview.5.25263.2`
-> → major version 11). If DAC load fails, update to match:
-> `dotnet tool update -g dotnet-dump --prerelease` (installs the latest, usually sufficient)
-> or install a specific major version: find the latest `<major>.0.*` version on
-> https://www.nuget.org/packages/dotnet-dump and install it, e.g.,
-> `dotnet tool install -g dotnet-dump --version 11.0.547801`.
+> `No CLR runtime found`). `dotnet-dump` is backwards compatible, so the simplest
+> approach is to install the latest version:
+> `dotnet tool install -g dotnet-dump --prerelease` (or `dotnet tool update -g dotnet-dump --prerelease`).
+> This usually comes from the `dotnet-tools` feed and works for all supported runtime versions.
 >
 > **If a matching dotnet-dump version is not available** (common for unreleased .NET versions
 > where no package exists on NuGet or dev feeds), **skip dotnet-dump and use `cdb` instead**
@@ -268,7 +265,7 @@ Use your judgement and knowledge of the codebase to form a diagnosis and suggest
 
 ## Common Pitfalls
 
-- **Helix artifacts expire after ~30 days.** If downloads fail with 404, the artifacts have likely expired — tell the user.
+- **Helix artifacts expire after 20 days.** If downloads fail with 404, the artifacts have likely expired — tell the user.
 - **AzDO builds also expire** due to retention policies. If a build returns "not found", try a more recent build. When multiple builds are listed (e.g., in an issue), start with the newest.
 - **`dotnet-dump` only handles managed state.** For native crashes, use `cdb`/`lldb` on matching OS.
 - **32-bit dumps on 64-bit OS:** Use 32-bit dotnet SDK to install dotnet-dump.
