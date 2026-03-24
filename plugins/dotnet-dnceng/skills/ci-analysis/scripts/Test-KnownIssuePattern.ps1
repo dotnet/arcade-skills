@@ -106,7 +106,7 @@ if ($LogFile) {
     }
     $logLineSource = [System.IO.File]::ReadLines($resolvedPath)
 } else {
-    $logLineSource = @($LogContent -split "`n")
+    $logLineSource = @($LogContent -split "\r?\n")
     if ($logLineSource.Count -eq 0) {
         throw "Log content is empty."
     }
