@@ -13,10 +13,11 @@ Onboard a .NET repository onto the [dotnet/arcade](https://github.com/dotnet/arc
 2. **Ask the user** about publishing preferences (NuGet.org yes/no, shipping scope) and 1ES metadata
 3. **Create/modify infrastructure files** — global.json, Directory.Build.props/targets, eng/ files, NuGet.config, es-metadata.yml
 4. **Copy eng/common/** — arcade shared build scripts
-5. **Create Azure Pipelines YAML** — public CI and/or official build definitions
-6. **Set up internal mirror** — configure GitHub → AzDO mirror for official builds
-7. **Map dependencies to darc/maestro** — convert eligible NuGet references to flowable dependencies
-8. **Summarize next steps** — darc setup, subscriptions, channel assignments
+5. **Update dependencies via darc** — run `darc update-dependencies` to pull latest coherent Arcade SDK, eng/common, and global.json from the target channel
+6. **Create Azure Pipelines YAML** — public CI and/or official build definitions
+7. **Set up internal mirror** — configure GitHub → AzDO mirror for official builds
+8. **Map dependencies to darc/maestro** — convert eligible NuGet references to flowable dependencies
+9. **Summarize next steps** — darc setup, subscriptions, channel assignments
 
 ## Step 1: Analyze the Repository
 
@@ -94,7 +95,7 @@ Read [references/file-templates.md](references/file-templates.md) for complete t
 
 ### File creation order (dependencies flow top-down):
 
-1. **global.json** — reference Arcade SDK. Use latest version from [arcade releases](https://github.com/dotnet/arcade/releases) or from arcade-validation's global.json. If file exists, merge `msbuild-sdks` section.
+1. **global.json** — reference Arcade SDK with a seed version. The `tools.dotnet` version should match the .NET SDK major version the repo targets (e.g. `10.0.104` for .NET 10). The Arcade SDK version will be updated by `darc update-dependencies` in the next step — use any recent version as seed (e.g. from the VMR's `global.json`).
 
 2. **Directory.Build.props** — import `Sdk.props` from Arcade SDK. If file exists, add the import at the top and merge properties. Set `<IsShipping>` based on user preference.
 
@@ -102,7 +103,7 @@ Read [references/file-templates.md](references/file-templates.md) for complete t
 
 4. **eng/Versions.props** — set `VersionPrefix`, `PreReleaseVersionLabel`, `PreReleaseVersionIteration`, and all dependency version properties. Migrate versions from any existing `Directory.Packages.props` or centralized version file.
 
-5. **eng/Version.Details.xml** — create with Arcade SDK dependency entry at minimum. Add entries for all dependencies that will flow via maestro (see Step 6).
+5. **eng/Version.Details.xml** — create with Arcade SDK dependency entry pointing to `https://github.com/dotnet/dotnet` (VMR). Use a seed version and SHA — `darc update-dependencies` (Step 5) will update these to the latest coherent versions. Add entries for all dependencies that will flow via maestro (see Step 8).
 
 6. **NuGet.config** — add required dnceng feeds. If file exists, merge feeds. Keep existing feeds the repo needs (e.g. nuget.org for third-party packages).
 
@@ -149,7 +150,80 @@ Key files in eng/common/:
 - `templates-official/` — official (internal) build pipeline templates
 - `post-build/` — publishing and validation templates
 
-## Step 5: Create Azure Pipelines YAML
+## Step 5: Update Dependencies via Darc
+
+After creating infrastructure files and copying `eng/common/`, run `darc update-dependencies` to pull the **latest coherent versions** from the appropriate .NET SDK channel. This updates `global.json`, `eng/Version.Details.xml`, and `eng/Versions.props` with versions that are known to work together.
+
+### Why this step matters
+
+Creating files manually with hardcoded versions is error-prone — the Arcade SDK version, SHA, and `eng/common/` scripts must all be coherent (from the same build). `darc update-dependencies` resolves this by pulling all related versions from a single channel build.
+
+### Determine the target channel
+
+Ask the user which .NET version they target, then pick the matching channel:
+
+| .NET Version | Channel Name | Example |
+|-------------|-------------|---------|
+| .NET 10 | `.NET 10.0.1xx SDK` | Arcade SDK 10.x |
+| .NET 9 | `.NET 9.0.1xx SDK` | Arcade SDK 9.x |
+| .NET Eng Latest | `.NET Eng - Latest` | Bleeding edge (arcade repo directly) |
+
+```bash
+# List available channels
+darc get-channels | grep -i "10.0\|9.0\|eng.*latest"
+```
+
+### Seed the Version.Details.xml
+
+Before running darc, `eng/Version.Details.xml` must have the Arcade SDK dependency pointing to `https://github.com/dotnet/dotnet` (the VMR). Use any recent seed version — darc will update it:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<Dependencies>
+  <ToolsetDependencies>
+    <Dependency Name="Microsoft.DotNet.Arcade.Sdk" Version="10.0.0-beta.25001.1">
+      <Uri>https://github.com/dotnet/dotnet</Uri>
+      <Sha>0000000000000000000000000000000000000000</Sha>
+    </Dependency>
+  </ToolsetDependencies>
+</Dependencies>
+```
+
+**Important:** The URI must be `https://github.com/dotnet/dotnet` (the VMR/dotnet-dotnet repo), **not** `https://github.com/dotnet/arcade`. The Arcade SDK is published from the VMR for .NET 9+ channels. Using `dotnet/arcade` only works for the `.NET Eng - Latest` channel.
+
+### Run the update
+
+```bash
+darc update-dependencies --channel ".NET 10.0.1xx SDK" --verbose
+```
+
+This will:
+1. Query the latest build from the specified channel
+2. Update `eng/Version.Details.xml` with the correct version and SHA
+3. Update `global.json` with the matching Arcade SDK version
+4. Update `eng/Versions.props` if it has any version properties tracked by darc
+5. Update `eng/common/` scripts to match the Arcade SDK version
+
+### Verify the update
+
+```bash
+# Check that global.json was updated
+cat global.json
+
+# Check that Version.Details.xml has the correct SHA and version
+cat eng/Version.Details.xml
+
+# Verify the build still works
+./eng/common/build.sh --restore --build --pack --configuration Release --prepareMachine
+```
+
+### Channel selection guidance
+
+- **For most repos targeting a stable .NET release** → use `.NET {Major}.0.1xx SDK` (e.g. `.NET 10.0.1xx SDK`)
+- **For repos that need the latest arcade features** → use `.NET Eng - Latest` (but the dependency URI should be `dotnet/arcade`)
+- **For repos targeting a preview/RC** → use the matching SDK RC channel (e.g. `.NET 10.0.1xx SDK RC 2`)
+
+## Step 6: Create Azure Pipelines YAML
 
 Read [references/pipeline-templates.md](references/pipeline-templates.md) for complete templates.
 
@@ -203,7 +277,7 @@ pipelines: {}
 
 The 1ES automation will populate pipeline IDs and SDL tool baselines (credscan, binskim, eslint, etc.) after the first official build runs. **Do not edit this file manually after it's populated.** See [references/pipeline-templates.md](references/pipeline-templates.md#1es-sdl-auto-baselining) for details.
 
-## Step 5b: Configure Signing
+## Step 6b: Configure Signing
 
 Signing is handled by MicroBuild/ESRP during official builds. There are **two separate mechanisms** that must be configured:
 
@@ -305,7 +379,7 @@ stages:
 4. **Signing happens in rounds** — Round 0: individual DLLs, Round 1: NuGet packages (re-packed after DLL signing)
 5. **Post-build validation** — `SignCheck` (in the `Validate` stage) independently verifies all files are properly signed, using `SignCheckExclusionsFile.txt` for exclusions
 
-## Step 6: Set Up Internal Mirror
+## Step 7: Set Up Internal Mirror
 
 Read [references/internal-mirror.md](references/internal-mirror.md) for the complete guide.
 
@@ -347,7 +421,7 @@ dnceng/internal:
   {org}/{repo}/{repo}-official
 ```
 
-## Step 7: Map Dependencies to Darc/Maestro
+## Step 8: Map Dependencies to Darc/Maestro
 
 Read [references/dependency-flow.md](references/dependency-flow.md) for the complete guide.
 
@@ -368,7 +442,7 @@ Replace dots with nothing, append `Version`:
 - `Microsoft.Extensions.Logging` → `<MicrosoftExtensionsLoggingVersion>`
 - `System.Text.Json` → `<SystemTextJsonVersion>`
 
-## Step 8: Darc Setup and Summary
+## Step 9: Darc Setup and Summary
 
 After all files are created/modified:
 
@@ -403,7 +477,7 @@ Create `eng/setup-darc.sh` (or `.ps1`) in the repo with all the darc commands pr
 4. Create all subscriptions (arcade, plus one per source repo in Version.Details.xml)
 5. Print a summary of what was configured
 
-Use this template — replace OWNER, REPO, channel names, and subscription entries based on the analysis from Steps 1 and 7:
+Use this template — replace OWNER, REPO, channel names, and subscription entries based on the analysis from Steps 1 and 8:
 
 ```bash
 #!/usr/bin/env bash
@@ -437,12 +511,14 @@ darc add-default-channel \
   --repo "$REPO" \
   --channel "<CHANNEL_NAME>"
 
-# 4. Subscribe to arcade updates (required for all onboarded repos)
+# 4. Subscribe to arcade/VMR updates (required for all onboarded repos)
+# For .NET 9+ SDK channels, use dotnet/dotnet (VMR) as source repo
+# For .NET Eng - Latest channel, use dotnet/arcade instead
 echo ""
 echo "Creating arcade subscription..."
 darc add-subscription \
-  --channel ".NET Eng - Latest" \
-  --source-repo https://github.com/dotnet/arcade \
+  --channel "<SDK_CHANNEL_NAME>" \
+  --source-repo https://github.com/dotnet/dotnet \
   --target-repo "$REPO" \
   --target-branch "$TARGET_BRANCH" \
   --update-frequency everyDay \
