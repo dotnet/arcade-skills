@@ -183,7 +183,7 @@ Tracks all dependencies with source repo and SHA for darc/maestro dependency flo
   <ToolsetDependencies>
     <!-- Toolset dependencies: packages used to build but not shipped -->
     <Dependency Name="Microsoft.DotNet.Arcade.Sdk" Version="ARCADE_SDK_VERSION">
-      <Uri>https://github.com/dotnet/arcade</Uri>
+      <Uri>https://github.com/dotnet/dotnet</Uri>
       <Sha>ARCADE_SHA_HERE</Sha>
     </Dependency>
   </ToolsetDependencies>
@@ -200,6 +200,12 @@ Tracks all dependencies with source repo and SHA for darc/maestro dependency flo
 - `Pinned="true"`: Prevents automatic updates by maestro
 - `<Uri>`: Source repository URL
 - `<Sha>`: Git commit SHA that produced this version
+
+**Important — Arcade SDK URI:**
+- For .NET 9+ channels (`.NET 10.0.1xx SDK`, etc.) → use `https://github.com/dotnet/dotnet` (VMR)
+- For `.NET Eng - Latest` channel → use `https://github.com/dotnet/arcade`
+
+The Arcade SDK is built from the VMR for release channels. Using the wrong URI means `darc update-dependencies` won't find matching builds.
 
 ## NuGet.config
 
