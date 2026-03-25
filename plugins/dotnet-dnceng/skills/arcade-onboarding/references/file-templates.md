@@ -13,6 +13,7 @@ Templates for all files that must be created or modified when onboarding a repos
 - [eng/Publishing.props](#engpublishingprops)
 - [eng/Signing.props](#engsigningprops)
 - [eng/SignCheckExclusionsFile.txt](#engsigncheckexclusionsfiletxt)
+- [es-metadata.yml](#es-metadatayml)
 - [NuGet.config](#nugetconfig)
 - [eng/Publishing.props](#engpublishingprops)
 
@@ -327,4 +328,106 @@ Exclusions for post-build SignCheck validation. This is **separate** from `Signi
 **Important:** This file must be consistent with `Signing.props`. If you set `CertificateName="None"` for `.js` in `Signing.props`, you must also exclude `*.js` in `SignCheckExclusionsFile.txt`. Otherwise the post-build validation will flag those files as unsigned.
 
 **Reference:** Pattern from [dotnet/Scaffolding](https://github.com/dotnet/Scaffolding/blob/main/eng/SignCheckExclusionsFile.txt).
+```
+
+## es-metadata.yml
+
+1ES Inventory-as-Code metadata file. Required for all repos in the 1ES ecosystem. This file maps the repository to a Service Tree entry for compliance, telemetry, and issue routing.
+
+**Documentation:** [1ES Inventory as Code](https://eng.ms/docs/coreai/devdiv/one-engineering-system-1es/1es-docs/product-catalog/inventory-as-code/about)
+
+### Template
+
+```yaml
+schemaVersion: 0.0.1
+isProduction: <IS_PRODUCTION>
+accountableOwners:
+  service: <SERVICE_TREE_ID>
+routing:
+  defaultAreaPath:
+    org: <AZDO_ORG>
+    path: <AZDO_AREA_PATH>
+```
+
+### Field descriptions
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| `schemaVersion` | Always `0.0.1` (current schema version) | `0.0.1` |
+| `isProduction` | Whether this is a production service/component. Map from `IsShipping`: if `IsShipping=true` → `isProduction: true` | `true` |
+| `accountableOwners.service` | Service Tree UUID. Find at https://servicetree.msft.ms/ | `9d770e15-6208-4284-b347-b2762803623b` |
+| `routing.defaultAreaPath.org` | Azure DevOps organization for bug routing (`devdiv` or `dnceng`) | `devdiv` |
+| `routing.defaultAreaPath.path` | Azure DevOps area path for bug routing | `DevDiv\.NET MAUI` |
+
+### IsShipping → isProduction mapping
+
+- `IsShipping=true` (packages published to NuGet.org) → `isProduction: true`
+- `IsShipping=false` (internal/dev-only) → `isProduction: false`
+
+### Reference examples
+
+**dotnet/maui** (production, devdiv):
+```yaml
+schemaVersion: 0.0.1
+isProduction: true
+accountableOwners:
+  service: 9d770e15-6208-4284-b347-b2762803623b
+routing:
+  defaultAreaPath:
+    org: devdiv
+    path: DevDiv\.NET MAUI
+```
+
+**dotnet/aspire** (production, devdiv):
+```yaml
+schemaVersion: 0.0.1
+isProduction: true
+accountableOwners:
+  service: 6e21af9f-054b-4ed9-a856-e34c73d843d1
+routing:
+  defaultAreaPath:
+    org: devdiv
+    path: DevDiv\ASP.NET Core
+```
+
+**dotnet/runtime** (production, devdiv):
+```yaml
+schemaVersion: 0.0.1
+isProduction: true
+accountableOwners:
+  service: 1dc8dedc-8f5f-4b94-b182-ec3bdfb207b0
+routing:
+  defaultAreaPath:
+    org: devdiv
+    path: DevDiv\NET Runtime
+```
+
+**dotnet/arcade** (production, dnceng):
+```yaml
+schemaVersion: 0.0.1
+isProduction: true
+accountableOwners:
+  service: b3bbd815-183a-4142-8056-3a676d687f71
+routing:
+  defaultAreaPath:
+    org: dnceng
+    path: internal\Dotnet-Core-Engineering
+```
+
+### Placeholder handling
+
+If the user doesn't know their Service Tree ID or area path, generate the file with placeholders and add a TODO comment:
+
+```yaml
+# TODO: Replace placeholders with actual values
+# Service Tree: https://servicetree.msft.ms/
+# 1ES docs: https://eng.ms/docs/coreai/devdiv/one-engineering-system-1es/1es-docs/product-catalog/inventory-as-code/about
+schemaVersion: 0.0.1
+isProduction: true
+accountableOwners:
+  service: <SERVICE_TREE_ID>
+routing:
+  defaultAreaPath:
+    org: <AZDO_ORG>
+    path: <AZDO_AREA_PATH>
 ```
