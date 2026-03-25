@@ -30,8 +30,6 @@ The `Files` array contains artifacts with `FileName` and `Uri` properties.
 - **Standard unit tests** → Console logs only, no binlogs
 - **Crash failures** (exit code 134) → Core dumps may be present
 
-Always query the specific work item to see what's available rather than assuming a fixed structure.
-
 ## Common Artifact Patterns
 
 | File Pattern | Purpose | When Useful |

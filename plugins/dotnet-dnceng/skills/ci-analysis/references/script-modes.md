@@ -21,8 +21,6 @@ The script operates in three distinct modes depending on what information you ha
 | An AzDO build ID | `-BuildId 1276327` | Single build analysis: timeline, failures, Helix results |
 | A Helix job ID (optionally a specific work item) | `-HelixJob "..." [-WorkItem "..."]` | Deep dive: list work items for the job, or with `-WorkItem`, focus on a single work item's console logs, artifacts, and test results |
 
-> ❌ **Don't guess the mode.** If the user gives a PR URL, use `-PRNumber`. If they paste an AzDO build link, extract the build ID. If they reference a specific Helix job, use `-HelixJob`.
-
 ## What the Script Does
 
 ### PR Analysis Mode (`-PRNumber`)
@@ -36,7 +34,7 @@ The script operates in three distinct modes depending on what information you ha
 8. Correlates failures with PR file changes
 9. **Emits structured summary** — `[CI_ANALYSIS_SUMMARY]` JSON block with all key facts for the agent to reason over
 
-> **After the script runs**, you (the agent) generate recommendations. The script collects data; you synthesize the advice. See [recommendation-generation.md](recommendation-generation.md).
+For recommendation generation, see [recommendation-generation.md](recommendation-generation.md).
 
 ### Build ID Mode (`-BuildId`)
 1. Fetches the build timeline directly (skips PR discovery)
