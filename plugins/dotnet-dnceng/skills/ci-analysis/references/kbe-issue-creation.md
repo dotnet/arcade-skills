@@ -46,12 +46,19 @@ Also check the `knownIssues` array from the `[CI_ANALYSIS_SUMMARY]` JSON — Bui
 
 ## Issue Template
 
-The issue body must contain a `## Build Information` section and a `## Error Message` section with a JSON blob that Build Analysis parses for matching.
+The issue body must contain a `## Build Information` section, a `## Error Details` section with the full exception/stack trace, and a `## Error Message` section with a JSON blob that Build Analysis parses for matching.
 
 ````markdown
 ## Build Information
 Build: <!-- Link to the AzDO build with the error -->
 Leg Name: <!-- Name of the failing job/leg -->
+
+## Error Details
+<!-- Paste the full stack trace or exception output below so readers can understand the failure at a glance.
+     This section is for humans — Build Analysis only parses the ## Error Message section. -->
+```
+<full exception / stack trace here>
+```
 
 ## Error Message
 <!-- The JSON blob below is parsed by Build Analysis for automatic matching -->
@@ -80,23 +87,47 @@ Build Analysis uses `String.Contains` (case-sensitive, ordinal) to match each lo
 **Rules for choosing the error string:**
 1. Must match at least one line in the build/test error output
 2. Strip unique identifiers: machine names, paths, timestamps, GUIDs, port numbers
-3. Keep enough context to avoid false positives
+3. **Be as specific as possible** — the pattern must match every occurrence of *this particular failure* but **never** match unrelated failures. Don't worry about pattern length; specificity matters more than brevity
+4. **Prefer multi-line patterns** (array syntax) when a single line could plausibly match unrelated errors. Include the test name, exception type, and key assertion details as separate lines
+5. Only use a short single-line pattern when it is genuinely unique to this failure (e.g., a specific telemetry tag + unique error text)
 
-**Example:** For the error:
+**Example — single-line is sufficient** (the telemetry tag + specific package name makes it unique):
 ```
 ##[error].dotnet/sdk/6.0.100-rc.1.21411.28/NuGet.RestoreEx.targets(19,5): error : (NETCORE_ENGINEERING_TELEMETRY=Restore) Failed to retrieve information about 'Microsoft.Extensions.Hosting.WindowsServices'
 ```
 
-Use only the stable part:
 ```json
 {
-    "ErrorMessage": "(NETCORE_ENGINEERING_TELEMETRY=Restore) Failed to retrieve information"
+    "ErrorMessage": "(NETCORE_ENGINEERING_TELEMETRY=Restore) Failed to retrieve information about 'Microsoft.Extensions.Hosting.WindowsServices'"
 }
 ```
+
+**Example — multi-line needed** (a generic assertion like `Assert.True() Failure` alone would match many unrelated tests):
+```
+Failed test: System.Net.Http.Tests.HttpClientHandlerTest.GetAsync_UnknownHost_Throws
+   System.Net.Http.HttpRequestException : Name or service not known (nonexistent.example.com:443)
+   Assert.True() Failure
+   Expected: True
+   Actual:   False
+```
+
+Use multi-line to pin down the specific test and exception:
+```json
+{
+    "ErrorMessage": [
+        "System.Net.Http.Tests.HttpClientHandlerTest.GetAsync_UnknownHost_Throws",
+        "System.Net.Http.HttpRequestException : Name or service not known"
+    ]
+}
+```
+
+> ⚠️ **Each array element must match a different log line.** If two substrings appear on the same line, combine them into one element.
 
 ### Regex Matching (`ErrorPattern`)
 
 Build Analysis uses `Regex` with options: **Singleline**, **IgnoreCase**, **NonBacktracking**, and a 50ms timeout per line.
+
+The same specificity rules apply: **be as specific as possible**. Use multi-line array syntax if needed to avoid matching unrelated failures.
 
 ```json
 {
@@ -184,6 +215,11 @@ gh issue create --repo dotnet/<REPO> \
   --body "## Build Information
 Build: <AzDO build URL>
 Leg Name: <failing job name>
+
+## Error Details
+\`\`\`
+<full stack trace or exception output>
+\`\`\`
 
 ## Error Message
 \`\`\`json

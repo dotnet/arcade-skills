@@ -212,8 +212,19 @@ if ($overallMatch) {
     Write-Host "RESULT: FAIL - Pattern does not match the log" -ForegroundColor Red
     Write-Host ""
     if ($isMultiLine) {
-        Write-Host "Multi-line matching requires all patterns to match in order." -ForegroundColor Yellow
-        Write-Host "Check that each pattern matches at least one line and they appear in sequence." -ForegroundColor Yellow
+        Write-Host "Matched $patternIdx of $($patterns.Count) patterns. Stuck on pattern[$patternIdx]:" -ForegroundColor Yellow
+        Write-Host "  ``$($patterns[$patternIdx])``" -ForegroundColor Yellow
+        if ($currentMatches.Count -gt 0) {
+            Write-Host ""
+            Write-Host "Partial matches before failure:" -ForegroundColor Yellow
+            foreach ($m in $currentMatches) {
+                Write-Host "  pattern[$($m.PatternIndex)] matched line $($m.LineNumber): $($m.LineContent)" -ForegroundColor Gray
+            }
+        }
+        Write-Host ""
+        Write-Host "Possible causes:" -ForegroundColor Yellow
+        Write-Host "  - The substring does not appear in any log line" -ForegroundColor Yellow
+        Write-Host "  - It appears on a line already consumed by an earlier pattern (each element must match a *different* line)" -ForegroundColor Yellow
     } else {
         Write-Host "No log line contains the specified $(if ($useRegex) { 'pattern' } else { 'substring' })." -ForegroundColor Yellow
     }
@@ -280,6 +291,12 @@ $template = @(
     "## Build Information"
     "Build: <!-- Add link to the AzDO build -->"
     "Leg Name: <!-- Add failing job name -->"
+    ""
+    "## Error Details"
+    "<!-- Paste the full stack trace or exception output below -->"
+    '```'
+    "<!-- Replace this line with the full error output -->"
+    '```'
     ""
     "## Error Message"
     "${fence}json"
