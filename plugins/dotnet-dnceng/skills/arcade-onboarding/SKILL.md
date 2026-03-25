@@ -1,6 +1,6 @@
 ---
 name: arcade-onboarding
-description: "Onboard a .NET repository onto the dotnet/arcade build system. Use when a user wants to adopt Arcade SDK for building, versioning, signing, packaging, and publishing .NET projects. Handles creating or modifying global.json, Directory.Build.props/targets, eng/Versions.props, eng/Version.Details.xml, NuGet.config, eng/common/ scripts, Azure Pipelines YAML, and eng/Publishing.props. Supports configuring NuGet.org publishing (shipping vs non-shipping), setting up GitHub-to-AzDO internal mirror for official builds, identifying NuGet dependencies that can be replaced with darc/maestro dependency flow, and setting up subscriptions for automatic dependency updates. Triggers: 'arcade onboarding', 'onboard arcade', 'arcade SDK', 'dotnet arcade', 'arcade build system', 'dependency flow', 'darc onboarding', 'maestro setup', 'arcade publishing', 'internal mirror', 'dnceng mirror', or any request about adopting the .NET Arcade infrastructure."
+description: "Onboard a .NET repository onto the dotnet/arcade build system. Use when a user wants to adopt Arcade SDK for building, versioning, signing, packaging, and publishing .NET projects. Handles creating or modifying global.json, Directory.Build.props/targets, eng/Versions.props, eng/Version.Details.xml, NuGet.config, eng/common/ scripts, Azure Pipelines YAML, eng/Publishing.props, and es-metadata.yml (1ES inventory-as-code). Supports configuring NuGet.org publishing (shipping vs non-shipping), setting up GitHub-to-AzDO internal mirror for official builds, identifying NuGet dependencies that can be replaced with darc/maestro dependency flow, and setting up subscriptions for automatic dependency updates. Triggers: 'arcade onboarding', 'onboard arcade', 'arcade SDK', 'dotnet arcade', 'arcade build system', 'dependency flow', 'darc onboarding', 'maestro setup', 'arcade publishing', 'internal mirror', 'dnceng mirror', 'es-metadata', '1es inventory', or any request about adopting the .NET Arcade infrastructure."
 ---
 
 # Arcade Onboarding
@@ -10,8 +10,8 @@ Onboard a .NET repository onto the [dotnet/arcade](https://github.com/dotnet/arc
 ## Onboarding Workflow
 
 1. **Analyze the repository** — scan for projects, output types, existing CI, NuGet dependencies
-2. **Ask the user** about publishing preferences (NuGet.org yes/no, shipping scope)
-3. **Create/modify infrastructure files** — global.json, Directory.Build.props/targets, eng/ files, NuGet.config
+2. **Ask the user** about publishing preferences (NuGet.org yes/no, shipping scope) and 1ES metadata
+3. **Create/modify infrastructure files** — global.json, Directory.Build.props/targets, eng/ files, NuGet.config, es-metadata.yml
 4. **Copy eng/common/** — arcade shared build scripts
 5. **Create Azure Pipelines YAML** — public CI and/or official build definitions
 6. **Set up internal mirror** — configure GitHub → AzDO mirror for official builds
@@ -63,7 +63,7 @@ cat eng/Versions.props 2>/dev/null
 
 ### Check existing arcade artifacts
 ```bash
-ls global.json Directory.Build.props Directory.Build.targets eng/Versions.props eng/Version.Details.xml eng/common/ 2>/dev/null
+ls global.json Directory.Build.props Directory.Build.targets eng/Versions.props eng/Version.Details.xml eng/common/ es-metadata.yml 2>/dev/null
 ```
 
 If some arcade files exist, this is a **partial onboarding** — only create/modify what's missing.
@@ -76,11 +76,17 @@ Ask the user:
    - If yes: which projects are shipping? (default: all library projects)
    - If no: set `<IsShipping>false</IsShipping>` globally
 
-2. **Version prefix** — What version should the repo use? (e.g. `1.0.0`, `8.0.0`)
+2. **1ES inventory metadata (es-metadata.yml)** — Based on the shipping answer:
+   - If **IsShipping=true** → `isProduction: true` in `es-metadata.yml`. Then ask:
+     - **Service Tree ID** — The GUID identifying this service in Microsoft's Service Tree. Ask: "What is the Service Tree ID (GUID) for this repo? You can find it at https://servicetree.msft.ms/". If the user doesn't know it, use a placeholder: `<SERVICE_TREE_ID>`.
+     - **Default Area Path** — The Azure DevOps area path for routing issues. Ask: "What Azure DevOps org and area path should be used for routing? (e.g., org: devdiv, path: DevDiv\\.NET MAUI)". If the user doesn't know, use placeholders: `org: <AZDO_ORG>`, `path: <AZDO_AREA_PATH>`.
+   - If **IsShipping=false** → `isProduction: false` in `es-metadata.yml`. Still ask for Service Tree ID and area path (or use placeholders).
 
-3. **Pre-release label** — `preview`, `beta`, `alpha`, `rc`, or empty for release-only
+3. **Version prefix** — What version should the repo use? (e.g. `1.0.0`, `8.0.0`)
 
-4. **License** — MIT, Apache-2.0, or other
+4. **Pre-release label** — `preview`, `beta`, `alpha`, `rc`, or empty for release-only
+
+5. **License** — MIT, Apache-2.0, or other
 
 ## Step 3: Create/Modify Infrastructure Files
 
@@ -105,6 +111,8 @@ Read [references/file-templates.md](references/file-templates.md) for complete t
 8. **eng/Signing.props** — configure signing certificates for MicroBuild/ESRP. Map first-party DLLs to the .NET certificate, third-party DLLs to `3PartySHA2`, and file extensions like `.js` to `None`. See [references/file-templates.md](references/file-templates.md#engsigningprops).
 
 9. **eng/SignCheckExclusionsFile.txt** — exclusions for post-build SignCheck validation. Must be consistent with `Signing.props` — e.g. if `.js` is `None` in `Signing.props`, add `*.js` here. See [references/file-templates.md](references/file-templates.md#engsigncheckexclusionsfiletxt).
+
+10. **es-metadata.yml** — 1ES inventory-as-code metadata. Required for all repos in the 1ES ecosystem. Set `isProduction` based on shipping status, and populate Service Tree ID and area path from user input (or placeholders). See [references/file-templates.md](references/file-templates.md#es-metadatayml).
 
 ### Important rules:
 - **Never delete** existing content from files — always merge
@@ -481,6 +489,7 @@ Cross-check generated files against known arcade-onboarded repos for correctness
 | eng/Version.Details.xml | [dotnet/runtime](https://github.com/dotnet/runtime/blob/main/eng/Version.Details.xml) — ProductDependencies/ToolsetDependencies structure |
 | NuGet.config | [dotnet/aspire](https://github.com/dotnet/aspire/blob/main/NuGet.config) — feed URLs, packageSourceMapping |
 | eng/Publishing.props | [dotnet/aspire](https://github.com/dotnet/aspire/blob/main/eng/Publishing.props) — PublishingVersion=3 |
+| es-metadata.yml | [dotnet/maui](https://github.com/dotnet/maui/blob/main/es-metadata.yml), [dotnet/aspire](https://github.com/dotnet/aspire/blob/main/es-metadata.yml), [dotnet/runtime](https://github.com/dotnet/runtime/blob/main/es-metadata.yml) — schemaVersion, isProduction, service tree ID, area path |
 | Official pipeline | [dotnet/aspire](https://github.com/dotnet/aspire/blob/main/eng/pipelines/azure-pipelines.yml) — 1ES template, post-build |
 
 **Key patterns validated against real repos:**
@@ -606,15 +615,12 @@ Also ensure `eng/Signing.props` maps third-party DLLs to `3PartySHA2` certificat
 
 **Pattern:** For publishing NuGet packages to NuGet.org from dnceng official builds, use the `1ES.PublishNuget@1` task (not `DotNetCoreCLI@2` or `NuGetCommand@2`).
 
-**CRITICAL: NuGet.org publishing MUST be a separate pipeline** from the main build pipeline. MicroBuild signing (used for Authenticode signing in the build pipeline) enables CFS (Container Fencing Service) network isolation that blocks outbound HTTPS to external hosts including NuGet.org. This manifests as DNS being redirected to TEST-NET IPs (`192.0.2.x`), causing `Unable to connect to the remote server` errors. This cannot be worked around within the same pipeline — `networkIsolationPolicy: Permissive` does not override CFS restrictions set by MicroBuild. The solution is a dedicated release pipeline (like aspire's `release-publish-nuget.yml`) that has no MicroBuild/signing stages.
-
-Key requirements for the release pipeline:
-- `settings.networkIsolationPolicy: Permissive` at the 1ES template level (do NOT use `Permissive,CFSClean` — it also blocks NuGet.org)
+Key requirements:
+- `settings.networkIsolationPolicy: Permissive` at the 1ES template level (do NOT use `Permissive,CFSClean` — it blocks NuGet.org)
 - `templateContext.type: releaseJob` with `isProduction: true` on the publish job
 - `useDotNetTask: false` (DotNetCoreCLI@2 doesn't support encrypted API keys)
-- `nuGetFeedType: external` with a `publishFeedCredentials` service connection
-- Pipeline resource referencing the build pipeline: `resources.pipelines` with `trigger: none` for manual releases
+- `nuGetFeedType: external` with a `publishFeedCredentials` service connection (naming convention: `NuGet.org - dotnet/{repo}`)
 
-**SBOM requirement:** The `releaseJob` type triggers an SBOM validator that expects `_manifest/spdx_2.2/manifest.spdx.json` alongside the packages. Since `PackageArtifacts` is published by Arcade (not through 1ES `templateContext.outputs`), no SBOM is generated. **The release pipeline must have a `PrepareArtifacts` stage** that downloads artifacts from the build pipeline and re-publishes them through `templateContext.outputs` — this generates the SBOM. The `Release` stage then consumes the SBOM-annotated artifacts.
+**SBOM requirement (critical):** The `releaseJob` type triggers an SBOM validator that expects `_manifest/spdx_2.2/manifest.spdx.json` alongside the packages. Since `PackageArtifacts` is published by Arcade (not through 1ES `templateContext.outputs`), no SBOM is generated. **You must add a `PrepareArtifacts` job** that downloads the artifact and re-publishes it through `templateContext.outputs` — this generates the SBOM. The `PublishNuGet` job then consumes the SBOM-annotated artifact. Without this, the build fails with `manifest.spdx.json not found`.
 
 Reference implementation: [dotnet/aspire release-publish-nuget.yml](https://github.com/dotnet/aspire/blob/main/eng/pipelines/release-publish-nuget.yml). See [references/pipeline-templates.md](references/pipeline-templates.md#nugetorg-publishing-with-1espublishnuget1) for the full template.
