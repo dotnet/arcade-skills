@@ -69,6 +69,52 @@ ls global.json Directory.Build.props Directory.Build.targets eng/Versions.props 
 
 If some arcade files exist, this is a **partial onboarding** — only create/modify what's missing.
 
+### Check LICENSE file format
+
+Arcade's `RepositoryValidation.proj` validates the `LICENSE` file line-by-line against the expected template (`tools/Licenses/MIT.txt` inside the Arcade SDK package). Lines with `*ignore-line*` are skipped (the copyright holder line). Any extra content — headers, preambles, project names — will cause a validation error.
+
+```bash
+cat LICENSE | head -5
+```
+
+**Common issue:** Files with a project name header (e.g. `Xamarin SDK`) before `The MIT License (MIT)` will fail. The LICENSE must start with `The MIT License (MIT)` on line 1.
+
+**Expected format:**
+```
+The MIT License (MIT)
+
+Copyright (c) <Your Copyright Holder>
+
+All rights reserved.
+...
+```
+
+### Check solution file configuration mappings
+
+Inspect the `.sln` file for configuration mismatches. Visual Studio sometimes maps `Release|Any CPU` to `Debug|Any CPU` for specific projects, which causes them to build as Debug even when `-configuration Release` is passed. This means no packages are produced (Arcade outputs Release packages to `artifacts/packages/Release/Shipping/`).
+
+```bash
+grep -A2 "Release|Any CPU" *.sln
+```
+
+Look for lines like `{GUID}.Release|Any CPU.Build.0 = Debug|Any CPU` — these must be fixed to `Release|Any CPU`.
+
+### Check AssemblyCopyright for signing compatibility
+
+Arcade's `Sign.proj` (error SIGN004) inspects the `AssemblyCopyright` attribute in compiled DLLs to classify them as 1st-party or 3rd-party. If the copyright contains a non-Microsoft entity (e.g. `Xamarin Inc.`, `Google LLC`), the DLL is flagged as 3rd-party and signing with the Microsoft certificate fails.
+
+```bash
+# Check for manual AssemblyInfo files
+find . -name "AssemblyInfo.cs" -not -path "./eng/*" -not -path "./.packages/*" -not -path "./artifacts/*"
+
+# Check if projects disable auto-generated assembly info
+grep -rn "GenerateAssemblyInfo.*false" --include="*.csproj"
+```
+
+**If `GenerateAssemblyInfo` is `false`:** The copyright from the manual `AssemblyInfo.cs` is used — update `AssemblyCopyright` to `© Microsoft Corporation. All rights reserved.` (or similar Microsoft copyright).
+
+**If `GenerateAssemblyInfo` is `true` (default):** The `<Copyright>` MSBuild property in the csproj or `Directory.Build.props` is used — ensure it contains a Microsoft copyright.
+
 ## Step 2: User Configuration
 
 Ask the user:
@@ -143,12 +189,14 @@ rm -rf /tmp/arcade-clone
 ```
 
 Key files in eng/common/:
-- `build.sh` / `build.cmd` — entry points for builds
-- `cibuild.sh` / `cibuild.cmd` — CI build wrappers
+- `build.sh` / `build.cmd` — entry points for builds (requires explicit flags like `--restore --build --ci`)
+- `cibuild.sh` / `cibuild.cmd` — CI build wrappers (automatically pass `--restore --build --test --pack --publish --ci`)
 - `dotnet-install.sh` / `dotnet-install.ps1` — SDK acquisition
 - `templates/` — public CI pipeline templates
 - `templates-official/` — official (internal) build pipeline templates
 - `post-build/` — publishing and validation templates
+
+**⚠️ build.sh vs cibuild.sh:** `cibuild.sh` is a thin wrapper that calls `build.sh` with `--ci` and all action flags. When using `build.sh` directly (e.g. for macOS jobs that skip test or need custom flags), **always pass `--ci`** — without it, no binary logs are created (`artifacts/log/` doesn't exist), and pipeline steps like "Publish Logs" will fail with `Not found PathtoPublish`.
 
 ## Step 5: Update Dependencies via Darc
 
@@ -167,6 +215,8 @@ Ask the user which .NET version they target, then pick the matching channel:
 | .NET 10 | `.NET 10.0.1xx SDK` | Arcade SDK 10.x |
 | .NET 9 | `.NET 9.0.1xx SDK` | Arcade SDK 9.x |
 | .NET Eng Latest | `.NET Eng - Latest` | Bleeding edge (arcade repo directly) |
+
+**⚠️ SDK compatibility:** Arcade SDK major version must match the .NET SDK major version. Arcade SDK 10.x requires .NET 10 SDK; Arcade SDK 11.x requires .NET 11 SDK (its MSBuild tasks reference System.Text.Json from that SDK). Using a mismatched SDK causes `FileNotFoundException` at build time. **For most repos, use Arcade SDK 10.x from the `.NET 10.0.1xx SDK` channel.**
 
 ```bash
 # List available channels
@@ -616,7 +666,9 @@ Cross-check generated files against known arcade-onboarded repos for correctness
    ```bash
    ls artifacts/packages/Release/Shipping/
    ```
-   You should see `.nupkg` files for all projects with `<IsPackable>true</IsPackable>` or `<IsShipping>true</IsShipping>`.
+   You should see `.nupkg` files for all projects with `<IsPackable>true</IsPackable>`.
+
+   **⚠️ IsPackable must be explicit:** Even if a project has `<PackageId>` set, Arcade requires `<IsPackable>true</IsPackable>` to generate packages. Having `PackageId` alone is **not sufficient**.
 
 ### Common build failures
 
@@ -628,6 +680,10 @@ Cross-check generated files against known arcade-onboarded repos for correctness
 | `The project file was not found` | Relative path to `--projects` | Use absolute path |
 | WiX/signing errors | Arcade SDK 10+ WiX bug | Add MakeDir workaround (see Known Issues) |
 | `manifest.spdx.json not found` | SBOM missing in NuGet publish stage | Add PrepareArtifacts job (see Known Issues) |
+| `License file content doesn't match` | LICENSE file has extra headers or wrong format | Remove extra content; must match Arcade's MIT template (see Step 1) |
+| `SIGN004: Signing 3rd party library` | `AssemblyCopyright` contains non-Microsoft entity (e.g. `Xamarin Inc.`) | Update to Microsoft copyright (see Step 1) |
+| No packages in `artifacts/packages/Release/Shipping/` | Missing `IsPackable=true`, or .sln maps Release→Debug | Add `<IsPackable>true</IsPackable>` to csproj; fix .sln config mapping (see Step 1) |
+| `Not found PathtoPublish: artifacts/log` | macOS job using `build.sh` without `--ci` flag | Add `--ci` to `build.sh` invocation (see Step 4) |
 
 ## Known Issues & Workarounds
 
