@@ -151,7 +151,7 @@ Read [references/file-templates.md](references/file-templates.md) for complete t
 
 5. **eng/Version.Details.xml** — create with Arcade SDK dependency entry pointing to `https://github.com/dotnet/dotnet` (VMR). Use a seed version and SHA — `darc update-dependencies` (Step 5) will update these to the latest coherent versions. Add entries for all dependencies that will flow via maestro (see Step 8).
 
-6. **NuGet.config** — add required dnceng feeds. If file exists, merge feeds. Keep existing feeds the repo needs (e.g. nuget.org for third-party packages).
+6. **NuGet.config** — add required dnceng feeds (`dotnet-public`, `dotnet-tools`, `dotnet-eng`, `dotnet10`). **Do not include nuget.org** — the `dotnet-public` feed mirrors it and CFS requires using only approved feeds. If file exists, merge feeds.
 
 7. **eng/Publishing.props** — create with `<PublishingVersion>3</PublishingVersion>`.
 
@@ -684,6 +684,7 @@ Cross-check generated files against known arcade-onboarded repos for correctness
 | `SIGN004: Signing 3rd party library` | `AssemblyCopyright` contains non-Microsoft entity (e.g. `Xamarin Inc.`) | Update to Microsoft copyright (see Step 1) |
 | No packages in `artifacts/packages/Release/Shipping/` | Missing `IsPackable=true`, or .sln maps Release→Debug | Add `<IsPackable>true</IsPackable>` to csproj; fix .sln config mapping (see Step 1) |
 | `Not found PathtoPublish: artifacts/log` | macOS job using `build.sh` without `--ci` flag | Add `--ci` to `build.sh` invocation (see Step 4) |
+| `NuGet Security Analysis found ... do not comply` | `nuget.org` listed as direct feed in NuGet.config | Remove `nuget.org`; use `dotnet-public` feed instead (mirrors nuget.org). See https://aka.ms/cfs/nuget |
 
 ## Known Issues & Workarounds
 
