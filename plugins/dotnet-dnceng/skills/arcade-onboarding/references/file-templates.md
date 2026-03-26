@@ -223,7 +223,6 @@ Must include the Arcade/dnceng feeds. Clear existing sources to ensure determini
     <add key="dotnet-tools" value="https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3/index.json" />
     <add key="dotnet-eng" value="https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-eng/nuget/v3/index.json" />
     <add key="dotnet10" value="https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet10/nuget/v3/index.json" />
-    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
   </packageSources>
   <disabledPackageSources>
     <clear />
@@ -231,10 +230,12 @@ Must include the Arcade/dnceng feeds. Clear existing sources to ensure determini
 </configuration>
 ```
 
+**⚠️ Do NOT include nuget.org:** Official builds at dnceng/internal use CFS (Container Fencing Service) which enforces Microsoft package feed security policies. Having `nuget.org` as a direct feed source triggers `NuGet Security Analysis` errors: *"NuGet package configuration file does not comply with Microsoft package feed security policies"*. The `dotnet-public` feed already mirrors all public NuGet.org packages — use it instead. See https://aka.ms/cfs/nuget for details.
+
 **Notes:**
 - Replace `dotnet10` with the feed matching your target .NET version (e.g. `dotnet9`, `dotnet11`). Check runtime and aspire for current feed names.
 - For transport packages, add `dotnet10-transport` if needed: `https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet10-transport/nuget/v3/index.json`
-- Keep `nuget.org` if the repo has non-dotnet third-party dependencies.
+- **Do not add nuget.org** — the `dotnet-public` feed mirrors all public NuGet.org packages and is required for CFS compliance in official builds.
 - If existing NuGet.config exists, **merge** the feeds rather than replacing.
 
 ### Package Source Mapping — CAUTION
