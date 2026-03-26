@@ -7,20 +7,28 @@ BinSkim scans compiled binaries, so you must build (and often pack) the repo fir
 Most dotnet repos need only the .NET SDK. The repo's `global.json` pins the SDK version and `build.cmd`/`build.sh` will auto-acquire it via the arcade bootstrap.
 
 ```powershell
-# Standard arcade build
+# Windows
 build.cmd -c Release
-
-# With packaging (produces .nupkg in artifacts\packages\)
 build.cmd -c Release -pack
+
+# Linux/macOS
+./build.sh -c Release
+./build.sh -c Release --pack
 ```
 
 ## Native Code (C/C++)
 
 Repos with native components (machinelearning, runtime, aspnetcore, diagnostics) need:
 
+**Windows:**
 - **MSVC compiler** (`cl.exe`) — from Visual Studio
 - **CMake** — for project generation
 - **Spectre-mitigated libraries** — required by most dotnet native projects (VS individual component: "MSVC vXXX Spectre-mitigated Libs")
+
+**Linux:**
+- **gcc or clang** — typically available via system package manager
+- **CMake** — `apt install cmake` or equivalent
+- No Spectre-mitigated library requirement on Linux
 
 ### Finding Visual Studio
 
@@ -57,12 +65,13 @@ You can still scan:
 
 ## Per-Repo Build Commands
 
-| Repo | Managed | Native | Pack |
+| Repo | Build (Windows) | Build (Linux) | Pack |
 |---|---|---|---|
-| machinelearning | `build.cmd -c Release` | `build.cmd -c Release -projects src\Native\Native.proj` | `build.cmd -c Release -pack` |
-| runtime | `build.cmd -subset libs -c Release` | `build.cmd -subset clr+libs -c Release` | `build.cmd -subset libs -c Release -pack` |
-| sdk | `build.cmd -c Release` | N/A (mostly managed) | `build.cmd -c Release -pack` |
-| aspnetcore | `build.cmd -c Release` | `build.cmd -c Release` (includes native) | `build.cmd -c Release -pack` |
-| roslyn | `build.cmd -c Release` | N/A | `build.cmd -c Release -pack` |
-| diagnostics | `build.cmd -c Release` | `build.cmd -c Release` | `build.cmd -c Release -pack` |
-| aspire | `build.cmd -c Release` | Includes Go/native CLI | `build.cmd -c Release -pack` |
+| machinelearning | `build.cmd -c Release` | `./build.sh -c Release` | `-pack` flag |
+| runtime | `build.cmd -subset libs -c Release` | `./build.sh -subset libs -c Release` | `-pack` flag |
+| sdk | `build.cmd -c Release` | `./build.sh -c Release` | `-pack` flag |
+| aspnetcore | `build.cmd -c Release` | `./build.sh -c Release` | `-pack` flag |
+| roslyn | `build.cmd -c Release` | `./build.sh -c Release` | `-pack` flag |
+| diagnostics | `build.cmd -c Release` | `./build.sh -c Release` | `-pack` flag |
+| aspire | `build.cmd -c Release` | `./build.sh -c Release` | `-pack` flag |
+| perfview | `build.cmd` (msbuild) | N/A (Windows-only) | N/A |

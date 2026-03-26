@@ -5,6 +5,7 @@ Known BinSkim configurations for major dotnet product repositories. These profil
 ## dotnet/machinelearning
 
 - **Pipeline YAML**: `build/vsts-ci.yml`
+- **Official pipeline**: [`dotnet-machinelearning-official`](https://dev.azure.com/dnceng/internal/_build/definition?definitionId=1110) (dnceng/internal #1110)
 - **BinSkim config**: `sdl.binskim.enabled: true`, `scanOutputDirectoryOnly: true`
 - **Scan target**: Published `pkgassets` artifact from `artifacts/pkgassets/`
 - **Published artifacts**: `pkgassets` (native blobs for NuGet redistribution)
@@ -24,7 +25,8 @@ Known BinSkim configurations for major dotnet product repositories. These profil
 
 ## dotnet/sdk
 
-- **Pipeline YAML**: `.vsts-ci.yml`
+- **Pipeline YAML**: `.vsts-ci.yml` (CI/official), `.vsts-pr.yml` (PR validation — no SDL)
+- **Official pipeline**: Look up in AzDO (may be in DevDiv org)
 - **BinSkim config**: `sdl.binskim.enabled: true`, explicit `analyzeTargetGlob`
 - **Scan target**: Explicit glob — `artifacts\bin\**\*.dll`, `artifacts\bin\**\*.exe`, plus `eng\**\*.props`
 - **Exclusions**: Known third-party DLLs: `msdia140.dll`, `pgort140.dll`, `capstone.dll`, and others
@@ -38,6 +40,7 @@ Known BinSkim configurations for major dotnet product repositories. These profil
 ## dotnet/runtime
 
 - **Pipeline YAML**: `eng/pipelines/runtime-official.yml`
+- **Official pipeline**: [`dotnet-runtime-official`](https://dev.azure.com/dnceng/internal/_build/definition?definitionId=679) (dnceng/internal #679)
 - **BinSkim config**: Via 1ES autobaselining (`.config/1espt/PipelineAutobaseliningConfig.yml`)
 - **Scan target**: Likely `artifacts/bin/` and installer outputs (via pipeline template defaults)
 - **How to reproduce locally**:
@@ -53,6 +56,7 @@ Known BinSkim configurations for major dotnet product repositories. These profil
 ## dotnet/roslyn
 
 - **Pipeline YAML**: `azure-pipelines-official.yml`
+- **Official pipeline**: [`dotnet-roslyn-official`](https://dev.azure.com/dnceng/internal/_build/definition?definitionId=327) (dnceng/internal #327)
 - **BinSkim config**: Pipeline-level via Guardian with `-ArtifactToolsList @("binskim")`
 - **Scan target**: `VSSetup` drop (installer VSIXes) and `PackageArtifacts` (NuGet packages)
 - **How to reproduce locally**:
@@ -66,6 +70,7 @@ Known BinSkim configurations for major dotnet product repositories. These profil
 ## dotnet/aspnetcore
 
 - **Pipeline YAML**: `eng/pipelines/aspnetcore-ci.yml` or `azure-pipelines.yml`
+- **Official pipeline**: Look up in AzDO (may be in DevDiv org)
 - **BinSkim config**: Check for `sdl.binskim` section
 - **How to reproduce locally**:
   1. Build: `build.cmd -c Release`
@@ -76,6 +81,7 @@ Known BinSkim configurations for major dotnet product repositories. These profil
 ## dotnet/aspire
 
 - **Pipeline YAML**: `eng/pipelines/azure-pipelines.yml`
+- **Official pipeline**: [`dotnet-aspire`](https://dev.azure.com/dnceng/internal/_build/definition?definitionId=1309) (dnceng/internal #1309)
 - **BinSkim config**: Via 1ES autobaselining
 - **Non-NuGet artifacts**: CLI zips/tarballs (`aspire-cli-*.zip`), VS Code extension (`.vsix`), WinGet manifests, Homebrew casks
 - **How to reproduce locally**: Build + scan `artifacts\bin\` outputs
@@ -84,6 +90,7 @@ Known BinSkim configurations for major dotnet product repositories. These profil
 ## dotnet/diagnostics
 
 - **Pipeline YAML**: `eng/pipelines/build.yml`
+- **Official pipeline**: [`dotnet-diagnostics`](https://dev.azure.com/dnceng/internal/_build/definition?definitionId=528) (dnceng/internal #528)
 - **BinSkim config**: Via 1ES autobaselining
 - **Published artifacts**: Build artifacts from `artifacts/bin/`, release drop `DiagnosticsRelease`, `BundledTools`
 - **How to reproduce locally**: Build + scan `artifacts\bin\` outputs
