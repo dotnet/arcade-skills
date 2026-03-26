@@ -1,12 +1,15 @@
-# Installing BinSkim
+s# Installing BinSkim
 
-BinSkim is distributed as a NuGet content package, **not** a dotnet global tool.
+BinSkim is distributed as a NuGet content package, **not** a dotnet global tool. It ships pre-built binaries for Windows (x64), Linux (x64, arm64), and macOS (x64).
 
 ## Quick Check
 
 ```powershell
-# Check if already installed
+# Windows
 Test-Path "C:\git\binskim-tool\extracted\tools\net9.0\win-x64\BinSkim.exe"
+
+# Linux/macOS
+test -x ~/binskim-tool/extracted/tools/net9.0/linux-x64/BinSkim
 ```
 
 If it exists, you're done.
@@ -14,6 +17,8 @@ If it exists, you're done.
 ## Installation Steps
 
 ```powershell
+# Works on both Windows (PowerShell) and Linux (pwsh)
+
 # 1. Find latest version
 $versions = Invoke-RestMethod "https://api.nuget.org/v3-flatcontainer/microsoft.codeanalysis.binskim/index.json"
 $latest = $versions.versions[-1]
@@ -21,20 +26,37 @@ Write-Host "Latest: $latest"
 
 # 2. Download .nupkg
 $url = "https://api.nuget.org/v3-flatcontainer/microsoft.codeanalysis.binskim/$latest/microsoft.codeanalysis.binskim.$latest.nupkg"
+
+# Windows
 $outDir = "C:\git\binskim-tool"
+# Linux/macOS
+# $outDir = "$HOME/binskim-tool"
+
 New-Item -ItemType Directory -Path $outDir -Force | Out-Null
-Invoke-WebRequest -Uri $url -OutFile "$outDir\binskim.nupkg"
+Invoke-WebRequest -Uri $url -OutFile "$outDir/binskim.nupkg"
 
 # 3. Extract (nupkg is a zip)
-Expand-Archive -Path "$outDir\binskim.nupkg" -DestinationPath "$outDir\extracted" -Force
+Expand-Archive -Path "$outDir/binskim.nupkg" -DestinationPath "$outDir/extracted" -Force
 
-# 4. Verify
-$exe = Get-ChildItem "$outDir\extracted\tools" -Recurse -Filter "BinSkim.exe" | Select-Object -First 1
+# 4. Verify — pick the right platform binary
+$exe = Get-ChildItem "$outDir/extracted/tools" -Recurse -Filter "BinSkim*" |
+    Where-Object { $_.Name -match '^BinSkim(\.exe)?$' } | Select-Object -First 1
 Write-Host "BinSkim at: $($exe.FullName)"
-& $exe.FullName version
 ```
 
-The executable is typically at `tools/net9.0/win-x64/BinSkim.exe` inside the extracted package.
+### Platform-specific paths inside the package
+
+```
+tools/net9.0/win-x64/BinSkim.exe       # Windows
+tools/net9.0/linux-x64/BinSkim         # Linux x64
+tools/net9.0/linux-arm64/BinSkim       # Linux arm64
+tools/net9.0/osx-x64/BinSkim           # macOS
+```
+
+On Linux/macOS, make the binary executable after extraction:
+```bash
+chmod +x ~/binskim-tool/extracted/tools/net9.0/linux-x64/BinSkim
+```
 
 ## Upgrading
 

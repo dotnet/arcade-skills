@@ -29,11 +29,14 @@ If the user needs exact pass/fail confirmation, **recommend they manually queue 
 
 > 💡 **SDL does NOT run on PR validation builds.** It only runs on official/CI pipelines (typically gated by `Build.Reason != PullRequest`). The user must manual-queue the official pipeline to get SDL results before merging.
 
-**Per-repo pipeline names** (see [references/repo-profiles.md](references/repo-profiles.md) for details):
-- **machinelearning**: Queue `dotnet-machinelearning-official`. SDL config is in `build/vsts-ci.yml`.
-- **sdk**: Queue the internal CI pipeline (`.vsts-ci.yml`, not `.vsts-pr.yml`).
-- **runtime**: Queue `runtime-official.yml` (SDL via 1ES autobaselining).
-- **roslyn**: Queue `azure-pipelines-official.yml`.
+**Per-repo pipeline names and AzDO links** (see [references/repo-profiles.md](references/repo-profiles.md) for details):
+- **machinelearning**: [`dotnet-machinelearning-official`](https://dev.azure.com/dnceng/internal/_build/definition?definitionId=1110) (dnceng/internal, definition 1110)
+- **runtime**: [`dotnet-runtime-official`](https://dev.azure.com/dnceng/internal/_build/definition?definitionId=679) (dnceng/internal, definition 679)
+- **roslyn**: [`dotnet-roslyn-official`](https://dev.azure.com/dnceng/internal/_build/definition?definitionId=327) (dnceng/internal, definition 327)
+- **aspire**: [`dotnet-aspire`](https://dev.azure.com/dnceng/internal/_build/definition?definitionId=1309) (dnceng/internal, definition 1309)
+- **diagnostics**: [`dotnet-diagnostics`](https://dev.azure.com/dnceng/internal/_build/definition?definitionId=528) (dnceng/internal, definition 528)
+- **sdk**: Look up in AzDO (may be in a different org)
+- **aspnetcore**: Look up in AzDO (may be in a different org)
 
 Tell the user: *"For exact results matching the official baseline, you can manually queue the official CI pipeline against your branch. This runs the real Guardian+BinSkim with production config and baseline suppressions. It's slower but authoritative."*
 
@@ -49,9 +52,11 @@ Tell the user: *"For exact results matching the official baseline, you can manua
 
 ## Prerequisites (for local scanning)
 
-- **BinSkim**: Installed at `C:\git\binskim-tool\extracted\tools\net9.0\win-x64\BinSkim.exe`. If missing, see [references/binskim-install.md](references/binskim-install.md).
-- **Build toolchain**: .NET SDK (managed builds), Visual Studio with MSVC + CMake (native builds). See [references/build-prereqs.md](references/build-prereqs.md).
-- **Repo cloned locally**: Typically under `C:\git\<repo-name>`.
+- **BinSkim**: See [references/binskim-install.md](references/binskim-install.md) for installation.
+  - Windows: `C:\git\binskim-tool\extracted\tools\net9.0\win-x64\BinSkim.exe`
+  - Linux: `~/binskim-tool/extracted/tools/net9.0/linux-x64/BinSkim`
+- **Build toolchain**: .NET SDK (managed builds). For native code: MSVC + CMake on Windows, gcc/clang + CMake on Linux. See [references/build-prereqs.md](references/build-prereqs.md).
+- **Repo cloned locally**: Typically under `C:\git\<repo-name>` (Windows) or `~/git/<repo-name>` (Linux).
 
 ## Local Scan Workflow
 
@@ -82,11 +87,11 @@ The key insight: **BinSkim scans built/packaged binaries, not source code.** You
 
 **Standard arcade repos (most dotnet repos):**
 ```powershell
-# Managed + pack (produces .nupkg files)
+# Windows
 build.cmd -c Release -pack
 
-# If the repo has native code AND you need pkgassets:
-build.cmd -c Release -projects src\Native\Native.proj /p:CopyPackageAssets=true
+# Linux
+./build.sh -c Release -pack
 ```
 
 **What to build depends on what the pipeline scans:**
@@ -190,9 +195,40 @@ Some repos (e.g., microsoft/perfview) don't use arcade infrastructure. For these
 
 The general approach still works: find the pipeline YAML, identify what's published, build it, scan it. You just can't assume arcade conventions.
 
-## Cross-Platform Limitations
+## Cross-Platform
 
-This skill targets **Windows scanning only**. The official pipeline may also build and scan Linux/macOS binaries (ELF, Mach-O). If central findings include non-Windows binaries, those cannot be reproduced locally on Windows. Flag this to the user.
+BinSkim ships for Windows, Linux (x64, arm64), and macOS (x64). Use the platform-appropriate binary:
+- Windows: `tools/net9.0/win-x64/BinSkim.exe`
+- Linux: `tools/net9.0/linux-x64/BinSkim` (make executable: `chmod +x`)
+- macOS: `tools/net9.0/osx-x64/BinSkim`
+
+Use `build.sh` instead of `build.cmd` on Linux/macOS. Artifact paths use forward slashes.
+
+If the official pipeline builds and scans on a different OS than the one you're on, you may not be able to reproduce those specific findings locally (e.g., ELF binaries on Windows).
+
+## Before/After Comparison (Optional)
+
+To prove a fix resolved specific findings, scan before and after the change:
+
+1. **Baseline scan** on `main` (or the branch before your fix):
+   ```
+   git stash  # or checkout main
+   # build + scan → binskim-before.sarif
+   ```
+2. **Fix scan** on your branch:
+   ```
+   git stash pop  # or checkout fix-branch
+   # build + scan → binskim-after.sarif
+   ```
+3. **Diff the results**:
+   ```powershell
+   $before = (Get-Content binskim-before.sarif | ConvertFrom-Json).runs[0].results | Where-Object { $_.level -eq 'error' }
+   $after  = (Get-Content binskim-after.sarif  | ConvertFrom-Json).runs[0].results | Where-Object { $_.level -eq 'error' }
+   Write-Host "Before: $($before.Count) errors, After: $($after.Count) errors"
+   # Compare by ruleId + target binary for specific delta
+   ```
+
+> ⚠️ This requires two full builds, so it's slow. Only suggest this when the user specifically wants proof that a fix works. For most cases, a single scan of the fix branch is sufficient.
 
 ## Anti-Patterns
 
