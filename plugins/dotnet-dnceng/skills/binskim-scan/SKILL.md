@@ -240,16 +240,74 @@ To prove a fix resolved specific findings, scan before and after the change:
 
 > ❌ **Don't assume the native build is required.** If native code fails to build locally, you can often still scan the pre-built native blobs from NuGet packages in the local cache (`$env:USERPROFILE\.nuget\packages\`).
 
-## Common BinSkim Rules
+## BinSkim Rules by Platform and SDL Compliance
 
-| Rule | Description | Typical fix |
-|---|---|---|
-| BA2008 | EnableControlFlowGuard — CFG not enabled | Rebuild with `/guard:cf` (MSVC) or equivalent |
-| BA2024 | EnableSpectreMitigations — Spectre v1 not mitigated | Rebuild with `/Qspectre` and Spectre-mitigated libs |
-| BA2006 | BuildWithSecureTools — outdated compiler | Update compiler/toolchain |
-| BA2007 | EnableCriticalCompilerWarnings — warnings disabled | Fix `/W` flags |
-| BA2011 | EnableStackProtection — `/GS-` used | Remove `/GS-` flag |
-| BA2012 | DoNotModifyStackProtectionCookie — custom cookie | Remove custom `__security_cookie` |
+Rules at **Error** severity are **required** for SDL compliance (the official pipeline will block on them).
+Rules at **Warning** severity are **recommended** but not blocking.
+
+### Windows PE Rules (BA2xxx)
+
+These apply to `.dll` and `.exe` files built with MSVC or the managed compiler.
+
+| Rule | Name | Severity | Typical fix |
+|---|---|---|---|
+| BA2001 | LoadImageAboveFourGigabyteAddress | Error | Remove custom `/BASE`; use default base address |
+| BA2002 | DoNotIncorporateVulnerableDependencies | Error | Update vulnerable static-linked dependency |
+| BA2004 | EnableSecureSourceCodeHashing | Error | Use `/ZH:SHA_256` (MSVC 17.0+) or `-checksumalgorithm:SHA256` (csc) |
+| BA2005 | DoNotShipVulnerableBinaries | Error | Update obsolete library to patched version |
+| BA2006 | BuildWithSecureTools | Error | Update compiler/toolchain to minimum required version |
+| BA2007 | EnableCriticalCompilerWarnings | Error | Compile at `/W3` or higher; don't disable required warnings |
+| BA2008 | EnableControlFlowGuard | Error | Rebuild with `/guard:cf` on both cl.exe and link.exe |
+| BA2009 | EnableAddressSpaceLayoutRandomization | Error | Don't set `/DYNAMICBASE:NO`; use default |
+| BA2010 | DoNotMarkImportsSectionAsExecutable | Error | Remove `/SECTION` or `/MERGE` that makes imports executable |
+| BA2011 | EnableStackProtection | Error | Don't use `/GS-`; keep default `/GS` |
+| BA2012 | DoNotModifyStackProtectionCookie | Error | Remove custom `__security_cookie` symbol |
+| BA2013 | InitializeStackProtection | Error | Use default CRT entry point or call `__security_init_cookie()` |
+| BA2014 | DoNotDisableStackProtectionForFunctions | Error | Remove `__declspec(safebuffers)` |
+| BA2015 | EnableHighEntropyVirtualAddresses | Error | Don't set `/HIGHENTROPYVA:NO` |
+| BA2016 | MarkImageAsNXCompatible | Error | Don't set `/NXCOMPAT:NO` |
+| BA2018 | EnableSafeSEH (x86 only) | Error | Pass `/SAFESEH` to linker (x86 builds only) |
+| BA2019 | DoNotMarkWritableSectionsAsShared | Error | Remove shared+writable section attributes |
+| BA2021 | DoNotMarkWritableSectionsAsExecutable | Error | Don't use writable+executable sections; disable incremental linking in release |
+| BA2022 | SignSecurely | Error | Sign with SHA-256 or stronger; don't use SHA-1 |
+| BA2024 | EnableSpectreMitigations | **Warning** | Rebuild with `/Qspectre` and Spectre-mitigated libs |
+| BA2025 | EnableShadowStack (CET) | **Warning** | Pass `/CETCOMPAT` to linker |
+| BA2026 | EnableMicrosoftCompilerSdlSwitch | **Warning** | Pass `/sdl` to cl.exe |
+| BA2027 | EnableSourceLink | **Warning** | Enable SourceLink in project properties |
+| BA2029 | EnableIntegrityCheck | Error | Pass `/INTEGRITYCHECK` to linker (required for drivers, PPL) |
+
+### Linux ELF Rules (BA3xxx)
+
+These apply to `.so` shared libraries and executables built with GCC or Clang on Linux.
+
+| Rule | Name | Severity | Typical fix |
+|---|---|---|---|
+| BA3001 | EnablePositionIndependentExecutable | Error | Compile with `-fpie`; link with `-pie` |
+| BA3002 | DoNotMarkStackAsExecutable | Error | Compile/link with `-z noexecstack` |
+| BA3003 | EnableStackProtector | Error | Compile with `--fstack-protector-strong` or `-all` |
+| BA3004 | GenerateRequiredSymbolFormat | Error | Use `-gdwarf-5` for debug symbols |
+| BA3005 | EnableStackClashProtection | Error | Compile with `-fstack-clash-protection` |
+| BA3006 | EnableNonExecutableStack | Error | Compile with `-z noexecstack` |
+| BA3010 | EnableReadOnlyRelocations | Error | Link with `-Wl,-z,relro` |
+| BA3011 | EnableBindNow | Error | Link with `-Wl,-z,now` |
+| BA3030 | UseGccCheckedFunctions (GCC only) | Error | Compile with `-D_FORTIFY_SOURCE=2 -O2` |
+| BA3031 | EnableClangSafeStack (Clang only) | Error | Compile/link with `-fsanitize=safe-stack` |
+
+### macOS Mach-O Rules (BA5xxx)
+
+These apply to `.dylib` and executables built for macOS/iOS.
+
+| Rule | Name | Severity | Typical fix |
+|---|---|---|---|
+| BA5001 | EnablePositionIndependentExecutable | Error | Compile with `-fpie` |
+| BA5002 | DoNotAllowExecutableStack | Error | Don't use `--allow_stack_execute` |
+
+### Key notes
+
+- **Managed-only assemblies** (pure C#/VB) are generally **not subject** to most BA2xxx rules — BinSkim auto-skips them as NotApplicable. Rules like BA2004 (secure hashing) and BA2027 (SourceLink) do apply to managed code.
+- **BA2024 (Spectre) is Warning, not Error** — it fires frequently on third-party native dependencies but won't block SDL compliance. However, 1ES Guardian may promote it to Error via org policy.
+- **Cross-platform repos** shipping both Windows and Linux binaries need to pass **both** BA2xxx and BA3xxx rules. BinSkim auto-detects binary format — you don't need separate rule configs.
+- **BA4002** (ReportElfOrMachoCompilerData) is informational only — it emits CSV data about compilers found, with no pass/fail.
 
 ## References
 
