@@ -1,6 +1,6 @@
 # Subagent Delegation Patterns
 
-CI investigations involve repetitive, mechanical work that burns main conversation context. Delegate data gathering to subagents; keep interpretation in the main agent.
+Delegate data gathering to subagents; keep interpretation in main.
 
 ## Pattern 1: Scanning Multiple Console Logs
 

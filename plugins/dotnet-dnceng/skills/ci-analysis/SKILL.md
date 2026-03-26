@@ -53,8 +53,6 @@ For full parameter reference and mode details, see [references/script-modes.md](
 
 ## Step 0: Gather Context (before running anything)
 
-Context changes how you interpret every failure. **Don't skip this.**
-
 1. **Read PR metadata** — title, description, author, labels, linked issues
 2. **Classify the PR type**:
 
@@ -121,7 +119,7 @@ Lead with a 1-2 sentence verdict, then the summary table, then detail bullets (o
 - **Recommendation generation**: [references/recommendation-generation.md](references/recommendation-generation.md)
 - **Analysis workflow (Steps 1–3)**: [references/analysis-workflow.md](references/analysis-workflow.md)
 - **Helix artifacts & binlogs**: [references/helix-artifacts.md](references/helix-artifacts.md)
-- **Binlog comparison**: [references/binlog-comparison.md](references/binlog-comparison.md)
+- **Binlog comparison**: For cross-build binlog diffs, use deep investigation techniques from [references/delegation-patterns.md](references/delegation-patterns.md)
 - **Build progression analysis**: [references/build-progression-analysis.md](references/build-progression-analysis.md)
 - **Subagent delegation**: [references/delegation-patterns.md](references/delegation-patterns.md)
 - **Azure CLI investigation**: [references/azure-cli.md](references/azure-cli.md)

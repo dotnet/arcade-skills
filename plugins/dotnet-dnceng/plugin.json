@@ -13,30 +13,8 @@
     "helix",
     "azure-devops"
   ],
-  "skills": "skills",
+  "skills": "./skills",
   "mcpServers": {
-    "ado-dnceng-public": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@azure-devops/mcp",
-        "dnceng-public"
-      ],
-      "env": {
-        "AZURE_DEVOPS_AUTH_METHOD": "azure-cli"
-      }
-    },
-    "ado-dnceng": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@azure-devops/mcp",
-        "dnceng"
-      ],
-      "env": {
-        "AZURE_DEVOPS_AUTH_METHOD": "azure-cli"
-      }
-    },
     "hlx": {
       "command": "dotnet",
       "args": [
@@ -56,6 +34,14 @@
     "mihubot": {
       "type": "http",
       "url": "https://mihubot.xyz/mcp"
+    },
+    "maestro": {
+      "command": "dotnet",
+      "args": [
+        "dnx",
+        "--yes",
+        "lewing.maestro.mcp"
+      ]
     }
   }
 }
