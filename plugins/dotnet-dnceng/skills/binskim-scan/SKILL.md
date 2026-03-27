@@ -35,8 +35,10 @@ If the user needs exact pass/fail confirmation, **recommend they manually queue 
 - **roslyn**: [`dotnet-roslyn-official`](https://dev.azure.com/dnceng/internal/_build/definition?definitionId=327) (dnceng/internal, definition 327)
 - **aspire**: [`dotnet-aspire`](https://dev.azure.com/dnceng/internal/_build/definition?definitionId=1309) (dnceng/internal, definition 1309)
 - **diagnostics**: [`dotnet-diagnostics`](https://dev.azure.com/dnceng/internal/_build/definition?definitionId=528) (dnceng/internal, definition 528)
+- **dotnet/dotnet (VMR)**: [`dotnet-unified-build`](https://dev.azure.com/dnceng/internal/_build/definition?definitionId=1330) (dnceng/internal, definition 1330)
 - **sdk**: Look up in AzDO (may be in a different org)
 - **aspnetcore**: Look up in AzDO (may be in a different org)
+- **perfview**: Official pipeline in devdiv/DevDiv org (not dnceng)
 
 Tell the user: *"For exact results matching the official baseline, you can manually queue the official CI pipeline against your branch. This runs the real Guardian+BinSkim with production config and baseline suppressions. It's slower but authoritative."*
 
@@ -210,6 +212,8 @@ When investigating discrepancies between local results and the central portal, d
 # Download SDL artifact from official build
 # Use AzDO tools or the ado-dnceng-pipelines_download_artifact tool
 # Artifact names follow the pattern: drop_build_<OS>_<arch>_sdl_analysis
+# For the VMR (dotnet/dotnet): drop_VMR_Vertical_Build_<OS>_<arch>_sdl_analysis
+# Some repos have multiple SDL legs — check all Windows legs for complete coverage
 
 # Key files inside the artifact:
 # - binskim/001/binskim.sarif    ← Raw BinSkim output (everything it found)
@@ -217,6 +221,8 @@ When investigating discrepancies between local results and the central portal, d
 # - break/001/options.json        ← Break policy (which tools can fail the build)
 # - .gdnbaselines                 ← Auto-generated baseline suppressions
 ```
+
+> ⚠️ **Large SARIF files**: For repos with many binaries (especially the VMR), the raw `binskim.sarif` and `Results.sarif` can be **50-80MB+**. Use PowerShell's `Get-Content -Raw | ConvertFrom-Json` to parse them — don't try to read them into your context directly. Stream through results with `ForEach-Object` and `Group-Object` for analysis.
 
 This is the authoritative way to understand the gap between "what BinSkim found" and "what the portal reports."
 
@@ -272,6 +278,36 @@ To prove a fix resolved specific findings, scan before and after the change:
    ```
 
 > ⚠️ This requires two full builds, so it's slow. Only suggest this when the user specifically wants proof that a fix works. For most cases, a single scan of the fix branch is sufficient.
+
+## Fix Strategies by Finding Type
+
+Not all BinSkim findings can be fixed the same way. The fix strategy depends on whether the flagged binary is **built from source** in the repo or **consumed as a pre-built dependency**.
+
+### Classify the finding first
+
+Before recommending a fix, determine where the binary comes from:
+
+1. **Search the repo for the binary name** — is there a `.vcxproj`, `.csproj`, or `CMakeLists.txt` that produces it?
+2. **Check NuGet packages** — is the binary copied from a `PackageReference` or `$(PkgXxx)` path?
+3. **Check for `<Content Include="...">` items** — is it a pre-built file just being copied to output?
+
+### Fix strategies
+
+| Binary origin | Example | Fix approach |
+|---|---|---|
+| **C++ source in repo** (`.vcxproj`) | EtwClrProfiler.dll in perfview | Add compiler/linker flags to the project file (e.g., `/guard:cf` for BA2008, `/Qspectre` for BA2024) |
+| **Pre-built native from NuGet** | winterop.dll (WiX), Intel MKL/TBB DLLs | **Cannot fix in this repo.** Update to newer package version, file issue upstream, or suppress/baseline |
+| **Third-party test framework** | xunit.*.dll | Fix scan scope — these shouldn't be in shipped artifacts. Exclude via BinSkim glob or fix packaging |
+| **Pre-built test fixtures** | mockclr_*.dll, mockdac.dll | Fix scan scope — exclude `**/TestBinaries/**` from scan target, or suppress/baseline |
+| **Managed C# assembly** | Most `.dll` from `.csproj` | BA2008 is **not applicable** (BinSkim skips IL-only). BA2004/BA2027 may apply — use csc options |
+
+### Common misconception: `<ControlFlowGuard>` in C# projects
+
+Setting `<ControlFlowGuard>Guard</ControlFlowGuard>` in a `.csproj` or `Directory.Build.targets` does **nothing** for C# projects. The C# compiler (`csc`) does not support `/guard:cf`. This property only works in `.vcxproj` (MSVC C++ projects). BA2008 only fires on native PE binaries anyway — managed assemblies are skipped.
+
+### VMR (dotnet/dotnet) fix ownership
+
+In the VMR, findings map to source sub-repos. Fixes should be made in the **source repo** (e.g., `dotnet/arcade`, `dotnet/runtime`), not the VMR itself. To identify the owning sub-repo, look at the artifact path in the SARIF — e.g., `src/arcade/artifacts/...` → fix goes to `dotnet/arcade`.
 
 ## Anti-Patterns
 
@@ -359,11 +395,34 @@ These apply to `.dylib` and executables built for macOS/iOS.
 ### Key notes
 
 - **Not all Error-level rules are SDL-required.** Guardian filters findings based on internal SDL policy requirement mappings before reporting to the central portal. Some Error-level rules (e.g., BA2028 CastGuard) may be scoped to specific orgs and filtered out for others. Use the `-PortalRulesFrom` parameter in `Invoke-BinSkimScan.ps1` to auto-discover which rules your pipeline actually reports.
-- **Managed-only assemblies** (pure C#/VB) are generally **not subject** to most BA2xxx rules — BinSkim auto-skips them as NotApplicable. Rules like BA2004 (secure hashing) and BA2027 (SourceLink) do apply to managed code.
+- **Which rules are required depends on your service tree registration** (`es-metadata.yml`). Different orgs have different SDL policy scopes. For example, `devdiv` repos (most dotnet/* repos) require BA2008/BA2009/BA2021, while `nettel` repos (e.g., microsoft/perfview) require BA2004/BA2027 instead. Always check your own portal — don't assume rules from another repo apply to yours.
+- **Managed-only assemblies** (pure C#/VB) are generally **not subject** to most BA2xxx rules — BinSkim auto-skips IL-only and mixed-mode binaries as NotApplicable. BA2008 (EnableControlFlowGuard) specifically **only applies to native PE binaries** — it will never fire on C# assemblies. Rules like BA2004 (secure hashing) and BA2027 (SourceLink) can apply to managed code.
+- **BA2008 findings are almost always on third-party native binaries** consumed via NuGet (e.g., Intel MKL/oneDAL/TBB, WiX winterop.dll, emsdk toolchain). These can't be fixed in your repo — the upstream vendor must recompile with `/guard:cf`. Fix options: update to a newer package version, suppress/baseline, or file an issue upstream.
+- **BA2022 (SignSecurely) can produce thousands of raw findings** — especially on satellite resource DLLs (`.resources.dll`). These are typically all filtered by Guardian before reaching the portal. Don't be alarmed by high BA2022 counts in raw SARIF.
+- **`<ControlFlowGuard>Guard</ControlFlowGuard>` only works for C++ (`.vcxproj`)** — it maps to `/guard:cf` in the MSVC toolchain. The C# compiler (`csc`) has no `/guard:cf` support, and the .NET SDK doesn't wire this MSBuild property to anything for `.csproj` projects. This MSBuild property does nothing for managed code.
 - **BA2024 (Spectre) is Warning, not Error** — it fires frequently on third-party native dependencies.
 - **Cross-platform repos** shipping both Windows and Linux binaries need to pass **both** BA2xxx and BA3xxx rules. BinSkim auto-detects binary format — you don't need separate rule configs.
 - **BA4002** (ReportElfOrMachoCompilerData) is informational only — it emits CSV data about compilers found, with no pass/fail.
 - **BA6004** (EnableComdatFolding) and **BA6006** (EnableLinkTimeCodeGeneration) are optimization hints, not security rules. They may appear in SARIF but have no SDL compliance impact.
+
+### Observed portal requirements by service tree org
+
+Which BinSkim rules actually appear in the portal depends on the `es-metadata.yml` service tree registration (the `routing.defaultAreaPath.org` field). Based on empirical observation across multiple repos:
+
+| Rule | Description | devdiv org (most dotnet/*) | nettel org (microsoft/perfview) |
+|------|-------------|----------------------------|---------------------------------|
+| BA2004 | EnableSecureSourceCodeHashing | ❌ filtered | ✅ required |
+| BA2008 | EnableControlFlowGuard | ✅ required | ? |
+| BA2009 | EnableAddressSpaceLayoutRandomization | ✅ required | ? |
+| BA2021 | DoNotMarkWritableSectionsAsExecutable | ✅ required | ? |
+| BA2027 | EnableSourceLink | ❌ filtered | ✅ required |
+| BA2022 | SignSecurely | ❌ filtered | ? |
+| BA2024 | EnableSpectreMitigations | ❌ filtered | ? |
+| BA2025 | EnableShadowStack (CET) | ❌ filtered | ? |
+| BA2026 | EnableMicrosoftCompilerSdlSwitch | ❌ filtered | ? |
+| BA2028 | EnableCastGuard | ❌ filtered | ? |
+
+> ⚠️ This table is **observational** — derived from comparing raw `binskim.sarif` vs `Results.sarif` across repos. "❌ filtered" means confirmed absent from portal despite raw findings existing. "?" means untested. Always use `-PortalRulesFrom` to discover your own repo's requirements rather than relying on this table.
 
 ## Understanding Guardian Filtering
 
@@ -379,11 +438,13 @@ Guardian merges/filters → Results.sarif (subset of findings)
 Results.sarif uploaded → Central portal shows only what survived
 ```
 
-The raw `binskim.sarif` is available in the SDL build artifacts (e.g., `drop_build_Windows_x64_sdl_analysis`). The merged `Results.sarif` is in the same artifact. **Always compare both** to understand what's being filtered.
+The raw `binskim.sarif` is available in the SDL build artifacts (e.g., `drop_build_Windows_x64_sdl_analysis` for most repos, or `drop_VMR_Vertical_Build_Windows_x64_sdl_analysis` for the VMR). The merged `Results.sarif` is in the same artifact. **Always compare both** to understand what's being filtered.
 
 ### What gets filtered and why
 
 Guardian filters BinSkim findings before reporting them to the central portal. The primary mechanism is **SDL policy requirement mappings** — an internal, centrally-managed policy that defines which BinSkim rules are required for SDL compliance. Only findings for rules with applicable policy mappings are promoted to `Results.sarif` and the portal. Other findings are silently dropped.
+
+**The required rules vary by service tree org** (from `es-metadata.yml`). For example, `devdiv` org repos (most `dotnet/*` repos) have BA2008, BA2009, and BA2021 as required rules, while `nettel` org repos (e.g., `microsoft/perfview`) have BA2004 and BA2027 instead. See the "Observed portal requirements by service tree org" table above.
 
 This filtering is:
 - **Not severity-based**: Some Error-level rules may be filtered out if they lack a policy mapping for your org
@@ -405,7 +466,7 @@ Other filtering layers:
 
 When asked about BinSkim findings for a repo, **don't trust the central portal alone**. Download the SDL artifacts and examine both:
 
-1. **Download the SDL artifact** from the official build (e.g., `drop_build_Windows_x64_sdl_analysis`)
+1. **Download the SDL artifact** from the official build (e.g., `drop_build_Windows_x64_sdl_analysis` or `drop_VMR_Vertical_Build_Windows_x64_sdl_analysis` for VMR repos)
 2. **Parse raw `binskim.sarif`** (in `binskim/001/binskim.sarif`) — this has everything BinSkim actually found
 3. **Parse merged `Results.sarif`** (in the artifact root) — this is what the portal sees
 4. **Compare them** — the delta is what Guardian filtered out
