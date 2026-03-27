@@ -23,6 +23,13 @@
     Scan a directory directly instead of extracting .nupkg files. Useful for pkgassets/ or
     artifacts\bin\ scanning.
 
+.PARAMETER PortalRulesFrom
+    Path to a Guardian-merged Results.sarif from an official pipeline run. When specified,
+    the summary output filters to only show findings for rules that appear in that file --
+    matching what the central portal reports. Other findings are shown separately as
+    "informational (not portal-reported)". This avoids confusion from rules that BinSkim
+    evaluates but Guardian filters out based on SDL policy.
+
 .EXAMPLE
     # After build.cmd -c Release -pack:
     .\Invoke-BinSkimScan.ps1
@@ -30,6 +37,10 @@
 .EXAMPLE
     # Scan pkgassets directly (machinelearning-style):
     .\Invoke-BinSkimScan.ps1 -ScanDir artifacts\pkgassets
+
+.EXAMPLE
+    # Scan and filter to portal-reported rules:
+    .\Invoke-BinSkimScan.ps1 -ScanDir artifacts\pkgassets -PortalRulesFrom C:\temp\sdl\Results.sarif
 
 .EXAMPLE
     # Scan specific packages directory:
@@ -40,7 +51,8 @@ param(
     [string]$PackagesDir,
     [string]$OutputSarif,
     [string]$BinSkimPath = "C:\git\binskim-tool\extracted\tools\net9.0\win-x64\BinSkim.exe",
-    [string]$ScanDir
+    [string]$ScanDir,
+    [string]$PortalRulesFrom
 )
 
 $ErrorActionPreference = 'Stop'
@@ -89,7 +101,7 @@ if (-not $PackagesDir) {
             # Check for direct DLLs (pkgassets style)
             $dllCount = (Get-ChildItem $full -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue | Measure-Object).Count
             if ($dllCount -gt 0) {
-                Write-Host "Found $dllCount DLLs in $c (no .nupkg — scanning directly)"
+                Write-Host "Found $dllCount DLLs in $c (no .nupkg - scanning directly)"
                 & $BinSkimPath analyze "$full\**" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite"
                 Write-Host "Results written to $OutputSarif"
                 exit $LASTEXITCODE
@@ -155,13 +167,57 @@ if (Test-Path $OutputSarif) {
     $sarif = Get-Content $OutputSarif -Raw | ConvertFrom-Json
     $results = $sarif.runs[0].results
     if ($results) {
+        # Discover portal-reported rules if a Results.sarif was provided
+        $portalRules = $null
+        if ($PortalRulesFrom -and (Test-Path $PortalRulesFrom)) {
+            $portalSarif = Get-Content $PortalRulesFrom -Raw | ConvertFrom-Json
+            $portalResults = $portalSarif.runs | ForEach-Object { $_.results } | Where-Object { $_ }
+            if ($portalResults) {
+                $portalRules = @($portalResults | ForEach-Object { $_.ruleId } | Sort-Object -Unique)
+                Write-Host "`nPortal-reported rules (from Results.sarif): $($portalRules -join ', ')"
+            } else {
+                Write-Host "`nWarning: Results.sarif had no findings -- cannot determine portal rules. Showing all."
+            }
+        }
+
         $errors = @($results | Where-Object { $_.level -eq 'error' })
         $warnings = @($results | Where-Object { $_.level -eq 'warning' })
-        Write-Host "`n=== Summary ==="
-        Write-Host "Errors: $($errors.Count), Warnings: $($warnings.Count)"
-        if ($errors.Count -gt 0) {
-            Write-Host "`nErrors by rule:"
-            $errors | Group-Object ruleId | Sort-Object Count -Descending | Format-Table Count, Name -AutoSize
+
+        if ($portalRules) {
+            # Split findings into portal-reported vs informational
+            $portalErrors = @($errors | Where-Object { $portalRules -contains $_.ruleId })
+            $portalWarnings = @($warnings | Where-Object { $portalRules -contains $_.ruleId })
+            $infoErrors = @($errors | Where-Object { $portalRules -notcontains $_.ruleId })
+            $infoWarnings = @($warnings | Where-Object { $portalRules -notcontains $_.ruleId })
+
+            Write-Host "`n=== Portal-Reported Findings (SDL-required for your org) ==="
+            Write-Host "Errors: $($portalErrors.Count), Warnings: $($portalWarnings.Count)"
+            if ($portalErrors.Count -gt 0) {
+                Write-Host "`nPortal errors by rule:"
+                $portalErrors | Group-Object ruleId | Sort-Object Count -Descending | Format-Table Count, Name -AutoSize
+            }
+            if ($portalErrors.Count -eq 0 -and $portalWarnings.Count -eq 0) {
+                Write-Host "(None -- your fix cleared all portal-reported findings!)"
+            }
+
+            if ($infoErrors.Count -gt 0 -or $infoWarnings.Count -gt 0) {
+                Write-Host "`n=== Informational Findings (not portal-reported) ==="
+                Write-Host "Errors: $($infoErrors.Count), Warnings: $($infoWarnings.Count)"
+                if ($infoErrors.Count -gt 0) {
+                    Write-Host "`nInformational errors by rule:"
+                    $infoErrors | Group-Object ruleId | Sort-Object Count -Descending | Format-Table Count, Name -AutoSize
+                }
+            }
+        }
+        else {
+            # No portal filter -- show everything
+            Write-Host "`n=== Summary ==="
+            Write-Host "Errors: $($errors.Count), Warnings: $($warnings.Count)"
+            if ($errors.Count -gt 0) {
+                Write-Host "`nErrors by rule:"
+                $errors | Group-Object ruleId | Sort-Object Count -Descending | Format-Table Count, Name -AutoSize
+            }
+            Write-Host "`nTip: Use -PortalRulesFrom <Results.sarif> to filter to portal-reported rules only."
         }
     }
     else {
