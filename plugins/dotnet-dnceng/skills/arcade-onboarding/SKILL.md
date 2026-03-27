@@ -307,7 +307,7 @@ Official builds need the `_SignType` variable. Set it in the pipeline variables:
 ```yaml
 variables:
 - name: _SignType
-  value: Real    # Use 'test' for testing, 'Real' for production signing
+  value: test    # Start with 'test', switch to 'Real' after pipeline is validated
 ```
 
 Then reference it in build arguments:
@@ -316,6 +316,14 @@ _OfficialBuildArgs: /p:DotNetSignType=$(_SignType)
   /p:TeamName=$(_TeamName)
   /p:OfficialBuildId=$(BUILD.BUILDNUMBER)
 ```
+
+**Recommended signing rollout:**
+1. **Start with `test`** — validates the full signing pipeline (MicroBuild plugin installation, `Sign.proj` execution, certificate mapping) without requiring ESRP service connection approval. This lets you confirm everything works end-to-end.
+2. **Switch to `Real`** — once test signing passes, submit a follow-up PR changing `_SignType: test` → `_SignType: Real`. The first Real build will **pause waiting for service connection approval**:
+   - `DevDiv-ESRP-PME-DNCENG` — ESRP code signing service
+   - `MicroBuild Signing Task (DevDiv)` — MicroBuild signing plugin
+   - `Darc: Maestro Production` — post-build publishing
+   Ask in the **dnceng First Responders** Teams channel to approve these. This is a **one-time setup** per pipeline definition.
 
 ### 1ES SDL Auto-Baselining
 
