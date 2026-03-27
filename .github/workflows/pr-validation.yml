@@ -521,20 +521,14 @@ jobs:
               }
 
               # ── 3c. MCP server dependency check (per plugin) ──────────
-              try {
-                $pluginJsonRaw = Get-Content -Path $pluginJsonPath -Raw
-                if ($pluginJsonRaw -match '"mcpServers"') {
-                  $pjParsed = $pluginJsonRaw | ConvertFrom-Json
-                  if ($null -ne $pjParsed.mcpServers) {
-                    foreach ($prop in ($pjParsed.mcpServers | Get-Member -MemberType NoteProperty)) {
-                      $depKey = "mcp-server:$($pluginName):$($prop.Name)"
-                      if (-not $allowedDeps.Contains($depKey)) {
-                        $warnings.Add("$ctx — MCP server '$($prop.Name)' in plugin.json — verify this dependency is intentional. (allow: $depKey)")
-                      }
-                    }
+              if ($null -ne $pluginJson -and $null -ne $pluginJson.mcpServers) {
+                foreach ($prop in ($pluginJson.mcpServers | Get-Member -MemberType NoteProperty)) {
+                  $depKey = "mcp-server:$($pluginName):$($prop.Name)"
+                  if (-not $allowedDeps.Contains($depKey)) {
+                    $warnings.Add("$ctx — MCP server '$($prop.Name)' in plugin.json — verify this dependency is intentional. (allow: $depKey)")
                   }
                 }
-              } catch { }
+              }
 
               # ── 4. Agent validation ────────────────────────────────────
               if (-not [string]::IsNullOrWhiteSpace($agentsField)) {
