@@ -124,8 +124,29 @@ Get-ChildItem "$nupkgDir\*.nupkg" | ForEach-Object {
 > ⚠️ **Only extract Shipping packages** unless you have reason to believe NonShipping packages are also scanned. The official pipeline typically scans only what's published to customers.
 
 > ⚠️ **Native builds may require extra setup** — MSVC toolchain, Spectre-mitigated libraries, CMake, specific SDKs. If the native build fails, you can still scan managed outputs and NuGet-packaged native blobs from the NuGet cache. See [references/build-prereqs.md](references/build-prereqs.md).
+>
+> **NuGet cache limitation**: Scanning NuGet-cached DLLs only covers third-party native blobs consumed via NuGet packages. It misses: (1) first-party native code compiled from source, (2) managed assemblies the repo builds, and (3) pack-only artifacts. For repos like machinelearning where all current BA2008 findings are on NuGet-sourced Intel DLLs, this is sufficient. For repos that compile native code from source, a full build is needed for complete coverage.
 
 ### Step 3: Run BinSkim
+
+**Preferred: Use the helper script** which handles scanning, summary, and portal filtering:
+
+```powershell
+$script = "c:\git\arcade-skills\plugins\dotnet-dnceng\skills\binskim-scan\scripts\Invoke-BinSkimScan.ps1"
+
+# Scan a directory directly (e.g., pkgassets):
+& $script -RepoRoot C:\git\machinelearning -ScanDir artifacts\pkgassets
+
+# Scan and filter to portal-reported rules:
+& $script -RepoRoot C:\git\machinelearning -ScanDir artifacts\pkgassets -PortalRulesFrom C:\temp\Results.sarif
+
+# Auto-discover scan targets (searches common artifact locations):
+& $script -RepoRoot C:\git\machinelearning
+```
+
+> 💡 `-ScanDir` accepts both relative paths (joined with `-RepoRoot`) and absolute paths.
+
+**Manual BinSkim invocation** (if not using the helper script):
 
 ```powershell
 $binskim = "C:\git\binskim-tool\extracted\tools\net9.0\win-x64\BinSkim.exe"

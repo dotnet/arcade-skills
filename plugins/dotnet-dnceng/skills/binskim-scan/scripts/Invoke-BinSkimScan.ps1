@@ -66,10 +66,16 @@ if (-not (Test-Path $BinSkimPath)) {
 if (-not $OutputSarif) {
     $OutputSarif = Join-Path $RepoRoot "binskim-results.sarif"
 }
+$scanExitCode = 0
 
 # Mode 1: Scan a directory directly
 if ($ScanDir) {
-    $target = Join-Path $RepoRoot $ScanDir
+    # Support both absolute and relative paths
+    if ([System.IO.Path]::IsPathRooted($ScanDir)) {
+        $target = $ScanDir
+    } else {
+        $target = Join-Path $RepoRoot $ScanDir
+    }
     if (-not (Test-Path $target)) {
         Write-Error "Scan directory not found: $target"
         exit 1
@@ -77,18 +83,18 @@ if ($ScanDir) {
     $fileCount = (Get-ChildItem $target -Recurse -Include "*.dll","*.exe" | Measure-Object).Count
     Write-Host "Scanning $fileCount DLL/EXE files in $target"
     & $BinSkimPath analyze "$target\**" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite"
+    $scanExitCode = $LASTEXITCODE
     Write-Host "Results written to $OutputSarif"
-    exit $LASTEXITCODE
 }
-
-# Mode 2: Extract .nupkg and scan
-if (-not $PackagesDir) {
+# Mode 2: Auto-discover or extract .nupkg and scan
+elseif (-not $PackagesDir) {
     # Search common locations
     $candidates = @(
         "artifacts\packages\Release\Shipping"
         "artifacts\packages\Release\NonShipping"
         "artifacts\pkgassets"
     )
+    $foundDirect = $false
     foreach ($c in $candidates) {
         $full = Join-Path $RepoRoot $c
         if (Test-Path $full) {
@@ -103,64 +109,68 @@ if (-not $PackagesDir) {
             if ($dllCount -gt 0) {
                 Write-Host "Found $dllCount DLLs in $c (no .nupkg - scanning directly)"
                 & $BinSkimPath analyze "$full\**" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite"
+                $scanExitCode = $LASTEXITCODE
                 Write-Host "Results written to $OutputSarif"
-                exit $LASTEXITCODE
+                $foundDirect = $true
+                break
             }
         }
     }
-    if (-not $PackagesDir) {
+    if (-not $PackagesDir -and -not $foundDirect) {
         Write-Error "No .nupkg files found in common locations. Build with -pack first, or specify -PackagesDir or -ScanDir."
         exit 1
     }
 }
 
-# Extract .nupkg files (mirrors eng/common/sdl/extract-artifact-packages.ps1)
-$extractDir = Join-Path $RepoRoot "artifacts\extracted-for-binskim"
-if (Test-Path $extractDir) {
-    Remove-Item $extractDir -Recurse -Force
-}
-New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
+# Mode 2 continued: Extract and scan .nupkg files if we found packages (not direct DLLs)
+if ($PackagesDir) {
+    $extractDir = Join-Path $RepoRoot "artifacts\extracted-for-binskim"
+    if (Test-Path $extractDir) {
+        Remove-Item $extractDir -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
 
-$relevantExtensions = @('.dll', '.exe', '.pdb')
-$nupkgs = Get-ChildItem $PackagesDir -Filter "*.nupkg"
-Write-Host "Extracting $($nupkgs.Count) packages..."
+    $relevantExtensions = @('.dll', '.exe', '.pdb')
+    $nupkgs = Get-ChildItem $PackagesDir -Filter "*.nupkg"
+    Write-Host "Extracting $($nupkgs.Count) packages..."
 
-foreach ($nupkg in $nupkgs) {
-    $pkgName = [System.IO.Path]::GetFileNameWithoutExtension($nupkg.Name)
-    $pkgExtractDir = Join-Path $extractDir $pkgName
-    New-Item -ItemType Directory -Path $pkgExtractDir -Force | Out-Null
+    foreach ($nupkg in $nupkgs) {
+        $pkgName = [System.IO.Path]::GetFileNameWithoutExtension($nupkg.Name)
+        $pkgExtractDir = Join-Path $extractDir $pkgName
+        New-Item -ItemType Directory -Path $pkgExtractDir -Force | Out-Null
 
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    try {
-        $zip = [System.IO.Compression.ZipFile]::OpenRead($nupkg.FullName)
-        $extracted = 0
-        foreach ($entry in $zip.Entries) {
-            $ext = [System.IO.Path]::GetExtension($entry.Name)
-            if ($relevantExtensions -contains $ext) {
-                $targetPath = Join-Path $pkgExtractDir (Split-Path $entry.FullName)
-                New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
-                $targetFile = Join-Path $pkgExtractDir $entry.FullName
-                [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $targetFile, $true)
-                $extracted++
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        try {
+            $zip = [System.IO.Compression.ZipFile]::OpenRead($nupkg.FullName)
+            $extracted = 0
+            foreach ($entry in $zip.Entries) {
+                $ext = [System.IO.Path]::GetExtension($entry.Name)
+                if ($relevantExtensions -contains $ext) {
+                    $targetPath = Join-Path $pkgExtractDir (Split-Path $entry.FullName)
+                    New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
+                    $targetFile = Join-Path $pkgExtractDir $entry.FullName
+                    [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $targetFile, $true)
+                    $extracted++
+                }
+            }
+            if ($extracted -gt 0) {
+                Write-Host "  $pkgName : $extracted files"
             }
         }
-        if ($extracted -gt 0) {
-            Write-Host "  $pkgName : $extracted files"
+        finally {
+            if ($zip) { $zip.Dispose() }
         }
     }
-    finally {
-        if ($zip) { $zip.Dispose() }
-    }
+
+    # Count total scan targets
+    $totalFiles = (Get-ChildItem $extractDir -Recurse -Include "*.dll","*.exe" | Measure-Object).Count
+    Write-Host "`nScanning $totalFiles DLL/EXE files from extracted packages..."
+
+    # Run BinSkim (exclude _.pdb like the official pipeline does)
+    & $BinSkimPath analyze "$extractDir\**;-:file|$extractDir\**\_.pdb" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite"
+    $scanExitCode = $LASTEXITCODE
+    Write-Host "`nResults written to $OutputSarif"
 }
-
-# Count total scan targets
-$totalFiles = (Get-ChildItem $extractDir -Recurse -Include "*.dll","*.exe" | Measure-Object).Count
-Write-Host "`nScanning $totalFiles DLL/EXE files from extracted packages..."
-
-# Run BinSkim (exclude _.pdb like the official pipeline does)
-& $BinSkimPath analyze "$extractDir\**;-:file|$extractDir\**\_.pdb" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite"
-
-Write-Host "`nResults written to $OutputSarif"
 
 # Quick summary
 if (Test-Path $OutputSarif) {
@@ -225,4 +235,4 @@ if (Test-Path $OutputSarif) {
     }
 }
 
-exit $LASTEXITCODE
+exit $scanExitCode

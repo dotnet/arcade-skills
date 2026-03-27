@@ -21,7 +21,7 @@ Known BinSkim configurations for major dotnet product repositories. These profil
 - **How to reproduce locally**:
   1. Build native: `build.cmd -c Release -projects src\Native\Native.proj /p:CopyPackageAssets=true` (requires MSVC + Spectre libs)
   2. Scan: `BinSkim.exe analyze "artifacts\pkgassets\**\*.dll" --recurse --output results.sarif --pretty-print --force`
-  3. Or scan NuGet cache directly: find `mlnetmkldeps`, `inteldal.devel.win-x64`, `inteltbb.devel.win` under `$env:USERPROFILE\.nuget\packages\`
+  3. Or scan NuGet cache directly: find `mlnetmkldeps`, `inteldal.redist.win-x64`, `inteltbb.devel.win`/`inteltbb.redist.win` under `$env:USERPROFILE\.nuget\packages\`
 - **Quirks**:
   - Native build requires git submodule init (`git submodule update --init`)
   - Native build requires MSVC Spectre-mitigated libraries (VS individual component)
