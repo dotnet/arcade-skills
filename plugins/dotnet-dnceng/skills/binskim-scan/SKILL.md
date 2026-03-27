@@ -13,7 +13,7 @@ description: >
 
 Run BinSkim locally against a dotnet repository to approximate the results of the official 1ES SDL pipeline. This skill handles: installing BinSkim, building the repo to produce shippable artifacts, discovering what the pipeline actually scans, running BinSkim with matching file targeting, and comparing results with central findings.
 
-> ⚠️ **Local scans are an approximation.** The official pipeline runs BinSkim via Guardian, which may apply different default policies, rule configurations, and organization-level settings. Local scans also don't apply baseline suppressions (`PipelineAutobaseliningConfig.yml`), so you'll see all findings including ones the official pipeline suppresses as known/accepted. For exact-match results, see "Approach 2: Recommend Official Pipeline Run" below.
+> ⚠️ **Local scans are an approximation.** The official pipeline runs BinSkim via Guardian, which may apply different default policies, rule configurations, and organization-level settings. Local scans don't apply Guardian's filtering/baselining, so you may see more findings than the central portal reports. This can actually be useful — see "Understanding Guardian Filtering" below. For exact-match results, see "Approach 2: Recommend Official Pipeline Run" below.
 
 ## Two Approaches
 
@@ -132,7 +132,9 @@ $binskim = "C:\git\binskim-tool\extracted\tools\net9.0\win-x64\BinSkim.exe"
 $target = "<scan-target-from-step-1>"
 $output = "binskim-results.sarif"
 
-& $binskim analyze $target --recurse --output $output --pretty-print --force
+# Note: newer BinSkim versions (4.x+) use --log syntax, not --pretty-print/--force
+& $binskim analyze $target --recurse --output $output --log "PrettyPrint;ForceOverwrite"
+# Older versions may use: --pretty-print --force
 ```
 
 **Target patterns** (match what `configure-sdl-tool.ps1` generates):
@@ -145,7 +147,7 @@ $output = "binskim-results.sarif"
 
 **For subtree scanning** (user wants to scan only part of a repo):
 ```powershell
-& $binskim analyze "src\SomeLibrary\artifacts\bin\**\*.dll" --recurse --output $output --pretty-print --force
+& $binskim analyze "src\SomeLibrary\artifacts\bin\**\*.dll" --recurse --output $output --log "PrettyPrint;ForceOverwrite"
 ```
 
 ### Step 4: Analyze Results
@@ -176,6 +178,26 @@ If the user provides central/official BinSkim results:
 2. Flag any **gaps** — findings in central that you don't see locally (likely packaging differences)
 3. Flag any **extras** — findings you see locally but not centrally (likely scanning too broadly — test dependencies, transitive NuGet packages)
 4. The central pipeline scans only *shipped* artifacts; local builds include test/sample outputs
+
+> 💡 **Local scans are a superset, not a subset.** Local BinSkim sees ALL findings because there's no Guardian filtering. If the user's central portal shows fewer findings than your local scan, that's expected — Guardian filters findings before they reach the portal. To understand what's being filtered, download the raw `binskim.sarif` from the SDL build artifacts (see "Understanding Guardian Filtering" below).
+
+### Step 6: Download and Compare Raw vs Merged SARIF (for investigation)
+
+When investigating discrepancies between local results and the central portal, download the SDL artifacts from the official build:
+
+```powershell
+# Download SDL artifact from official build
+# Use AzDO tools or the ado-dnceng-pipelines_download_artifact tool
+# Artifact names follow the pattern: drop_build_<OS>_<arch>_sdl_analysis
+
+# Key files inside the artifact:
+# - binskim/001/binskim.sarif    ← Raw BinSkim output (everything it found)
+# - Results.sarif                 ← Guardian-merged output (what the portal sees)
+# - break/001/options.json        ← Break policy (which tools can fail the build)
+# - .gdnbaselines                 ← Auto-generated baseline suppressions
+```
+
+This is the authoritative way to understand the gap between "what BinSkim found" and "what the portal reports."
 
 ## Coverage Gap Detection
 
@@ -238,12 +260,20 @@ To prove a fix resolved specific findings, scan before and after the change:
 
 > ❌ **Don't skip the pack step.** Many repos' shippable binaries only materialize during packing (native blobs get copied into pkgassets, NuGets get assembled). Building without packing scans the wrong thing.
 
-> ❌ **Don't assume the native build is required.** If native code fails to build locally, you can often still scan the pre-built native blobs from NuGet packages in the local cache (`$env:USERPROFILE\.nuget\packages\`).
+> ❌ **Don't assume the native build is required.** If native code fails to build locally (e.g., missing Spectre-mitigated MSVC libs), you can still scan pre-built native DLLs from the NuGet cache. Many BinSkim rules (including BA2008) don't need PDBs, so NuGet-cached binaries work fine. PDB-dependent rules like BA2028 will report ERR997.ExceptionLoadingPdb instead of actual findings.
+
+> ❌ **Don't trust the central portal as the complete picture.** Always download the raw `binskim.sarif` from the SDL build artifacts and compare it with the Guardian-merged `Results.sarif`. The portal may silently omit Error-level findings without any human decision.
+
+> ❌ **Don't assume "not in the portal" means "not a problem."** The auto-baselining system and Guardian filtering can hide real SDL-required findings. If you find Error-level results in the raw SARIF that aren't in the portal, flag them — they may represent unintentional coverage gaps.
+
+> ❌ **Don't confuse break policy with reporting.** The break policy (`IncludeTools`) controls whether BinSkim can fail the build. It does NOT control what gets reported to the portal. Findings can be reported without breaking the build, and findings can be filtered from reporting even if they would break the build.
 
 ## BinSkim Rules by Platform and SDL Compliance
 
-Rules at **Error** severity are **required** for SDL compliance (the official pipeline will block on them).
-Rules at **Warning** severity are **recommended** but not blocking.
+Rules at **Error** severity are **required** for SDL compliance and should be fixed or explicitly exempted.
+Rules at **Warning** severity are **recommended** best practices but not blocking.
+
+> ⚠️ **"Required" ≠ "the build will break."** Whether the build actually breaks on BinSkim errors depends on whether the repo's Guardian `break` policy includes BinSkim in its `IncludeTools` list. Many repos do not — BinSkim runs and reports but doesn't gate the build. Error-level findings are still SDL requirements regardless of whether the build breaks on them.
 
 ### Windows PE Rules (BA2xxx)
 
@@ -274,6 +304,7 @@ These apply to `.dll` and `.exe` files built with MSVC or the managed compiler.
 | BA2025 | EnableShadowStack (CET) | **Warning** | Pass `/CETCOMPAT` to linker |
 | BA2026 | EnableMicrosoftCompilerSdlSwitch | **Warning** | Pass `/sdl` to cl.exe |
 | BA2027 | EnableSourceLink | **Warning** | Enable SourceLink in project properties |
+| BA2028 | EnableCastGuard | Error | Pass `/guard:ehcont` to cl.exe and `/GUARD:EHCONT` to linker |
 | BA2029 | EnableIntegrityCheck | Error | Pass `/INTEGRITYCHECK` to linker (required for drivers, PPL) |
 
 ### Linux ELF Rules (BA3xxx)
@@ -308,6 +339,72 @@ These apply to `.dylib` and executables built for macOS/iOS.
 - **BA2024 (Spectre) is Warning, not Error** — it fires frequently on third-party native dependencies but won't block SDL compliance. However, 1ES Guardian may promote it to Error via org policy.
 - **Cross-platform repos** shipping both Windows and Linux binaries need to pass **both** BA2xxx and BA3xxx rules. BinSkim auto-detects binary format — you don't need separate rule configs.
 - **BA4002** (ReportElfOrMachoCompilerData) is informational only — it emits CSV data about compilers found, with no pass/fail.
+- **BA6004** (EnableComdatFolding) and **BA6006** (EnableLinkTimeCodeGeneration) are optimization hints, not security rules. They may appear in SARIF but have no SDL compliance impact.
+
+## Understanding Guardian Filtering
+
+The official pipeline runs BinSkim via Guardian, and the results go through multiple filtering layers before reaching the central portal. Understanding this pipeline is important for interpreting what the portal shows (and doesn't show).
+
+### The filtering pipeline
+
+```
+BinSkim runs → raw binskim.sarif (ALL findings)
+     ↓
+Guardian merges/filters → Results.sarif (subset of findings)
+     ↓
+Results.sarif uploaded → Central portal shows only what survived
+```
+
+The raw `binskim.sarif` is available in the SDL build artifacts (e.g., `drop_build_Windows_x64_sdl_analysis`). The merged `Results.sarif` is in the same artifact. **Always compare both** to understand what's being filtered.
+
+### What gets filtered and why
+
+The exact filtering mechanism between raw SARIF and the Guardian-merged `Results.sarif` is not fully documented. Observed behaviors:
+
+1. **Break policy (`IncludeTools`)**: Controls whether BinSkim can fail the build. Found in the `break/001/options.json` artifact. Many repos don't include BinSkim in `IncludeTools` — meaning BinSkim never breaks the build regardless of findings. This is separate from reporting.
+
+2. **Auto-baselining**: The `.config/1espt/PipelineAutobaseliningConfig.yml` file enables auto-baselining. Guardian generates `.gdnbaselines` and `.gdnsuppress` files as pipeline artifacts (not checked into source). These may suppress findings from the merged results.
+
+3. **Unknown filtering**: In practice, findings can disappear between the raw SARIF and the merged Results.sarif even when they are at Error level, without any obvious human decision. The filtering mechanism is not fully transparent.
+
+> ⚠️ **The central portal may significantly undercount real findings.** In machinelearning, the raw SARIF contained 40 findings including 7 Error-level BA2028 findings on first-party DLLs, but the portal only showed 5 BA2008 findings. No human explicitly suppressed the BA2028 findings.
+
+### How to investigate
+
+When asked about BinSkim findings for a repo, **don't trust the central portal alone**. Download the SDL artifacts and examine both:
+
+1. **Download the SDL artifact** from the official build (e.g., `drop_build_Windows_x64_sdl_analysis`)
+2. **Parse raw `binskim.sarif`** (in `binskim/001/binskim.sarif`) — this has everything BinSkim actually found
+3. **Parse merged `Results.sarif`** (in the artifact root) — this is what the portal sees
+4. **Compare them** — the delta is what Guardian filtered out
+5. **Check `break/001/options.json`** — look at `IncludeTools` to see if BinSkim can actually break the build
+
+```powershell
+# Compare raw vs merged findings
+$raw = (Get-Content "binskim\001\binskim.sarif" -Raw | ConvertFrom-Json).runs[0].results
+$merged = (Get-Content "Results.sarif" -Raw | ConvertFrom-Json).runs[0].results
+
+Write-Host "Raw BinSkim findings: $($raw.Count)"
+Write-Host "After Guardian filtering: $($merged.Count)"
+Write-Host "`nRaw findings by rule:"
+$raw | Group-Object ruleId | ForEach-Object {
+    $levels = ($_.Group | ForEach-Object { $_.level } | Sort-Object -Unique) -join ","
+    Write-Host "  $($_.Name): count=$($_.Count) levels=[$levels]"
+}
+```
+
+### Suppression mechanisms (where human decisions go)
+
+If someone wants to **explicitly** suppress a finding, these are the mechanisms:
+
+| Mechanism | File | Scope | Human decision? |
+|---|---|---|---|
+| Auto-baselining | `.config/1espt/PipelineAutobaseliningConfig.yml` | Pipeline-level | No — automatic |
+| Guardian baselines | `.gdnbaselines` (pipeline artifact) | Per-finding | No — auto-generated |
+| Guardian suppress | `.gdnsuppress` (can be checked into repo) | Per-finding | Yes — if in source control |
+| Break policy | Pipeline YAML / template config | Per-tool | Semi — configured once |
+
+Currently most dotnet repos rely only on auto-baselining, meaning **no human has explicitly reviewed or accepted any suppressed finding**. If you find Error-level findings in the raw SARIF that aren't in the portal, flag this to the user — it may indicate a coverage gap rather than an intentional suppression.
 
 ## References
 

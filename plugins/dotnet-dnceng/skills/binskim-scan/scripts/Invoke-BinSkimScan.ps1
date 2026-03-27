@@ -64,7 +64,7 @@ if ($ScanDir) {
     }
     $fileCount = (Get-ChildItem $target -Recurse -Include "*.dll","*.exe" | Measure-Object).Count
     Write-Host "Scanning $fileCount DLL/EXE files in $target"
-    & $BinSkimPath analyze "$target\**" --recurse --output $OutputSarif --pretty-print --force
+    & $BinSkimPath analyze "$target\**" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite"
     Write-Host "Results written to $OutputSarif"
     exit $LASTEXITCODE
 }
@@ -90,7 +90,7 @@ if (-not $PackagesDir) {
             $dllCount = (Get-ChildItem $full -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue | Measure-Object).Count
             if ($dllCount -gt 0) {
                 Write-Host "Found $dllCount DLLs in $c (no .nupkg — scanning directly)"
-                & $BinSkimPath analyze "$full\**" --recurse --output $OutputSarif --pretty-print --force
+                & $BinSkimPath analyze "$full\**" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite"
                 Write-Host "Results written to $OutputSarif"
                 exit $LASTEXITCODE
             }
@@ -146,7 +146,7 @@ $totalFiles = (Get-ChildItem $extractDir -Recurse -Include "*.dll","*.exe" | Mea
 Write-Host "`nScanning $totalFiles DLL/EXE files from extracted packages..."
 
 # Run BinSkim (exclude _.pdb like the official pipeline does)
-& $BinSkimPath analyze "$extractDir\**;-:file|$extractDir\**\_.pdb" --recurse --output $OutputSarif --pretty-print --force
+& $BinSkimPath analyze "$extractDir\**;-:file|$extractDir\**\_.pdb" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite"
 
 Write-Host "`nResults written to $OutputSarif"
 

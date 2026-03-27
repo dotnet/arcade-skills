@@ -94,3 +94,30 @@ To match what the pipeline does:
    ```
 
 This produces results equivalent to the official pipeline (minus any baseline suppression).
+
+## Understanding the Guardian Output Artifacts
+
+When downloading SDL build artifacts, you'll find several key files:
+
+### `binskim/001/binskim.sarif` — Raw BinSkim output
+
+This is what BinSkim actually found. It contains ALL findings, unfiltered. This is what your local scan should match.
+
+### `Results.sarif` — Guardian-merged output
+
+This is what the central portal sees. Guardian applies filtering/baselining between the raw SARIF and this file. Compare with the raw SARIF to understand what was filtered.
+
+### `break/001/options.json` — Break policy
+
+Controls whether BinSkim can fail the build. Key fields:
+- `IncludeTools`: array of tool names that can break the build (e.g., `["credscan", "fxcop", "roslynanalyzers"]`)
+- `policy`: typically `"Microsoft"`
+- `minSeverity`: typically `"Error"`
+
+If BinSkim isn't in `IncludeTools`, it runs and reports but never gates the build.
+
+### `.gdnbaselines` / `.gdnsuppress` — Suppression files
+
+Generated at runtime by Guardian, not typically checked into source. These may suppress findings from the merged Results.sarif.
+
+> 💡 **When investigating a repo's BinSkim status, always download the raw SARIF.** The merged Results.sarif and central portal only tell you what survived Guardian's filtering — which may be a small subset of actual findings.
