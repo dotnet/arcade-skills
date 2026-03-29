@@ -154,7 +154,7 @@ When asked about a major version, check **all branches** — don't ask for clari
 ./scripts/Get-CodeflowStatus.ps1 -Repository "dotnet/runtime" -PRNumber 12345
 
 # Check if a PR exists for a repo/branch (finds the open backflow PR)
-./scripts/Get-CodeflowStatus.ps1 -Repository "dotnet/runtime" -Branch "main"
+./scripts/Get-CodeflowStatus.ps1 -Repository "dotnet/runtime" -CheckMissing -Branch "main"
 
 # Check for missing PRs across all branches
 ./scripts/Get-CodeflowStatus.ps1 -Repository "dotnet/runtime" -CheckMissing

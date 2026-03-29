@@ -36,6 +36,8 @@ dotnet tool install -g lewing.maestro.mcp
 
 After installation, `mstro` is available globally. Verify: `mstro --help`
 
+> Note: The same package (`lewing.maestro.mcp`) serves as both a .NET global tool (providing the `mstro` CLI) and an MCP server (via `dotnet dnx`). The CLI is what this skill uses.
+
 ## Authentication
 
 Three-tier cascade (automatic fallback):
