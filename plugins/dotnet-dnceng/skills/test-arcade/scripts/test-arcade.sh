@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # test-arcade.sh
 #
-# Replaces the BuildAndTestArcade .NET CLI tool.
-# Builds the Arcade SDK from ~/repos/arcade, configures a local NuGet feed
-# with the build artifacts, and builds arcade-validation against them.
+# Builds the Arcade SDK from a local checkout, configures a local NuGet feed
+# with the build artifacts, and builds a test repository against them.
 # Optionally runs Signing Validation (SignCheck) on the test repo output.
 #
 # Prerequisites:
@@ -11,11 +10,11 @@
 #   - Network access to Azure DevOps package feeds
 #
 # Usage:
-#   ./test-arcade.sh
-#   ./test-arcade.sh --clean-feed
-#   ./test-arcade.sh --signcheck
-#   ./test-arcade.sh --signcheck --signcheck-dir path/to/files
-#   ./test-arcade.sh --skip-arcade-build --signcheck   # reuse previous Arcade build
+#   ./test-arcade.sh --arcade /path/to/arcade --test-repo /path/to/test-repo
+#   ./test-arcade.sh --arcade /path/to/arcade --test-repo /path/to/test-repo --clean-feed
+#   ./test-arcade.sh --arcade /path/to/arcade --test-repo /path/to/test-repo --signcheck
+#   ./test-arcade.sh --arcade /path/to/arcade --test-repo /path/to/test-repo --signcheck --signcheck-dir path/to/files
+#   ./test-arcade.sh --arcade /path/to/arcade --test-repo /path/to/test-repo --skip-arcade-build --signcheck
 
 set -euo pipefail
 
@@ -23,17 +22,24 @@ CLEAN_FEED=false
 SIGNCHECK=false
 SIGNCHECK_DIR=""
 SKIP_ARCADE_BUILD=false
+ARCADE_PATH=""
+TEST_PATH=""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR" && git rev-parse --show-toplevel)"
-ARCADE_PATH="$REPO_ROOT/../arcade"
-TEST_PATH="$REPO_ROOT/../arcade-validation"
 FEED_PATH="$SKILL_DIR/.arcade-local-feed"
 
 # ─── Parse arguments ────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --arcade)
+            ARCADE_PATH="$2"
+            shift 2
+            ;;
+        --test-repo)
+            TEST_PATH="$2"
+            shift 2
+            ;;
         --clean-feed) CLEAN_FEED=true;  shift   ;;
         --signcheck)  SIGNCHECK=true;   shift   ;;
         --skip-arcade-build) SKIP_ARCADE_BUILD=true; shift ;;
@@ -50,25 +56,35 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# ─── Validate required arguments ────────────────────────────────────────────
+if [[ -z "$ARCADE_PATH" ]]; then
+    echo "Error: --arcade <path> is required"
+    echo "Usage: $0 --arcade /path/to/arcade --test-repo /path/to/test-repo [options]"
+    exit 1
+fi
+if [[ -z "$TEST_PATH" ]]; then
+    echo "Error: --test-repo <path> is required"
+    echo "Usage: $0 --arcade /path/to/arcade --test-repo /path/to/test-repo [options]"
+    exit 1
+fi
+
 # Resolve to absolute paths
 ARCADE_PATH="$(cd "$ARCADE_PATH" 2>/dev/null && pwd)" || ARCADE_PATH=""
 TEST_PATH="$(cd "$TEST_PATH" 2>/dev/null && pwd)" || TEST_PATH=""
 
 # ─── Validate paths ─────────────────────────────────────────────────────────
 if [[ -z "$ARCADE_PATH" || ! -d "$ARCADE_PATH" ]]; then
-    echo "Error: 'arcade' directory not found next to the arcade-skills repo"
-    echo "Expected at: $REPO_ROOT/../arcade"
+    echo "Error: Arcade directory not found at the specified path"
     exit 1
 fi
 if [[ -z "$TEST_PATH" || ! -d "$TEST_PATH" ]]; then
-    echo "Error: 'arcade-validation' directory not found next to the arcade-skills repo"
-    echo "Expected at: $REPO_ROOT/../arcade-validation"
+    echo "Error: Test repo directory not found at the specified path"
     exit 1
 fi
 
 echo "Building and testing Arcade with the following parameters:"
 echo "Arcade Repo Path:       $ARCADE_PATH"
-echo "Test Repo Path:         $TEST_PATH (arcade-validation)"
+echo "Test Repo Path:         $TEST_PATH"
 echo "Package Feed Path:      $FEED_PATH"
 if $SIGNCHECK; then
     echo "Signing Validation:     enabled${SIGNCHECK_DIR:+ (dir: $SIGNCHECK_DIR)}"
@@ -142,7 +158,7 @@ else
 fi
 
 # ─── Build Test Repo ─────────────────────────────────────────────────────────
-echo "Building arcade-validation..."
+echo "Building test repo..."
 (cd "$TEST_PATH" && ./build.sh)
 
 # ─── Run Signing Validation ──────────────────────────────────────────────────

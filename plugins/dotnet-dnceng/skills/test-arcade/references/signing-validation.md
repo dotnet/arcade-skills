@@ -37,7 +37,7 @@ $TEST_PATH/artifacts/packages/<config>/NonShipping
 
 It checks `Debug` first, then `Release`, using whichever exists. If neither is found, the script exits with an error suggesting `--pack` or `--signcheck-dir`.
 
-> ⚠️ The default `./build.sh` in arcade-validation does not produce packages. If you need packages in the default location, build with `./build.sh --pack`. Alternatively, point `--signcheck-dir` at any directory containing files to validate.
+> ⚠️ Some repos (e.g., arcade-validation) do not produce packages with the default `./build.sh`. If you need packages in the default location, build with `./build.sh --pack`. Alternatively, point `--signcheck-dir` at any directory containing files to validate.
 
 ## MSBuild Properties
 
@@ -75,7 +75,7 @@ SignCheck recursively inspects containers (archives, packages) to validate signa
 
 ## Exclusions
 
-To skip specific files from validation, create an exclusions file and pass it via `SignCheckExclusionsFile`. The file is referenced in the test repo's CI pipeline as `eng/SignCheckExclusionsFile.txt`, though arcade-validation does not ship one by default.
+To skip specific files from validation, create an exclusions file and pass it via `SignCheckExclusionsFile`. The file is typically referenced in a repo's CI pipeline as `eng/SignCheckExclusionsFile.txt`.
 
 ## Signing Configuration in the Test Repo
 
@@ -102,7 +102,7 @@ This file controls which files are **signed** during a build. `SignCheck` then v
 After a SignCheck run, look for these files in the test repo:
 
 ```
-arcade-validation/artifacts/log/
+<test-repo>/artifacts/log/
 ├── Debug/
 │   ├── SigningValidation.binlog    ← MSBuild binary log
 │   ├── signcheck.log              ← Full validation output
@@ -206,7 +206,7 @@ Total Files: 3, Signed: 1, Unsigned: 0, Skipped: 2, Excluded: 0, Skipped & Exclu
 
 **Fix**:
 1. Verify the Arcade build produced the SDK package: `ls arcade/artifacts/packages/Release/NonShipping/Microsoft.DotNet.Arcade.Sdk.*.nupkg`
-2. Verify `global.json` was updated: `grep Arcade arcade-validation/global.json`
+2. Verify `global.json` was updated: `grep Arcade <test-repo>/global.json`
 3. Clear NuGet caches and retry: `dotnet nuget locals all --clear`
 
 ### SignCheck passes but shouldn't

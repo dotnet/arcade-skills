@@ -35,45 +35,47 @@ Build the Arcade SDK from a local checkout, publish the artifacts to a local NuG
 ## Quick Start
 
 ```bash
-# Full build-and-test (uses ~/repos/arcade and ~/repos/arcade-validation)
-./scripts/test-arcade.sh
+# Full build-and-test
+./scripts/test-arcade.sh --arcade /path/to/arcade --test-repo /path/to/test-repo
 
 # Clean the local feed before running (e.g., after switching arcade branches)
-./scripts/test-arcade.sh --clean-feed
+./scripts/test-arcade.sh --arcade /path/to/arcade --test-repo /path/to/test-repo --clean-feed
 
 # Build and run Signing Validation (SignCheck) on test repo output
-./scripts/test-arcade.sh --signcheck
+./scripts/test-arcade.sh --arcade /path/to/arcade --test-repo /path/to/test-repo --signcheck
 
 # Run SignCheck against a custom directory
-./scripts/test-arcade.sh --signcheck --signcheck-dir /path/to/files
+./scripts/test-arcade.sh --arcade /path/to/arcade --test-repo /path/to/test-repo --signcheck --signcheck-dir /path/to/files
 ```
 
 ## Step 0: Verify Repos Are Cloned
 
-The script finds `arcade` and `arcade-validation` as sibling directories of the `arcade-skills` repo root. For example, if `arcade-skills` is at `~/repos/arcade-skills`, the script expects:
+Both the Arcade repo and the test repo must be cloned locally. The test repo can be any .NET repo that consumes the Arcade SDK (e.g., `arcade-validation`, `runtime`, `sdk`, `aspnetcore`).
 
-- `~/repos/arcade` — the `dotnet/arcade` repo with the changes to test
-- `~/repos/arcade-validation` — the `dotnet/arcade-validation` repo used as the test target
+- The `--arcade` argument points to the local `dotnet/arcade` checkout with the changes to test
+- The `--test-repo` argument points to any Arcade-consuming repo to validate against
 
 The local NuGet feed is stored at `.arcade-local-feed/` inside the skill directory (hidden). It is **not cleaned up** between runs — use `--clean-feed` to explicitly clear it when needed (e.g., after switching branches or testing a different Arcade change).
 
 ## Step 1: Run the Script
 
-Run `scripts/test-arcade.sh`. The script performs these phases in order:
+Run `scripts/test-arcade.sh` with the required `--arcade` and `--test-repo` arguments. The script performs these phases in order:
 
-1. **Validate** — confirms `~/repos/arcade` and `~/repos/arcade-validation` directories exist
+1. **Validate** — confirms the arcade and test repo directories exist
 2. **Reset repos** — deletes `.packages` and `artifacts` directories in both repos to ensure a clean state
 3. **Create feed** — creates the feed directory if it doesn't exist (only cleans it when `--clean-feed` is passed)
 4. **Build Arcade** — runs `./build.sh --configuration Release --pack` with an auto-generated future-dated `OfficialBuildId` in the arcade repo
-5. **Configure local NuGet feed** — uses `dotnet nuget push` to populate a hierarchical local feed from `artifacts/packages/Release/NonShipping`, clears all NuGet caches, and adds the feed as a source for arcade-validation
-6. **Update global.json** — finds the built `Microsoft.DotNet.Arcade.Sdk` package, extracts its version, and updates arcade-validation's `global.json` to replace wildcard (`*`) version pins for both `Microsoft.DotNet.Arcade.Sdk` and `Microsoft.DotNet.Helix.Sdk` with the exact built version
-7. **Build arcade-validation** — runs `./build.sh` in arcade-validation
+5. **Configure local NuGet feed** — uses `dotnet nuget push` to populate a hierarchical local feed from `artifacts/packages/Release/NonShipping`, clears all NuGet caches, and adds the feed as a source for the test repo
+6. **Update global.json** — finds the built `Microsoft.DotNet.Arcade.Sdk` package, extracts its version, and updates the test repo's `global.json` to replace version pins for both `Microsoft.DotNet.Arcade.Sdk` and `Microsoft.DotNet.Helix.Sdk` with the exact built version
+7. **Build test repo** — runs `./build.sh` in the test repo
 8. **Signing Validation** *(optional, `--signcheck`)* — runs `eng/common/sdk-task.sh --task SigningValidation` against the test repo's output packages. Defaults to `artifacts/packages/<config>/NonShipping`; override with `--signcheck-dir`
 
 ### Script Arguments
 
 | Argument | Required | Description |
 |----------|----------|-------------|
+| `--arcade <path>` | ✅ | Path to the local `dotnet/arcade` checkout |
+| `--test-repo <path>` | ✅ | Path to the Arcade-consuming repo to test against |
 | `--clean-feed` | ❌ | Delete and recreate the local feed directory before running. Use when switching branches or testing a different Arcade change |
 | `--signcheck` | ❌ | Run Signing Validation (SignCheck) after building the test repo. Checks files in `artifacts/packages/<config>/NonShipping` by default |
 | `--signcheck-dir <path>` | ❌ | Directory to validate with SignCheck. Implies `--signcheck`. Use to check a custom directory instead of the default |
