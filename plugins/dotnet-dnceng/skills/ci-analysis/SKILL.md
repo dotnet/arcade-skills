@@ -20,7 +20,7 @@ Analyze CI build status and test failures in Azure DevOps and Helix for dotnet r
 
 **Accessing services**: Start with MCP tools if available. Get repo-specific CI guidance early — it provides the investigation workflow, tool selection, failure patterns, and classification algorithm for that repo. The guidance evolves with the toolset, so it always reflects current capabilities.
 
-If MCP tools aren't loaded, the Helix CLI tool and the **helix-cli** skill provide the same capabilities via bash with progressive discovery.
+If MCP tools aren't loaded, the Helix CLI tool provides the same capabilities via bash with progressive discovery.
 
 For AzDO, multiple tool sets may exist for different organizations — match the org in the build URL to the correct tools (see [references/azdo-helix-reference.md](references/azdo-helix-reference.md#azure-devops-organizations)). If queries return null, check the org before trying other approaches. For complex investigations, track what you've tried in SQL to avoid repeating failed approaches.
 
