@@ -16,9 +16,13 @@ Analyze CI build status and test failures in Azure DevOps and Helix for dotnet r
 
 > 🚨 **NEVER** use `gh pr review --approve` or `--request-changes`. Only `--comment` is allowed. Approval and blocking are human-only actions.
 
-**Workflow**: Gather PR context (Step 0) → run the script → read human-readable output + `[CI_ANALYSIS_SUMMARY]` JSON → synthesize recommendations. The script collects data; you generate the advice. MCP tools (AzDO, Helix, GitHub) provide supplementary access when available; the script and `gh` CLI work independently when they're not.
+**Workflow**: Gather PR context (Step 0) → collect failure data → synthesize recommendations. The agent drives the investigation; tools provide the data.
 
-**Accessing services**: There are several possible methods to access each service (AzDO, Helix, GitHub). Start with MCP tools, then fall back to CLI (`gh` for GitHub, `Invoke-RestMethod` for AzDO/Helix REST APIs). Explore all available options before determining you don't have access. For AzDO, multiple tool sets may exist for different organizations — match the org in the build URL to the correct tools (see [references/azdo-helix-reference.md](references/azdo-helix-reference.md#azure-devops-organizations)). If queries return null, check the org before trying other approaches. For complex investigations, track what you've tried in SQL to avoid repeating failed approaches.
+**Accessing services**: Start with MCP tools if available. Get repo-specific CI guidance early — it provides the investigation workflow, tool selection, failure patterns, and classification algorithm for that repo. The guidance evolves with the toolset, so it always reflects current capabilities.
+
+If MCP tools aren't loaded, the Helix CLI tool provides the same capabilities via bash with progressive discovery.
+
+For AzDO, multiple tool sets may exist for different organizations — match the org in the build URL to the correct tools (see [references/azdo-helix-reference.md](references/azdo-helix-reference.md#azure-devops-organizations)). If queries return null, check the org before trying other approaches. For complex investigations, track what you've tried in SQL to avoid repeating failed approaches.
 
 ## When to Use This Skill
 
@@ -31,23 +35,15 @@ Analyze CI build status and test failures in Azure DevOps and Helix for dotnet r
 
 **Not for**: GitHub Actions workflows, non-Helix repos, or build performance (use binlog analysis).
 
-> 💡 **Per-repo CI patterns differ significantly.** Each dotnet repo structures test results differently (TRX availability, console log patterns, work item naming). Before investigating a repo you haven't seen before, check the empirical profiles in `dnceng-knowledge/ci-repo-profiles` — they document the fastest investigation path per repo and prevent wasted MCP calls.
+> 💡 **Per-repo CI patterns differ significantly.** Get repo-specific guidance early — it tells you which tools to use, what log patterns to search for, and what gotchas to expect. This is the fastest path and prevents wasted calls.
 
 ## Quick Start
 
-```powershell
-# Analyze PR failures (most common) - defaults to dotnet/runtime
-./scripts/Get-CIStatus.ps1 -PRNumber 123445 -ShowLogs
+1. **Get repo-specific CI guidance** — investigation workflow, tool selection, search patterns, and failure classification for that repo
+2. **Find builds** for the PR or use a build ID directly
+3. **Follow the investigation order** from the guidance — it tells you what to check and in what sequence
 
-# Analyze by build ID
-./scripts/Get-CIStatus.ps1 -BuildId 1276327 -ShowLogs
-
-# Query specific Helix work item
-./scripts/Get-CIStatus.ps1 -HelixJob "4b24b2c2-..." -WorkItem "System.Net.Http.Tests"
-
-# Other dotnet repositories
-./scripts/Get-CIStatus.ps1 -PRNumber 12345 -Repository "dotnet/aspnetcore"
-```
+If MCP tools aren't available, the Helix CLI tool provides the same capabilities via bash. A legacy PowerShell script is also available for environments that support it.
 
 For full parameter reference and mode details, see [references/script-modes.md](references/script-modes.md).
 
@@ -65,24 +61,21 @@ For full parameter reference and mode details, see [references/script-modes.md](
 | **Dependency update** | Bumps package versions, global.json | Build failures often trace to the dependency |
 
 3. **Check existing comments** — has someone already diagnosed failures or is a retry pending?
-4. **Note the changed files** — you'll use these for correlation after the script runs
+4. **Note the changed files** — you'll use these for failure correlation
 
-## After the Script: Use Its Output
+## After Data Collection: Synthesize
 
-> 🚨 **The script already collected the data. Do NOT re-query AzDO or Helix for information the script already produced.** Parse the `[CI_ANALYSIS_SUMMARY]` JSON and the human-readable output first. Only make additional API calls for data the script *didn't* provide (e.g., deeper Helix log searches, binlog analysis, build progression).
+> 🚨 **Don't re-fetch data you already have.** Only make additional calls for deeper investigation (Helix log searches, binlog analysis, build progression).
 
-**If the script found no builds** (e.g., AzDO builds expired, CI not triggered): report this to the user immediately. Don't spend turns re-querying AzDO with different org/project combinations — if the script couldn't find builds, they're likely unavailable. Offer alternatives: analyze by build ID if the user has one, check GitHub PR status for summary info, or note that Helix results may still be queryable directly even when AzDO builds have expired.
+**Classify each failure.** Determine whether it's a build error, test failure, crash, timeout, or infrastructure issue. Exit codes, log patterns, and Helix work item state all contribute — the repo-specific CI guidance includes a classification algorithm with the patterns and recommended next steps for each category. Crashes (exit code -4, 139, 134) don't always mean tests failed — check for recoverable test results before concluding.
 
-**If the script succeeded**: the `[CI_ANALYSIS_SUMMARY]` JSON contains `failedJobDetails`, `knownIssues`, `canceledJobNames`, `prCorrelation`, and `recommendationHint`. Use these fields — don't re-fetch the same data via MCP tools or REST APIs. To find specific details in large output, use `Select-String` or `grep` on the output file rather than re-running the script.
+**Cross-reference with known issues.** Check which failures are already matched by Build Analysis — green means all failures are accounted for, red means some are unmatched. For each unmatched failure, search for related known issues by error message, test name, or job type. The user needs a per-failure verdict, not two separate lists.
 
-> 🚨 **Check build progression on multi-commit PRs.** If the PR has multiple commits, query AzDO for builds on `refs/pull/{PR}/merge` (sorted by queue time, top 10-20) — `gh pr checks` only shows the latest SHA. Present a progression table showing which builds passed/failed at which SHAs. This narrows failures to the commit that introduced them. See [references/build-progression-analysis.md](references/build-progression-analysis.md).
+**Correlate with PR changes.** If the same files appear in both the PR diff and the failure messages, the failure is likely PR-related. If not, check whether the same test fails on the target branch — that distinguishes pre-existing flakes from regressions.
 
-Then follow the detailed workflow in [references/analysis-workflow.md](references/analysis-workflow.md). Key principles:
+**Verify before claiming.** Don't call it "infrastructure" without a Build Analysis match or target-branch verification. Don't call it "safe to retry" unless ALL failures are accounted for.
 
-1. **Cross-reference failures with known issues** — The script outputs `failedJobDetails` and `knownIssues` as separate lists. You must explicitly match each failure to a known issue (by error message, test name, or job type) or mark it **unmatched**. Don't present them as two independent lists — the user needs a per-failure verdict.
-2. **Check Build Analysis status** — Green = all failures matched known issues. Red = some unmatched. Never claim "all known issues" when Build Analysis is red.
-3. **Correlate with PR changes** — same files failing = likely PR-related.
-4. **Verify before claiming** — don't call it "infrastructure" without Build Analysis match or target-branch verification. Don't call it "safe to retry" unless ALL failures are accounted for.
+> 🚨 **Check build progression on multi-commit PRs.** If the PR has multiple commits, query AzDO for builds on `refs/pull/{PR}/merge` (sorted by queue time, top 10-20). Present a progression table showing which builds passed/failed at which SHAs — this narrows failures to the commit that introduced them. See [references/build-progression-analysis.md](references/build-progression-analysis.md).
 
 For interpreting error categories, crash recovery, and canceled jobs: [references/failure-interpretation.md](references/failure-interpretation.md)
 
@@ -110,7 +103,7 @@ Lead with a 1-2 sentence verdict, then the summary table, then detail bullets (o
 
 > ❌ **Don't say "safe to retry" with Build Analysis red.** Map each failing job to a specific known issue first.
 
-> ❌ **Don't use `Invoke-RestMethod` or `curl` for AzDO/Helix when MCP tools are available.** Check your available tools for Azure DevOps and Helix operations first. REST API fallback is for when MCP tools are genuinely unavailable, not a first resort.
+> ❌ **Don't use raw REST APIs when higher-level tools are available.** Check your available tools for Azure DevOps and Helix operations first. REST API fallback is for when those tools are genuinely unavailable, not a first resort.
 
 ## References
 
@@ -129,9 +122,8 @@ Lead with a 1-2 sentence verdict, then the summary table, then detail bullets (o
 
 ## Tips
 
-1. Check if same test fails on target branch before assuming transient
-2. Look for `[ActiveIssue]` attributes for known skipped tests
-3. Use `-SearchMihuBot` for semantic search of related issues
-4. `gh pr checks --json` fields: `bucket`, `completedAt`, `description`, `event`, `link`, `name`, `startedAt`, `state`, `workflow` — `state` has `SUCCESS`/`FAILURE` directly (no `conclusion` field)
-5. "Canceled" ≠ "Failed" — canceled jobs may have recoverable Helix results. Helix data may persist even when AzDO builds have expired — query Helix directly if you have job IDs.
-6. **Truncated failure details**: When `failedJobDetailsTruncated` is `true` in the JSON output, the `failedJobDetails` array is capped at `-MaxJobs` (default 5). The full failure count is always available in `totalFailedJobs`, and all failed job names are listed in `failedJobNames` — use these to assess the full scope before investigating details. Pass `-MaxJobs N` to increase the detail cap for builds with many failures.
+1. Get repo-specific CI guidance first — it gives you the investigation order, search patterns, and gotchas
+2. Check if same test fails on target branch before assuming transient
+3. Look for `[ActiveIssue]` attributes for known skipped tests
+4. Search for related issues across dotnet repos when failures don't match known patterns
+5. "Canceled" ≠ "Failed" — canceled jobs may have recoverable Helix results. Helix data may persist even when AzDO builds have expired.

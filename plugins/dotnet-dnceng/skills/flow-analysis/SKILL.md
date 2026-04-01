@@ -41,7 +41,7 @@ For **"is the backflow healthy for repo X on branch Y?"** — use PR Analysis (`
 
 For **"what's the flow status across all repos?"** or **multi-repo/multi-branch scanning** — use the Codeflow Overview (MCP tools for subscription health + build freshness across many repos simultaneously).
 
-For **investigating a specific PR** — use PR Analysis (`Get-CodeflowStatus.ps1 -PrUrl`). If **no open PR exists**, the script reports this; use MCP tools to check the subscription state.
+For **investigating a specific PR** — use PR Analysis (`Get-CodeflowStatus.ps1 -PRNumber`). If **no open PR exists**, the script reports this; use MCP tools to check the subscription state.
 
 ## Codeflow Concepts
 
@@ -150,11 +150,11 @@ When asked about a major version, check **all branches** — don't ask for clari
 ### Step 1: Run the Script
 
 ```powershell
-# Analyze a specific PR
-./scripts/Get-CodeflowStatus.ps1 -PrUrl "https://github.com/dotnet/runtime/pull/12345"
+# Analyze a specific PR by number
+./scripts/Get-CodeflowStatus.ps1 -Repository "dotnet/runtime" -PRNumber 12345
 
 # Check if a PR exists for a repo/branch (finds the open backflow PR)
-./scripts/Get-CodeflowStatus.ps1 -Repository "dotnet/runtime" -Branch "main"
+./scripts/Get-CodeflowStatus.ps1 -Repository "dotnet/runtime" -CheckMissing -Branch "main"
 
 # Check for missing PRs across all branches
 ./scripts/Get-CodeflowStatus.ps1 -Repository "dotnet/runtime" -CheckMissing
