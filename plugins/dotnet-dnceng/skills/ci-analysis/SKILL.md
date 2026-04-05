@@ -103,6 +103,8 @@ Lead with a 1-2 sentence verdict, then the summary table, then detail bullets (o
 
 > ❌ **Don't say "safe to retry" with Build Analysis red.** Map each failing job to a specific known issue first.
 
+> ❌ **Don't execute `gh issue create` without explicit user approval.** Always present the draft command as text and ask the user to confirm before running it. This applies to KBE issues and any other GitHub issue creation.
+
 > ❌ **Don't use raw REST APIs when higher-level tools are available.** Check your available tools for Azure DevOps and Helix operations first. REST API fallback is for when those tools are genuinely unavailable, not a first resort.
 
 ## References
@@ -118,6 +120,7 @@ Lead with a 1-2 sentence verdict, then the summary table, then detail bullets (o
 - **Azure CLI investigation**: [references/azure-cli.md](references/azure-cli.md)
 - **Manual investigation**: [references/manual-investigation.md](references/manual-investigation.md)
 - **SQL tracking**: [references/sql-tracking.md](references/sql-tracking.md)
+- **Known Build Error issue creation**: [references/kbe-issue-creation.md](references/kbe-issue-creation.md)
 - **AzDO/Helix details**: [references/azdo-helix-reference.md](references/azdo-helix-reference.md)
 
 ## Tips
