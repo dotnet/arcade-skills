@@ -502,6 +502,7 @@ jobs:
 
       - name: Post or update PR comment
         if: always() && github.event_name == 'pull_request' && steps.validate.outputs.has_comment == 'true'
+        continue-on-error: ${{ github.event.pull_request.head.repo.fork == true }}  # GITHUB_TOKEN is read-only for fork PRs (dotnet/arcade-skills#13)
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash

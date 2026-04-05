@@ -16,9 +16,9 @@ Read `recommendationHint` as a starting point, then layer in context:
 | `MERGE_CONFLICTS` | PR has merge conflicts — CI won't run. Tell the user to resolve conflicts. Offer to analyze a previous build by ID. |
 | `NO_BUILDS` | No AzDO builds found (CI not triggered). Offer to check if CI needs to be triggered or analyze a previous build. |
 
-## Layering Nuance
+## Refining with Context
 
-Then layer in nuance the heuristic can't capture:
+Refine the recommendation with context the heuristic can't capture:
 
 - **Unmatched novel failures**: Build Analysis is red and some failures don't match any known issue or PR correlation → suggest the user consider filing a Known Build Error issue. **Before drafting any issue, you MUST first**: (1) download/extract the actual failure log, (2) run `scripts/Test-KnownIssuePattern.ps1 -ErrorMessage "<pattern>" -LogFile <log>` (or `-ErrorPattern` for regex), (3) confirm the script outputs `RESULT: PASS`. Only then draft a `gh issue create` command. Do NOT skip validation — patterns that look correct often don't match due to invisible characters, line breaks, or log formatting. See [kbe-issue-creation.md](kbe-issue-creation.md).
 - **Mixed signals**: Some failures match known issues AND some correlate with PR changes → separate them. Known issues = safe to retry; correlated = fix first.
