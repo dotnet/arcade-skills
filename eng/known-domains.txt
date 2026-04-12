@@ -66,6 +66,5 @@ github.com/jaredpar/runfo
 github.com/lewing/maestro.mcp
 
 # Tools
-regex101.com
 msbuildlog.com
 live.msbuildlog.com
