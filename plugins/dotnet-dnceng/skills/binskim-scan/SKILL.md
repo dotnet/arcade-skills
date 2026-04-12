@@ -211,6 +211,6 @@ In the VMR (dotnet/dotnet), look at the SARIF artifact path to find the source s
 
 - **Installing BinSkim**: [references/binskim-install.md](references/binskim-install.md)
 - **Build prerequisites**: [references/build-prereqs.md](references/build-prereqs.md)
-- **Per-repo pipeline configs**: See [../binskim-analysis/references/repo-profiles.md](../binskim-analysis/references/repo-profiles.md) for known pipeline names, SDL artifact patterns, and local repro notes per repo
-- **Arcade SDL infrastructure**: See [../binskim-analysis/references/arcade-sdl.md](../binskim-analysis/references/arcade-sdl.md) for `configure-sdl-tool.ps1` and `extract-artifact-packages.ps1` details
+- **Per-repo pipeline configs**: Use the `binskim-analysis` skill for known pipeline names, SDL artifact patterns, and local repro notes per repo
+- **Arcade SDL infrastructure**: Use the `binskim-analysis` skill for `configure-sdl-tool.ps1` and `extract-artifact-packages.ps1` details
 - **Rules reference and Guardian filtering**: See the **binskim-analysis** skill
