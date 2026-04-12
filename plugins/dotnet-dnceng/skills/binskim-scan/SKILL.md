@@ -4,16 +4,17 @@ description: >
   Run BinSkim binary security analysis locally against a dotnet repository.
   Use when asked to scan binaries, check BinSkim compliance, verify a fix for a rule violation,
   or run a local SDL scan. Also use when asked "run binskim", "binary security scan", "scan binaries",
-  "check binskim", or "verify my fix". DO NOT USE FOR: investigating official pipeline results or
-  portal findings (use binskim-analysis), source code analysis (use CodeQL), credential scanning
-  (use CredScan), or general build/test failures (use ci-analysis).
+  "check binskim", "verify my fix", "repro BA2008 locally", or "verify BA2008 fix". DO NOT USE FOR:
+  investigating official pipeline results or portal findings (use binskim-analysis), source code
+  analysis (use CodeQL), credential scanning (use CredScan), or general build/test failures
+  (use ci-analysis).
 ---
 
 # BinSkim Local Scanning
 
 Run BinSkim locally against a dotnet repository to find binary security issues. This skill covers installing BinSkim, building the repo, discovering what the official pipeline scans, running BinSkim with matching targeting, and interpreting results.
 
-> **Local scans are an approximation.** The official pipeline runs BinSkim via Guardian with additional filtering. Local scans produce a **superset** of official findings. For understanding what the portal reports vs what BinSkim finds, use the **binskim-analysis** skill.
+> **Local scans are an approximation.** The official pipeline runs BinSkim via Guardian with additional filtering. Local scans produce a **superset** of official findings. For understanding what the portal reports vs what BinSkim finds, use the **binskim-analysis** skill. For authoritative pass/fail confirmation, recommend the user manually queue the official CI pipeline against their branch — SDL does not run on PR validation builds.
 
 ## When to Use This Skill
 
@@ -94,6 +95,8 @@ Get-ChildItem "$nupkgDir\*.nupkg" | ForEach-Object {
 > Only extract **Shipping** packages unless you have reason to scan NonShipping too.
 
 > **Native builds may require extra setup.** If native code fails to build, you can still scan pre-built native DLLs from the NuGet cache. Many rules (including BA2008) don't need PDBs. See [references/build-prereqs.md](references/build-prereqs.md).
+>
+> **NuGet cache limitation**: This only covers third-party native blobs consumed via NuGet. It misses first-party native code compiled from source, managed assemblies the repo builds, and pack-only artifacts. For repos where all findings are on NuGet-sourced binaries (e.g., machinelearning's Intel DLLs), this is sufficient. For repos that compile native code from source, a full build is needed.
 
 ### Step 3: Run BinSkim
 
@@ -206,4 +209,6 @@ In the VMR (dotnet/dotnet), look at the SARIF artifact path to find the source s
 
 - **Installing BinSkim**: [references/binskim-install.md](references/binskim-install.md)
 - **Build prerequisites**: [references/build-prereqs.md](references/build-prereqs.md)
+- **Per-repo pipeline configs**: See `binskim-analysis/references/repo-profiles.md` for known pipeline names, SDL artifact patterns, and local repro notes per repo
+- **Arcade SDL infrastructure**: See `binskim-analysis/references/arcade-sdl.md` for `configure-sdl-tool.ps1` and `extract-artifact-packages.ps1` details
 - **Rules reference and Guardian filtering**: See the **binskim-analysis** skill

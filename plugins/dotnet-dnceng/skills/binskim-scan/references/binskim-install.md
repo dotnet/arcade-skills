@@ -1,4 +1,4 @@
-s# Installing BinSkim
+# Installing BinSkim
 
 BinSkim is distributed as a NuGet content package, **not** a dotnet global tool. It ships pre-built binaries for Windows (x64), Linux (x64, arm64), and macOS (x64).
 

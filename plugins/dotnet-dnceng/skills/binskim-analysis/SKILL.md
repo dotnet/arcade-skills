@@ -5,7 +5,7 @@ description: >
   compare raw vs merged SARIF, decode portal results, and determine fix ownership.
   Use when asked about SDL scan results, portal findings, Guardian filtering, rule meanings,
   or discrepancies between local and official results. Also use when asked "why does the portal
-  show X", "what's filtered", "BA2008", "explain Guardian", "investigate SDL findings",
+  show X", "what's filtered", "explain Guardian", "investigate SDL findings", "portal BA2008",
   "binskim failures in pipeline", or "what rules are required". DO NOT USE FOR: running BinSkim
   locally (use binskim-scan), source code analysis (use CodeQL), or credential scanning (use CredScan).
 ---
