@@ -9,7 +9,10 @@ BinSkim is distributed as a NuGet content package, **not** a dotnet global tool.
 Test-Path "C:\git\binskim-tool\extracted\tools\net9.0\win-x64\BinSkim.exe"
 
 # Linux/macOS
+# Linux
 test -x ~/binskim-tool/extracted/tools/net9.0/linux-x64/BinSkim
+# macOS
+test -x ~/binskim-tool/extracted/tools/net9.0/osx-x64/BinSkim
 ```
 
 If it exists, you're done.

@@ -52,6 +52,8 @@ Before scanning, read the repo's pipeline YAML to understand what the official s
 
 > **Report what you find.** Tell the user: "The official pipeline scans X with config Y. I'll reproduce that locally."
 
+> **No SDL config?** Some repos have no `sdl.binskim` section at all. In that case, identify what the pipeline publishes as artifacts (e.g., `**\bin\Release\**`) and scan that. Note to the user: "This repo has no explicit BinSkim/SDL configuration. Scanning the published artifact directory as a best-effort approximation. Results may differ from any central SDL portal findings."
+
 ### Step 2: Build the Repo
 
 **BinSkim scans built/packaged binaries, not source code.** You must build (and often pack) the repo.
@@ -100,10 +102,10 @@ Get-ChildItem "$nupkgDir\*.nupkg" | ForEach-Object {
 
 ### Step 3: Run BinSkim
 
-**Preferred: Use the helper script:**
+**Preferred: Use the helper script** (from the skill's `scripts/` directory, or provide its full path):
 
 ```powershell
-$script = "c:\git\arcade-skills\plugins\dotnet-dnceng\skills\binskim-scan\scripts\Invoke-BinSkimScan.ps1"
+$script = "plugins\dotnet-dnceng\skills\binskim-scan\scripts\Invoke-BinSkimScan.ps1"
 
 # Scan a directory:
 & $script -RepoRoot C:\git\machinelearning -ScanDir artifacts\pkgassets
@@ -119,7 +121,7 @@ $script = "c:\git\arcade-skills\plugins\dotnet-dnceng\skills\binskim-scan\script
 
 ```powershell
 $binskim = "C:\git\binskim-tool\extracted\tools\net9.0\win-x64\BinSkim.exe"
-& $binskim analyze "artifacts\pkgassets\**" --recurse --output binskim-results.sarif --log "PrettyPrint;ForceOverwrite"
+& $binskim analyze "artifacts\pkgassets\**" --recurse --output binskim-results.sarif --pretty-print --force
 ```
 
 > **Don't filter to `*.dll` only** — scan `**` and let BinSkim decide what's a PE binary. This catches `.exe` files too.
@@ -127,7 +129,7 @@ $binskim = "C:\git\binskim-tool\extracted\tools\net9.0\win-x64\BinSkim.exe"
 ### Step 4: Analyze Results
 
 ```powershell
-$sarif = Get-Content binskim-results.sarif | ConvertFrom-Json
+$sarif = Get-Content -Raw binskim-results.sarif | ConvertFrom-Json
 $results = $sarif.runs[0].results
 $errors = $results | Where-Object { $_.level -eq 'error' }
 $warnings = $results | Where-Object { $_.level -eq 'warning' }
@@ -163,8 +165,8 @@ To prove a fix works, scan before and after:
 
 ```powershell
 # Baseline on main, then fix branch
-$before = (Get-Content binskim-before.sarif | ConvertFrom-Json).runs[0].results | Where-Object { $_.level -eq 'error' }
-$after  = (Get-Content binskim-after.sarif  | ConvertFrom-Json).runs[0].results | Where-Object { $_.level -eq 'error' }
+$before = (Get-Content -Raw binskim-before.sarif | ConvertFrom-Json).runs[0].results | Where-Object { $_.level -eq 'error' }
+$after  = (Get-Content -Raw binskim-after.sarif  | ConvertFrom-Json).runs[0].results | Where-Object { $_.level -eq 'error' }
 Write-Host "Before: $($before.Count) errors, After: $($after.Count) errors"
 ```
 
@@ -209,6 +211,6 @@ In the VMR (dotnet/dotnet), look at the SARIF artifact path to find the source s
 
 - **Installing BinSkim**: [references/binskim-install.md](references/binskim-install.md)
 - **Build prerequisites**: [references/build-prereqs.md](references/build-prereqs.md)
-- **Per-repo pipeline configs**: See `binskim-analysis/references/repo-profiles.md` for known pipeline names, SDL artifact patterns, and local repro notes per repo
-- **Arcade SDL infrastructure**: See `binskim-analysis/references/arcade-sdl.md` for `configure-sdl-tool.ps1` and `extract-artifact-packages.ps1` details
+- **Per-repo pipeline configs**: See [../binskim-analysis/references/repo-profiles.md](../binskim-analysis/references/repo-profiles.md) for known pipeline names, SDL artifact patterns, and local repro notes per repo
+- **Arcade SDL infrastructure**: See [../binskim-analysis/references/arcade-sdl.md](../binskim-analysis/references/arcade-sdl.md) for `configure-sdl-tool.ps1` and `extract-artifact-packages.ps1` details
 - **Rules reference and Guardian filtering**: See the **binskim-analysis** skill

@@ -80,9 +80,14 @@ if ($ScanDir) {
         Write-Error "Scan directory not found: $target"
         exit 1
     }
-    $fileCount = (Get-ChildItem $target -Recurse -Include "*.dll","*.exe" | Measure-Object).Count
+    $allFiles = Get-ChildItem $target -Recurse -Include "*.dll","*.exe"
+    $fileCount = ($allFiles | Measure-Object).Count
+    $testFiles = @($allFiles | Where-Object { $_.FullName -match '[\\/](Tests?|Benchmarks?|TestUtilities)[\\/]' })
     Write-Host "Scanning $fileCount DLL/EXE files in $target"
-    & $BinSkimPath analyze "$target\**" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite"
+    if ($testFiles.Count -gt 0) {
+        Write-Host "  Note: $($testFiles.Count) files are in test/benchmark directories and are likely not shipped."
+    }
+    & $BinSkimPath analyze "$target\**;-:file|$target\**\_.pdb" --recurse --output $OutputSarif --pretty-print --force 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
     $scanExitCode = $LASTEXITCODE
     Write-Host "Results written to $OutputSarif"
 }
@@ -108,7 +113,7 @@ elseif (-not $PackagesDir) {
             $dllCount = (Get-ChildItem $full -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue | Measure-Object).Count
             if ($dllCount -gt 0) {
                 Write-Host "Found $dllCount DLLs in $c (no .nupkg - scanning directly)"
-                & $BinSkimPath analyze "$full\**" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite"
+                & $BinSkimPath analyze "$full\**;-:file|$full\**\_.pdb" --recurse --output $OutputSarif --pretty-print --force
                 $scanExitCode = $LASTEXITCODE
                 Write-Host "Results written to $OutputSarif"
                 $foundDirect = $true
@@ -134,12 +139,12 @@ if ($PackagesDir) {
     $nupkgs = Get-ChildItem $PackagesDir -Filter "*.nupkg"
     Write-Host "Extracting $($nupkgs.Count) packages..."
 
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
     foreach ($nupkg in $nupkgs) {
         $pkgName = [System.IO.Path]::GetFileNameWithoutExtension($nupkg.Name)
         $pkgExtractDir = Join-Path $extractDir $pkgName
         New-Item -ItemType Directory -Path $pkgExtractDir -Force | Out-Null
 
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
         try {
             $zip = [System.IO.Compression.ZipFile]::OpenRead($nupkg.FullName)
             $extracted = 0
@@ -167,7 +172,7 @@ if ($PackagesDir) {
     Write-Host "`nScanning $totalFiles DLL/EXE files from extracted packages..."
 
     # Run BinSkim (exclude _.pdb like the official pipeline does)
-    & $BinSkimPath analyze "$extractDir\**;-:file|$extractDir\**\_.pdb" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite"
+    & $BinSkimPath analyze "$extractDir\**;-:file|$extractDir\**\_.pdb" --recurse --output $OutputSarif --pretty-print --force 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
     $scanExitCode = $LASTEXITCODE
     Write-Host "`nResults written to $OutputSarif"
 }
@@ -232,6 +237,33 @@ if (Test-Path $OutputSarif) {
     }
     else {
         Write-Host "`nNo findings."
+    }
+
+    # Summarize ERR997 (PDB not found) from SARIF toolConfigurationNotifications
+    $configNotifs = $sarif.runs[0].invocations[0].toolConfigurationNotifications
+    if ($configNotifs) {
+        $pdbErrors = @($configNotifs | Where-Object { $_.descriptor.id -eq 'ERR997.ExceptionLoadingPdb' })
+        if ($pdbErrors.Count -gt 0) {
+            $uniqueBinaries = @($pdbErrors | ForEach-Object {
+                $uri = $_.locations[0].physicalLocation.artifactLocation.uri
+                [System.IO.Path]::GetFileName([Uri]::UnescapeDataString($uri))
+            } | Sort-Object -Unique)
+            Write-Host "`n=== Skipped Binaries (missing PDBs) ==="
+            Write-Host "$($pdbErrors.Count) binaries could not be fully evaluated (E_PDB_NOT_FOUND)."
+            Write-Host "Unique binaries: $($uniqueBinaries -join ', ')"
+            Write-Host "If any of these ship, re-run with symbols present to ensure they are scanned."
+        }
+    }
+
+    # Flag findings in test/benchmark paths
+    if ($results) {
+        $testFindings = @($results | Where-Object {
+            $_.level -eq 'error' -and
+            $_.locations[0].physicalLocation.artifactLocation.uri -match '[\\/](Tests?|Benchmarks?|TestUtilities)[\\/]'
+        })
+        if ($testFindings.Count -gt 0) {
+            Write-Host "`nNote: $($testFindings.Count) error(s) are in test/benchmark paths and are likely not shipped."
+        }
     }
 }
 

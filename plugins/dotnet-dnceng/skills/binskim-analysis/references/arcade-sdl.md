@@ -116,8 +116,11 @@ Controls whether BinSkim can fail the build. Key fields:
 
 If BinSkim isn't in `IncludeTools`, it runs and reports but never gates the build.
 
-### `.gdnbaselines` / `.gdnsuppress` — Suppression files
+### `.gdnbaselines` / `.gdnsuppress` — Guardian filtering files
 
-Generated at runtime by Guardian, not typically checked into source. These may suppress findings from the merged Results.sarif.
+Generated at runtime by Guardian, not typically checked into source. These files behave differently:
 
-> 💡 **When investigating a repo's BinSkim status, always download the raw SARIF.** The merged Results.sarif and central portal only tell you what survived Guardian's filtering — which may be a small subset of actual findings.
+- `.gdnbaselines` are baseline data used by Guardian for comparison workflows, but they do **not** remove findings from reporting or from the merged `Results.sarif`.
+- `.gdnsuppress` files are suppressions that **can** filter findings out of the merged `Results.sarif` and the central portal view.
+
+> 💡 **When investigating a repo's BinSkim status, always download the raw SARIF.** `binskim.sarif` shows what BinSkim actually found. The merged `Results.sarif` and central portal reflect Guardian-processed output after suppression filtering, so they may show only a subset of actual findings.

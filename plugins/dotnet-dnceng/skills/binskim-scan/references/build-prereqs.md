@@ -13,7 +13,7 @@ build.cmd -c Release -pack
 
 # Linux/macOS
 ./build.sh -c Release
-./build.sh -c Release --pack
+./build.sh -c Release -pack
 ```
 
 ## Native Code (C/C++)
