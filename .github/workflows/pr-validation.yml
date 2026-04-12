@@ -39,6 +39,10 @@ jobs:
           mkdir -p skill-validator-bin
           tar -xzf skill-validator.tar.gz -C skill-validator-bin
           chmod +x skill-validator-bin/skill-validator
+          if [ ! -x skill-validator-bin/skill-validator ]; then
+            echo "::error::skill-validator binary not found after extraction"
+            exit 1
+          fi
 
       - name: Run skill-validator check
         id: skill-check
@@ -59,7 +63,24 @@ jobs:
           if [ -f eng/known-domains.txt ]; then
             extra_args+=(--known-domains eng/known-domains.txt)
           fi
-          skill-validator-bin/skill-validator check "${plugin_args[@]}" "${extra_args[@]}"
+          set +e
+          skill-validator-bin/skill-validator check "${plugin_args[@]}" "${extra_args[@]}" 2>&1 | tee skill-check-output.txt
+          rc=${PIPESTATUS[0]}
+          set -e
+
+          # Write to step summary
+          {
+            echo "## skill-validator check"
+            echo ""
+            if [ "$rc" -eq 0 ]; then
+              echo "All checks passed."
+            else
+              echo '```'
+              head -n 200 skill-check-output.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
 
       - name: Validate plugin and skill structure
         if: always() && !cancelled()
@@ -534,8 +555,7 @@ jobs:
           }
 
       - name: Post or update PR comment
-        if: always() && github.event_name == 'pull_request' && steps.validate.outputs.has_comment == 'true'
-        continue-on-error: true  # GITHUB_TOKEN is read-only for fork PRs (dotnet/arcade-skills#13)
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.validate.outputs.has_comment == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
