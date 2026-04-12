@@ -31,6 +31,38 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Download skill-validator
+        shell: bash
+        run: |
+          curl -fsSL --retry 3 --retry-all-errors -o skill-validator.tar.gz \
+            https://github.com/dotnet/skills/releases/download/skill-validator-nightly/skill-validator-linux-x64.tar.gz
+          mkdir -p skill-validator-bin
+          tar -xzf skill-validator.tar.gz -C skill-validator-bin
+          chmod +x skill-validator-bin/skill-validator
+
+      - name: Run skill-validator check
+        id: skill-check
+        continue-on-error: true
+        shell: bash
+        run: |
+          plugin_args=()
+          for d in plugins/*/; do
+            [ -d "$d" ] && plugin_args+=(--plugin "$d")
+          done
+          if [ ${#plugin_args[@]} -eq 0 ]; then
+            echo "::error::No plugin directories found in plugins/"
+            exit 1
+          fi
+          extra_args=()
+          if [ -f eng/allowed-external-deps.txt ]; then
+            extra_args+=(--allowed-external-deps eng/allowed-external-deps.txt)
+          fi
+          if [ -f eng/known-domains.txt ]; then
+            extra_args+=(--known-domains eng/known-domains.txt)
+          fi
+          skill-validator-bin/skill-validator check "${plugin_args[@]}" "${extra_args[@]}" 2>&1 | tee skill-check-output.txt
+          exit ${PIPESTATUS[0]}
+
       - name: Validate plugin and skill structure
         id: validate
         shell: pwsh
@@ -46,18 +78,6 @@ jobs:
           $TokenSweetLow = 200   # chars/4 approximation
           $TokenSweetHigh = 2500
           $TokenWarnHigh = 5000
-          $MaxBundledAssetBytes = 5 * 1024 * 1024  # 5 MB per bundled asset
-          $MaxAggregateDescriptionLength = 8192     # total description chars across all skills in a plugin
-
-          # Built-in tools that don't need an external-dependency allowlist entry
-          $BuiltInTools = [System.Collections.Generic.HashSet[string]]::new(
-            [string[]]@(
-              'read','search','edit','create','task','skill','web_search','web_fetch',
-              'ask_user','bash','powershell','grep','glob','view','sql',
-              'report_intent','store_memory','fetch_copilot_cli_documentation'
-            ), [System.StringComparer]::OrdinalIgnoreCase)
-
-          $ScriptExtensions = @('.ps1','.sh','.py','.bat','.cmd','.bash')
 
           # ── Helper: validate kebab-case name ─────────────────────────
           function Test-KebabName([string]$Name, [string]$Kind, [string]$Context) {
@@ -119,49 +139,6 @@ jobs:
             }
             return $true
           }
-
-          # ── Helper: load a line-based config file (comments=#, blank lines ignored)
-          function Get-ConfigLines([string]$FilePath) {
-            if (-not (Test-Path $FilePath)) { return @() }
-            return (Get-Content -Path $FilePath) | Where-Object {
-              $_.Trim().Length -gt 0 -and -not $_.Trim().StartsWith('#')
-            } | ForEach-Object { $_.Trim().ToLowerInvariant() }
-          }
-
-          # ── Helper: check if a URL domain is in the known-domains list ─
-          function Test-KnownDomain([string]$Url, [string[]]$KnownDomains) {
-            $lower = $Url.ToLowerInvariant() -replace '\.git([/?#]|$)', '$1'
-            foreach ($domain in $KnownDomains) {
-              if ($domain.Contains('/')) {
-                # Path-scoped: match exact prefix
-                $escaped = [regex]::Escape($domain)
-                if ($lower -match "^https?://(www\.)?$escaped([/?#]|$)") { return $true }
-              } else {
-                # Bare domain: extract host and match domain or subdomain
-                $urlHost = $lower -replace '^https?://','' -replace '[/:?#].*',''
-                if ($urlHost -eq $domain -or $urlHost.EndsWith(".$domain")) { return $true }
-              }
-            }
-            return $false
-          }
-
-          function Test-LocalUrl([string]$Url) {
-            $lower = $Url.ToLowerInvariant()
-            return ($lower -match '^https?://localhost([:/]|$)' -or
-                    $lower -match '^https?://127\.0\.0\.1([:/]|$)' -or
-                    $lower -match '^https?://[+*]([:/]|$)')
-          }
-
-          # Load known-domains and allowed-external-deps config files
-          $knownDomainsFile = 'eng/known-domains.txt'
-          $allowedDepsFile = 'eng/allowed-external-deps.txt'
-          $knownDomains = Get-ConfigLines $knownDomainsFile
-          $allowedDeps = [System.Collections.Generic.HashSet[string]]::new(
-            [string[]](Get-ConfigLines $allowedDepsFile),
-            [System.StringComparer]::OrdinalIgnoreCase)
-
-          # Track all skill names for duplicate detection
-          $allSkillNames = [System.Collections.Generic.List[object]]::new()
 
           # ── 1. Marketplace JSON consistency ──────────────────────────
           $ghMarketplace = '.github/plugin/marketplace.json'
@@ -254,8 +231,6 @@ jobs:
               }
 
               # ── 3. Skill validation ────────────────────────────────────
-              $aggregateDescriptionLength = 0
-
               if (-not [string]::IsNullOrWhiteSpace($skillsField)) {
                 $skillsDirPath = Join-Path $pluginDir.FullName $skillsField
                 if (Test-Path $skillsDirPath) {
@@ -287,21 +262,11 @@ jobs:
                     }
                     Test-KebabName $fm.name 'Skill' $sCtx
 
-                    # Track for cross-plugin duplicate detection
-                    if (-not [string]::IsNullOrWhiteSpace($fm.name)) {
-                      $allSkillNames.Add([PSCustomObject]@{ Name = $fm.name; Context = $sCtx })
-                    }
-
                     # Description
                     if ([string]::IsNullOrWhiteSpace($fm.description)) {
                       $errors.Add("$sCtx — SKILL.md frontmatter has no 'description' field (required).")
                     } elseif ($fm.description.Length -gt $MaxDescriptionLength) {
                       $errors.Add("$sCtx — SKILL.md description is $($fm.description.Length) chars (max $MaxDescriptionLength).")
-                    }
-
-                    # Accumulate description length for aggregate check
-                    if (-not [string]::IsNullOrWhiteSpace($fm.description)) {
-                      $aggregateDescriptionLength += $fm.description.Length
                     }
 
                     # Compatibility field (optional, ≤500 chars)
@@ -390,142 +355,6 @@ jobs:
                         }
                       }
                     }
-
-                    # ── Reference scanning (per skill) ──────────────────
-                    # Scan SKILL.md and all reference/*.md files for URL issues
-                    if ($knownDomains.Count -gt 0) {
-                      $scanFiles = @($skillMdPath)
-                      $refsDir = Join-Path $skillDir.FullName 'references'
-                      if (Test-Path $refsDir) {
-                        $scanFiles += Get-ChildItem -Path $refsDir -Filter '*.md' | ForEach-Object { $_.FullName }
-                      }
-
-                      foreach ($scanFile in $scanFiles) {
-                        $scanRelPath = [System.IO.Path]::GetRelativePath((Get-Location).Path, $scanFile) -replace '\\','/'
-                        $scanLines = Get-Content -Path $scanFile
-                        $inFence = $false; $fenceChar = '`'; $fenceLen = 0
-
-                        for ($li = 0; $li -lt $scanLines.Count; $li++) {
-                          $scanLine = $scanLines[$li]
-                          $lineNum = $li + 1
-
-                          # Track fenced code blocks
-                          $fMatch = [regex]::Match($scanLine, '^\s{0,3}(`{3,}|~{3,})')
-                          if ($fMatch.Success) {
-                            $fc = $fMatch.Groups[1].Value[0]
-                            $fl = $fMatch.Groups[1].Value.Length
-                            if (-not $inFence) {
-                              $inFence = $true; $fenceChar = $fc; $fenceLen = $fl
-                            } elseif ($fc -eq $fenceChar -and $fl -ge $fenceLen -and $scanLine.Trim() -match '^[`~]+$') {
-                              $inFence = $false
-                            }
-                            continue
-                          }
-
-                          # Pipe-to-shell detection
-                          if ($scanLine -match 'curl\s[^|]*\|\s*(ba)?sh\b|wget\s[^|]*\|\s*(ba)?sh\b') {
-                            $isPipeAllowed = $false
-                            foreach ($allowedUrl in @('https://dot.net/v1/dotnet-install.sh','https://aka.ms/dotnet-install.sh')) {
-                              if ($scanLine -match [regex]::Escape($allowedUrl)) { $isPipeAllowed = $true; break }
-                            }
-                            if (-not $isPipeAllowed) {
-                              $warnings.Add("$scanRelPath`:$lineNum — pipe-to-shell pattern detected (curl/wget piped to sh). Consider using a safer download-then-execute approach.")
-                            }
-                          }
-
-                          # URL scanning
-                          foreach ($urlMatch in [regex]::Matches($scanLine, 'https?://[^\s\)\]"''<>;]+')) {
-                            $url = $urlMatch.Value.TrimEnd('.', ',', ';', ':', ')', "'", '"', [char]0x60)
-                            # Skip placeholder URLs (check host and full URL path)
-                            $urlHost = ($url.ToLowerInvariant() -replace '^https?://','') -replace '[/:?#].*',''
-                            if ($urlHost -match '\{[^}]+\}|your[-_]?\w*name|example\.(com|org|net)|contoso\.com') { continue }
-                            $urlPath = $url -replace '^https?://[^/]+',''
-                            if ($urlPath -match '/(\{[^}]+\}|OWNER|REPO|USERNAME|my-repo|your[-_]?\w+name\w*)(/|$)') { continue }
-
-                            if ($inFence) {
-                              # Inside fenced blocks: skip HTTP check but still check domain
-                              if (-not (Test-KnownDomain $url $knownDomains) -and -not (Test-LocalUrl $url)) {
-                                $warnings.Add("$scanRelPath`:$lineNum — domain not in $knownDomainsFile — add if intentional: $url")
-                              }
-                            } else {
-                              # HTTP-not-HTTPS check
-                              if ($url.ToLowerInvariant().StartsWith('http://') -and -not (Test-LocalUrl $url)) {
-                                $httpHost = ($url.ToLowerInvariant() -replace '^http://','') -replace '[/:?#].*',''
-                                if ($httpHost -ne 'schemas.microsoft.com' -and -not $httpHost.EndsWith('.schemas.microsoft.com')) {
-                                  $warnings.Add("$scanRelPath`:$lineNum — insecure http:// URL (use https://): $url")
-                                }
-                              } elseif (-not (Test-KnownDomain $url $knownDomains) -and -not (Test-LocalUrl $url)) {
-                                $warnings.Add("$scanRelPath`:$lineNum — domain not in $knownDomainsFile — add if intentional: $url")
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-
-                    # ── External dependency checking (per skill) ────────
-                    # Script files in scripts/ directory
-                    $skillScriptsDir = Join-Path $skillDir.FullName 'scripts'
-                    if (Test-Path $skillScriptsDir) {
-                      $scriptFiles = Get-ChildItem -Path $skillScriptsDir -File -Recurse
-                      foreach ($sf in $scriptFiles) {
-                        $ext = [System.IO.Path]::GetExtension($sf.Name)
-                        if ($ext -in $ScriptExtensions) {
-                          $relPath = [System.IO.Path]::GetRelativePath($skillDir.FullName, $sf.FullName) -replace '\\','/'
-                          $depKey = "script:$($skillName):$relPath"
-                          if (-not $allowedDeps.Contains($depKey)) {
-                            $warnings.Add("$sCtx — script file '$relPath' — skills generally should not bundle executable scripts. Verify this is intentional. (allow: $depKey)")
-                          }
-                        }
-                      }
-                    }
-
-                    # INVOKES pattern in description
-                    if (-not [string]::IsNullOrWhiteSpace($fm.description) -and $fm.description -match 'INVOKES\s+[\w./-]*\.\w+') {
-                      $depKey = "invokes:$skillName"
-                      if (-not $allowedDeps.Contains($depKey)) {
-                        $warnings.Add("$sCtx — description references INVOKES pattern — verify this external script dependency is intentional. (allow: $depKey)")
-                      }
-                    }
-
-                    # Non-built-in #tool: references in SKILL.md content
-                    foreach ($toolMatch in [regex]::Matches($skillContent, '#tool:[\w/]+')) {
-                      $toolName = $toolMatch.Value.Substring(6)
-                      if (-not $BuiltInTools.Contains($toolName)) {
-                        $depKey = "tool-ref:$($skillName):$($toolMatch.Value)"
-                        if (-not $allowedDeps.Contains($depKey)) {
-                          $warnings.Add("$sCtx — non-built-in tool reference '$($toolMatch.Value)' — verify this is intentional. (allow: $depKey)")
-                        }
-                      }
-                    }
-
-                    # ── Bundled asset size check (per skill) ────────────
-                    foreach ($assetDir in @('references','assets','scripts')) {
-                      $assetDirPath = Join-Path $skillDir.FullName $assetDir
-                      if (Test-Path $assetDirPath) {
-                        $largeFiles = Get-ChildItem -Path $assetDirPath -File -Recurse | Where-Object { $_.Length -gt $MaxBundledAssetBytes }
-                        foreach ($lf in $largeFiles) {
-                          $lfRel = [System.IO.Path]::GetRelativePath($skillDir.FullName, $lf.FullName) -replace '\\','/'
-                          $sizeMB = [System.Math]::Round($lf.Length / 1MB, 1)
-                          $errors.Add("$sCtx — bundled asset '$lfRel' is ${sizeMB} MB (max 5 MB).")
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-
-              # ── 3b. Aggregate description length per plugin ───────────
-              if ($aggregateDescriptionLength -gt $MaxAggregateDescriptionLength) {
-                $warnings.Add("$ctx — aggregate skill description length is $aggregateDescriptionLength chars (recommended max $MaxAggregateDescriptionLength). Consider shortening individual skill descriptions.")
-              }
-
-              # ── 3c. MCP server dependency check (per plugin) ──────────
-              if ($null -ne $pluginJson -and $null -ne $pluginJson.mcpServers) {
-                foreach ($prop in ($pluginJson.mcpServers | Get-Member -MemberType NoteProperty)) {
-                  $depKey = "mcp-server:$($pluginName):$($prop.Name)"
-                  if (-not $allowedDeps.Contains($depKey)) {
-                    $warnings.Add("$ctx — MCP server '$($prop.Name)' in plugin.json — verify this dependency is intentional. (allow: $depKey)")
                   }
                 }
               }
@@ -549,13 +378,6 @@ jobs:
                 }
               }
             }
-          }
-
-          # ── 4b. Duplicate skill names across plugins ──────────────────
-          $nameGroups = $allSkillNames | Group-Object -Property Name | Where-Object { $_.Count -gt 1 }
-          foreach ($group in $nameGroups) {
-            $locations = ($group.Group | ForEach-Object { $_.Context }) -join ', '
-            $errors.Add("Duplicate skill name '$($group.Name)' found in: $locations")
           }
 
           # ── 5. eval.yaml validation ──────────────────────────────────
@@ -733,3 +555,17 @@ jobs:
             gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
               -X POST -F "body=@pr-comment.md"
           fi
+
+      - name: Fail if skill-validator check failed
+        if: always() && steps.skill-check.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "## skill-validator check" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f skill-check-output.txt ]; then
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            cat skill-check-output.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "::error::skill-validator check failed. See 'Run skill-validator check' step output above."
+          exit 1
