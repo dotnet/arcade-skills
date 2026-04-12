@@ -16,6 +16,8 @@
 
 **Local test failures**: Some repos (e.g., dotnet/sdk) run tests directly on build agents. These can also match known issues — search for the test name with the "Known Build Error" label.
 
+**Unmatched failures**: If a failure has no known issue match and is not PR-related, it may be a candidate for a new Known Build Error issue. See [kbe-issue-creation.md](kbe-issue-creation.md) for when and how to file one.
+
 ## Per-Failure Details
 
 `failedJobDetails` in JSON: Each failed job includes `errorCategory`, `errorSnippet`, and `helixWorkItems`. Use these for per-job classification instead of applying a single `recommendationHint` to all failures.
