@@ -36,6 +36,7 @@ Known BinSkim configurations for major dotnet product repositories. These profil
 - **BinSkim config**: Via 1ES autobaselining — applied at the VMR level, scans outputs from ALL sub-repos
 - **Published artifacts**: Multiple SDL legs, e.g., `drop_VMR_Vertical_Build_Windows_x64_sdl_analysis` (note: `VMR_Vertical_Build`, not `build`)
 - **SDL legs**: 6 Windows legs (x64/x86/arm64, possibly Release/Debug), plus Linux/macOS legs (which produce 0-byte BinSkim SARIF because the official pipeline only runs BinSkim on Windows legs)
+- **⚠️ OS coverage gap**: Linux and macOS SDL legs do not produce BinSkim results. Native binaries built for those platforms (e.g., Linux `.so` files, macOS `.dylib` files) are not scanned. This is a pipeline gap that should be fixed if those platforms ship native binaries.
 - **es-metadata.yml**: 27 separate `es-metadata.yml` files across sub-repos (root + each src/*), each potentially a distinct SDL compliance boundary
 - **Known findings (central portal, release branch)**: 6 BA2008 findings, all on `winterop.dll` (WiX toolset native DLL)
   - `winterop.dll` lives in `src/arcade/artifacts/` — pre-built native from `Microsoft.Signed.Wix` NuGet package

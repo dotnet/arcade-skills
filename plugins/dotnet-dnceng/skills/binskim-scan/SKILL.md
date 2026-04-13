@@ -157,7 +157,9 @@ BinSkim ships for Windows, Linux (x64, arm64), and macOS (x64):
 - Linux: `tools/net9.0/linux-x64/BinSkim` (`chmod +x`)
 - macOS: `tools/net9.0/osx-x64/BinSkim`
 
-Use `build.sh` on Linux/macOS. If the official pipeline scans on a different OS, you may not reproduce those findings locally.
+**Each OS build produces different native binaries with potentially different BinSkim findings.** A Windows scan does not cover Linux `.so` or macOS `.dylib` files, and vice versa. If the repo ships native binaries for multiple platforms, scan on each target OS — not just Windows.
+
+Use `build.sh` on Linux/macOS. If the official pipeline only runs BinSkim on Windows legs, flag this as a coverage gap — the pipeline should scan all OS configurations that produce shipped native artifacts.
 
 ## Before/After Comparison
 

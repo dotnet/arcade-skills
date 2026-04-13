@@ -47,7 +47,8 @@ To investigate official results, download the SDL artifact from the repo's offic
 # Artifact naming pattern:
 #   Most repos:  drop_build_Windows_x64_sdl_analysis
 #   VMR repos:   drop_VMR_Vertical_Build_Windows_x64_sdl_analysis
-# Some repos have multiple SDL legs — check all Windows legs
+# Some repos have multiple SDL legs — check ALL OS legs (Windows, Linux, macOS)
+# Each OS build produces different native binaries with potentially different findings
 
 # Key files inside the artifact:
 # - binskim/001/binskim.sarif    <- Raw BinSkim output (everything found)
@@ -121,7 +122,9 @@ After examining results, check whether the scan covers everything the repo ships
 2. **Compare with `.gdntoolinput` file lists** in the SDL artifact — these are the explicit files Guardian scanned. Not a recursive directory walk.
 3. **Report gaps**: "This repo ships X.dll (native C++ binary) but it's not in the `.gdntoolinput` scan targets — likely because it isn't staged to the bin/ or symbols/ directories that Guardian scans."
 
-**Common gap**: Native C++ binaries built by `.vcxproj` often output to project-local `Release\` directories, not the main `artifacts\bin\` staging area. Guardian generates `.gdntoolinput` from the staging directories, so these binaries get Prefast coverage (source analysis) but miss BinSkim (binary analysis). This is a pipeline artifact staging config issue.
+**Common gap — unstaged binaries**: Native C++ binaries built by `.vcxproj` often output to project-local `Release\` directories, not the main `artifacts\bin\` staging area. Guardian generates `.gdntoolinput` from the staging directories, so these binaries get Prefast coverage (source analysis) but miss BinSkim (binary analysis). This is a pipeline artifact staging config issue.
+
+**Common gap — missing OS coverage**: Each OS build configuration produces different native binaries (e.g., Linux `.so`, macOS `.dylib`, Windows `.dll`). If the official pipeline only runs BinSkim on Windows SDL legs, Linux and macOS native binaries are not scanned at all. **Flag this clearly as a coverage gap that needs fixing** — all OS configurations that produce shipped native binaries should have BinSkim SDL legs. Check the pipeline YAML for SDL legs on each OS, and compare with the set of OS-specific artifacts the repo publishes.
 
 ## Fix Ownership
 
@@ -156,6 +159,8 @@ Some repos (e.g., microsoft/perfview) don't use arcade infrastructure:
 
 > **Don't confuse break policy with reporting.** Break policy controls whether BinSkim fails the build. It does NOT control what gets reported to the portal. Findings can be reported without breaking the build.
 
+> **Don't assume Windows-only scanning is sufficient.** If the repo ships native binaries for Linux or macOS (`.so`, `.dylib`), those binaries may have different BinSkim findings than their Windows counterparts. If official SDL legs only cover Windows, flag this as a gap — the pipeline should be updated to run BinSkim on all OS configurations that produce shipped native artifacts.
+
 ## Comparing Local Scan vs Official Run
 
 When the user has run the **binskim-scan** skill locally and wants to validate against official results:
@@ -167,6 +172,7 @@ When the user has run the **binskim-scan** skill locally and wants to validate a
 | **NuGet package binaries** | Excluded unless staged | Included if in build output |
 | **Native C++ binaries** | Only if staged to bin/symbols dirs | Included if built successfully |
 | **PDB availability** | Staged alongside binaries | Present if build output is used |
+| **OS coverage** | Check whether ALL OS legs have SDL scanning — not just Windows | Scan on each OS you build for |
 
 **Key reconciliation questions:**
 1. Do all local errors also appear in official? If not, they may be in test/NuGet paths that official doesn't scan.
