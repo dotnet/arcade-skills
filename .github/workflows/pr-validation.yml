@@ -5,6 +5,7 @@ on:
     paths:
       - 'plugins/**'
       - 'tests/**'
+      - 'eng/**'
       - '.github/plugin/**'
       - '.claude-plugin/**'
       - '.github/workflows/pr-validation.yml'
@@ -13,6 +14,7 @@ on:
     paths:
       - 'plugins/**'
       - 'tests/**'
+      - 'eng/**'
       - '.github/plugin/**'
       - '.claude-plugin/**'
   workflow_dispatch:
@@ -29,7 +31,59 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
+      - name: Download skill-validator
+        shell: bash
+        run: |
+          curl -fsSL --retry 3 --retry-all-errors -o skill-validator.tar.gz \
+            https://github.com/dotnet/skills/releases/download/skill-validator-nightly/skill-validator-linux-x64.tar.gz
+          mkdir -p skill-validator-bin
+          tar -xzf skill-validator.tar.gz -C skill-validator-bin
+          chmod +x skill-validator-bin/skill-validator
+          if [ ! -x skill-validator-bin/skill-validator ]; then
+            echo "::error::skill-validator binary not found after extraction"
+            exit 1
+          fi
+
+      - name: Run skill-validator check
+        id: skill-check
+        shell: bash
+        run: |
+          plugin_args=()
+          for d in plugins/*/; do
+            [ -d "$d" ] && plugin_args+=(--plugin "$d")
+          done
+          if [ ${#plugin_args[@]} -eq 0 ]; then
+            echo "::error::No plugin directories found in plugins/"
+            exit 1
+          fi
+          extra_args=()
+          if [ -f eng/allowed-external-deps.txt ]; then
+            extra_args+=(--allowed-external-deps eng/allowed-external-deps.txt)
+          fi
+          if [ -f eng/known-domains.txt ]; then
+            extra_args+=(--known-domains eng/known-domains.txt)
+          fi
+          set +e
+          skill-validator-bin/skill-validator check "${plugin_args[@]}" "${extra_args[@]}" 2>&1 | tee skill-check-output.txt
+          rc=${PIPESTATUS[0]}
+          set -e
+
+          # Write to step summary
+          {
+            echo "## skill-validator check"
+            echo ""
+            if [ "$rc" -eq 0 ]; then
+              echo "All checks passed."
+            else
+              echo '```'
+              head -n 200 skill-check-output.txt
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$rc"
+
       - name: Validate plugin and skill structure
+        if: always() && !cancelled()
         id: validate
         shell: pwsh
         run: |
@@ -501,8 +555,7 @@ jobs:
           }
 
       - name: Post or update PR comment
-        if: always() && github.event_name == 'pull_request' && steps.validate.outputs.has_comment == 'true'
-        continue-on-error: ${{ github.event.pull_request.head.repo.fork == true }}  # GITHUB_TOKEN is read-only for fork PRs (dotnet/arcade-skills#13)
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && steps.validate.outputs.has_comment == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash

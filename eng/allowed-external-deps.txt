@@ -1,0 +1,33 @@
+# Allowed external dependencies for PR validation.
+# One entry per line. Lines starting with # are comments.
+# Format: type:name:detail
+#
+# Types:
+#   script:SKILL-NAME:relative/path    - Script file in a skill's scripts/ directory
+#   invokes:SKILL-NAME                 - INVOKES pattern in a skill description
+#   tool-ref:SKILL-NAME:#tool:reference - Non-built-in #tool: reference in skill/agent content
+#   agent-tool:AGENT-NAME:tool-name    - Non-built-in tool in agent frontmatter tools array
+#   mcp-server:PLUGIN-NAME:server-name - MCP server declaration in plugin.json
+#
+# To get clean, remove entries as the underlying dependency is resolved.
+
+# dotnet-dnceng plugin: ci-analysis skill
+script:ci-analysis:scripts/Get-CIStatus.ps1
+
+# dotnet-dnceng plugin: flow-analysis skill
+script:flow-analysis:scripts/Get-CodeflowStatus.ps1
+script:flow-analysis:scripts/Get-FlowHealth.ps1
+invokes:flow-analysis
+
+# dotnet-dnceng plugin: flow-tracing skill
+script:flow-tracing:scripts/Get-SdkVersionTrace.ps1
+invokes:flow-tracing
+
+# dotnet-dnceng plugin: known-issue-history skill
+script:known-issue-history:scripts/Get-KnownIssueHistory.ps1
+
+# dotnet-dnceng plugin: MCP servers
+mcp-server:dotnet-dnceng:hlx
+mcp-server:dotnet-dnceng:mcp-binlog-tool
+mcp-server:dotnet-dnceng:mihubot
+mcp-server:dotnet-dnceng:maestro

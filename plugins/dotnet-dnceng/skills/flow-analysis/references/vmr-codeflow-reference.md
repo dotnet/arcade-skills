@@ -120,8 +120,8 @@ GET /repos/dotnet/dotnet/contents/src/source-manifest.json?ref={branch}
 Returns JSON with `repositories[]` array, each having `path`, `remoteUri`, `commitSha`.
 
 ### Maestro/BAR REST API
-Base URL: `https://maestro.dot.net`
-- Swagger: `https://maestro.dot.net/swagger`
+Base URL: https://maestro.dot.net
+- Swagger: https://maestro.dot.net/swagger
 - Get subscriptions: `GET /api/subscriptions`
 - Get builds: `GET /api/builds`
 - Get build by ID: `GET /api/builds/{id}`

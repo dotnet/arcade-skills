@@ -135,7 +135,7 @@ The same specificity rules apply: **be as specific as possible**. Use multi-line
 }
 ```
 
-Test your regex at [regex101.com](https://regex101.com/) with **.NET (C#)** flavor, options: single line, insensitive, no backtracking.
+Test your regex at a site like regex101.com with **.NET (C#)** flavor, options: single line, insensitive, no backtracking.
 
 ### Multi-Line Matching (Array Syntax)
 
