@@ -47,7 +47,7 @@ Before scanning, read the repo's pipeline YAML to understand what the official s
        enabled: true
        scanOutputDirectoryOnly: true
    ```
-3. **Check for `BinskimAdditionalRunConfigParams`** — custom flags/exclusions.
+3. **Check for `sdl.binskim.additionalRunConfigParams`** — custom flags/exclusions.
 4. **Identify what artifacts are published** — look for `PublishPipelineArtifact` steps. The scan targets these.
 
 > **Report what you find.** Tell the user: "The official pipeline scans X with config Y. I'll reproduce that locally."
