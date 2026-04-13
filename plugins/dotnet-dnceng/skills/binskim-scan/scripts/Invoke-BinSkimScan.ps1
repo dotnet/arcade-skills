@@ -50,12 +50,27 @@ param(
     [string]$RepoRoot = (Get-Location).Path,
     [string]$PackagesDir,
     [string]$OutputSarif,
-    [string]$BinSkimPath = "C:\git\binskim-tool\extracted\tools\net9.0\win-x64\BinSkim.exe",
+    [string]$BinSkimPath,
     [string]$ScanDir,
     [string]$PortalRulesFrom
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Default BinSkimPath based on platform
+if (-not $BinSkimPath) {
+    if ($IsWindows -or $env:OS -eq 'Windows_NT') {
+        $BinSkimPath = Join-Path $env:USERPROFILE ".binskim" "tools" "net9.0" "win-x64" "BinSkim.exe"
+    } elseif ($IsLinux) {
+        $arch = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+        $rid = if ($arch -eq 'Arm64') { 'linux-arm64' } else { 'linux-x64' }
+        $BinSkimPath = Join-Path $HOME ".binskim" "tools" "net9.0" $rid "BinSkim"
+    } elseif ($IsMacOS) {
+        $BinSkimPath = Join-Path $HOME ".binskim" "tools" "net9.0" "osx-x64" "BinSkim"
+    } else {
+        $BinSkimPath = "BinSkim"  # Fall back to PATH
+    }
+}
 
 # Validate BinSkim
 if (-not (Test-Path $BinSkimPath)) {
@@ -127,7 +142,7 @@ elseif (-not $PackagesDir) {
 
 # Mode 2 continued: Extract and scan .nupkg files if we found packages (not direct DLLs)
 if ($PackagesDir) {
-    $extractDir = Join-Path $RepoRoot "artifacts\extracted-for-binskim"
+    $extractDir = Join-Path $RepoRoot "artifacts" "extracted-for-binskim"
     if (Test-Path $extractDir) {
         Remove-Item $extractDir -Recurse -Force
     }
