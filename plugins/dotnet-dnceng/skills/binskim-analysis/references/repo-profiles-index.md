@@ -12,6 +12,7 @@ Each file documents the BinSkim pipeline configuration, scan targets, known find
 | dotnet/runtime | [repo-runtime.md](repo-runtime.md) |
 | dotnet/roslyn | [repo-roslyn.md](repo-roslyn.md) |
 | dotnet/aspnetcore | [repo-aspnetcore.md](repo-aspnetcore.md) |
+| dotnet/extensions | [repo-extensions.md](repo-extensions.md) |
 | dotnet/aspire | [repo-aspire.md](repo-aspire.md) |
 | dotnet/diagnostics | [repo-diagnostics.md](repo-diagnostics.md) |
 | microsoft/perfview | [repo-perfview.md](repo-perfview.md) |
