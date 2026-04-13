@@ -61,7 +61,7 @@ To investigate official results, download the SDL artifact from the repo's offic
 
 > **SDL does NOT run on PR validation builds.** It only runs on official/CI pipelines (gated by `Build.Reason != PullRequest`). Users must manually queue the official pipeline for SDL results before merging.
 
-**Per-repo pipeline names** — see [references/repos/README.md](references/repos/README.md) for the index of per-repo profile files (one per repo). Load only the file for the repo you're investigating.
+**Per-repo pipeline names** — see [references/repo-profiles-index.md](references/repo-profiles-index.md) for the index of per-repo profile files (one per repo). Load only the file for the repo you're investigating.
 
 ## SDL Artifact Structure
 
@@ -186,6 +186,6 @@ When the user has run the **binskim-scan** skill locally and wants to validate a
 
 - **BinSkim rules (all platforms)**: [references/binskim-rules.md](references/binskim-rules.md)
 - **Guardian filtering deep-dive**: [references/guardian-filtering.md](references/guardian-filtering.md)
-- **Per-repo profiles**: [references/repos/README.md](references/repos/README.md) (index — one .md per repo)
+- **Per-repo profiles**: [references/repo-profiles-index.md](references/repo-profiles-index.md) (index — one .md per repo)
 - **Arcade SDL infrastructure**: [references/arcade-sdl.md](references/arcade-sdl.md)
 - **Local scanning**: Use the **binskim-scan** skill

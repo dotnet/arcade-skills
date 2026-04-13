@@ -6,15 +6,15 @@ Each file documents the BinSkim pipeline configuration, scan targets, known find
 
 | Repository | File |
 |---|---|
-| dotnet/machinelearning | [machinelearning.md](machinelearning.md) |
-| dotnet/dotnet (VMR) | [dotnet-vmr.md](dotnet-vmr.md) |
-| dotnet/sdk | [sdk.md](sdk.md) |
-| dotnet/runtime | [runtime.md](runtime.md) |
-| dotnet/roslyn | [roslyn.md](roslyn.md) |
-| dotnet/aspnetcore | [aspnetcore.md](aspnetcore.md) |
-| dotnet/aspire | [aspire.md](aspire.md) |
-| dotnet/diagnostics | [diagnostics.md](diagnostics.md) |
-| microsoft/perfview | [perfview.md](perfview.md) |
+| dotnet/machinelearning | [repo-machinelearning.md](repo-machinelearning.md) |
+| dotnet/dotnet (VMR) | [repo-dotnet-vmr.md](repo-dotnet-vmr.md) |
+| dotnet/sdk | [repo-sdk.md](repo-sdk.md) |
+| dotnet/runtime | [repo-runtime.md](repo-runtime.md) |
+| dotnet/roslyn | [repo-roslyn.md](repo-roslyn.md) |
+| dotnet/aspnetcore | [repo-aspnetcore.md](repo-aspnetcore.md) |
+| dotnet/aspire | [repo-aspire.md](repo-aspire.md) |
+| dotnet/diagnostics | [repo-diagnostics.md](repo-diagnostics.md) |
+| microsoft/perfview | [repo-perfview.md](repo-perfview.md) |
 
 ## Discovering New Repos
 
