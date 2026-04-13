@@ -120,8 +120,11 @@ $script = Join-Path "plugins" "dotnet-dnceng" "skills" "binskim-scan" "scripts" 
 **Manual invocation:**
 
 ```powershell
-$binskim = "C:\git\binskim-tool\extracted\tools\net9.0\win-x64\BinSkim.exe"
-& $binskim analyze "artifacts\pkgassets\**" --recurse --output binskim-results.sarif --pretty-print --force
+# Adjust path to your platform – see binskim-install.md for installation
+$binskim = Join-Path $HOME ".binskim" "tools" "net9.0" "linux-x64" "BinSkim"   # Linux
+# $binskim = Join-Path $HOME ".binskim" "tools" "net9.0" "win-x64" "BinSkim.exe" # Windows
+$targetGlob = Join-Path "artifacts" "pkgassets" "**"
+& $binskim analyze $targetGlob --recurse --output binskim-results.sarif --pretty-print --force
 ```
 
 > **Don't filter to `*.dll` only** — scan `**` and let BinSkim decide what's a PE binary. This catches `.exe` files too.

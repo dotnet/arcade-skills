@@ -102,18 +102,18 @@ if ($ScanDir) {
     if ($testFiles.Count -gt 0) {
         Write-Host "  Note: $($testFiles.Count) files are in test/benchmark directories and are likely not shipped."
     }
-    & $BinSkimPath analyze "$target\**" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite" 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
+    $targetGlob = Join-Path $target '**'
+    & $BinSkimPath analyze $targetGlob --recurse --output $OutputSarif --pretty-print --force 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
     $scanExitCode = $LASTEXITCODE
     Write-Host "Results written to $OutputSarif"
 }
 # Mode 2: Auto-discover or extract .nupkg and scan
 elseif (-not $PackagesDir) {
     # Search common locations
-    # Common artifact locations (Windows-centric; adapt separators for other platforms)
     $candidates = @(
-        (Join-Path $RepoRoot "artifacts\packages\Release\Shipping")
-        (Join-Path $RepoRoot "artifacts\packages\Release\NonShipping")
-        (Join-Path $RepoRoot "artifacts\pkgassets")
+        (Join-Path $RepoRoot "artifacts" "packages" "Release" "Shipping")
+        (Join-Path $RepoRoot "artifacts" "packages" "Release" "NonShipping")
+        (Join-Path $RepoRoot "artifacts" "pkgassets")
     )
     $foundDirect = $false
     foreach ($full in $candidates) {
@@ -128,7 +128,8 @@ elseif (-not $PackagesDir) {
             $dllCount = (Get-ChildItem $full -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue | Measure-Object).Count
             if ($dllCount -gt 0) {
                 Write-Host "Found $dllCount DLLs in $full (no .nupkg - scanning directly)"
-                & $BinSkimPath analyze "$full\**" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite" 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
+                $fullGlob = Join-Path $full '**'
+                & $BinSkimPath analyze $fullGlob --recurse --output $OutputSarif --pretty-print --force 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
                 $scanExitCode = $LASTEXITCODE
                 Write-Host "Results written to $OutputSarif"
                 $foundDirect = $true
@@ -193,7 +194,9 @@ if ($PackagesDir) {
     Write-Host "`nScanning $totalFiles DLL/EXE files from extracted packages..."
 
     # Run BinSkim (exclude _.pdb like the official pipeline does)
-    & $BinSkimPath analyze "$extractDir\**" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite" 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
+    $extractGlob = Join-Path $extractDir '**'
+    $excludeGlob = Join-Path $extractDir '**' '_.pdb'
+    & $BinSkimPath analyze "$extractGlob;-:file|$excludeGlob" --recurse --output $OutputSarif --pretty-print --force 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
     $scanExitCode = $LASTEXITCODE
     Write-Host "`nResults written to $OutputSarif"
 }

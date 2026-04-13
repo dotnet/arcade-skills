@@ -83,14 +83,18 @@ To match what the pipeline does:
 1. **Build + pack** the repo (produces .nupkg or pkgassets)
 2. **Extract packages** (mirrors `extract-artifact-packages.ps1`):
    ```powershell
-   Get-ChildItem "artifacts\packages\Release\Shipping\*.nupkg" | ForEach-Object {
-       $dest = Join-Path "artifacts\extracted" $_.BaseName
+   $packagesDir = Join-Path "artifacts" "packages" "Release" "Shipping"
+   $extractDir  = Join-Path "artifacts" "extracted"
+   Get-ChildItem (Join-Path $packagesDir "*.nupkg") | ForEach-Object {
+       $dest = Join-Path $extractDir $_.BaseName
        Expand-Archive $_.FullName $dest -Force
    }
    ```
 3. **Run BinSkim** with the same target pattern:
    ```powershell
-   & $binskim analyze "artifacts\extracted\**;-:file|artifacts\extracted\**\_.pdb" --recurse --output results.sarif --pretty-print --force
+   $extractGlob = Join-Path "artifacts" "extracted" "**"
+   $excludeGlob = Join-Path "artifacts" "extracted" "**" "_.pdb"
+   & $binskim analyze "$extractGlob;-:file|$excludeGlob" --recurse --output results.sarif --pretty-print --force
    ```
 
 This produces results equivalent to the official pipeline (minus any baseline suppression).
