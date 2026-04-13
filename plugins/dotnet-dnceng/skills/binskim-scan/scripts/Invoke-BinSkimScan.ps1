@@ -102,7 +102,7 @@ if ($ScanDir) {
     if ($testFiles.Count -gt 0) {
         Write-Host "  Note: $($testFiles.Count) files are in test/benchmark directories and are likely not shipped."
     }
-    & $BinSkimPath analyze "$target\**;-:file|$target\**\_.pdb" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite" 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
+    & $BinSkimPath analyze "$target\**" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite" 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
     $scanExitCode = $LASTEXITCODE
     Write-Host "Results written to $OutputSarif"
 }
@@ -128,7 +128,7 @@ elseif (-not $PackagesDir) {
             $dllCount = (Get-ChildItem $full -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue | Measure-Object).Count
             if ($dllCount -gt 0) {
                 Write-Host "Found $dllCount DLLs in $full (no .nupkg - scanning directly)"
-                & $BinSkimPath analyze "$full\**;-:file|$full\**\_.pdb" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite" 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
+                & $BinSkimPath analyze "$full\**" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite" 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
                 $scanExitCode = $LASTEXITCODE
                 Write-Host "Results written to $OutputSarif"
                 $foundDirect = $true
@@ -193,7 +193,7 @@ if ($PackagesDir) {
     Write-Host "`nScanning $totalFiles DLL/EXE files from extracted packages..."
 
     # Run BinSkim (exclude _.pdb like the official pipeline does)
-    & $BinSkimPath analyze "$extractDir\**;-:file|$extractDir\**\_.pdb" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite" 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
+    & $BinSkimPath analyze "$extractDir\**" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite" 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
     $scanExitCode = $LASTEXITCODE
     Write-Host "`nResults written to $OutputSarif"
 }
@@ -202,7 +202,33 @@ if ($PackagesDir) {
 if (Test-Path $OutputSarif) {
     $sarif = Get-Content $OutputSarif -Raw | ConvertFrom-Json
     $results = $sarif.runs[0].results
+
+    # Build a map of ruleId -> defaultLevel from the tool driver rules.
+    # BinSkim SARIF omits "level" on results when it matches the rule's default.
+    $ruleDefaultLevel = @{}
+    $driverRules = $sarif.runs[0].tool.driver.rules
+    if ($driverRules) {
+        foreach ($rule in $driverRules) {
+            $id = $rule.id
+            $defLevel = $rule.defaultConfiguration.level
+            if ($id -and $defLevel) { $ruleDefaultLevel[$id] = $defLevel }
+        }
+    }
+
+    # Resolve effective level for each result
+    function Get-EffectiveLevel($result) {
+        if ($result.level) { return $result.level }
+        $def = $ruleDefaultLevel[$result.ruleId]
+        if ($def) { return $def }
+        return 'warning'  # SARIF spec default
+    }
+
     if ($results) {
+        # Annotate each result with resolved level
+        foreach ($r in $results) {
+            $r | Add-Member -NotePropertyName 'effectiveLevel' -NotePropertyValue (Get-EffectiveLevel $r) -Force
+        }
+
         # Discover portal-reported rules if a Results.sarif was provided
         $portalRules = $null
         if ($PortalRulesFrom -and (Test-Path $PortalRulesFrom)) {
@@ -216,8 +242,8 @@ if (Test-Path $OutputSarif) {
             }
         }
 
-        $errors = @($results | Where-Object { $_.level -eq 'error' })
-        $warnings = @($results | Where-Object { $_.level -eq 'warning' })
+        $errors = @($results | Where-Object { $_.effectiveLevel -eq 'error' })
+        $warnings = @($results | Where-Object { $_.effectiveLevel -eq 'warning' })
 
         if ($portalRules) {
             # Split findings into portal-reported vs informational
@@ -232,6 +258,10 @@ if (Test-Path $OutputSarif) {
                 Write-Host "`nPortal errors by rule:"
                 $portalErrors | Group-Object ruleId | Sort-Object Count -Descending | Format-Table Count, Name -AutoSize
             }
+            if ($portalWarnings.Count -gt 0) {
+                Write-Host "`nPortal warnings by rule:"
+                $portalWarnings | Group-Object ruleId | Sort-Object Count -Descending | Format-Table Count, Name -AutoSize
+            }
             if ($portalErrors.Count -eq 0 -and $portalWarnings.Count -eq 0) {
                 Write-Host "(None -- your fix cleared all portal-reported findings!)"
             }
@@ -239,21 +269,25 @@ if (Test-Path $OutputSarif) {
             if ($infoErrors.Count -gt 0 -or $infoWarnings.Count -gt 0) {
                 Write-Host "`n=== Informational Findings (not portal-reported) ==="
                 Write-Host "Errors: $($infoErrors.Count), Warnings: $($infoWarnings.Count)"
-                if ($infoErrors.Count -gt 0) {
-                    Write-Host "`nInformational errors by rule:"
-                    $infoErrors | Group-Object ruleId | Sort-Object Count -Descending | Format-Table Count, Name -AutoSize
-                }
+                $allInfo = @($infoErrors) + @($infoWarnings)
+                Write-Host "`nInformational findings by rule:"
+                $allInfo | Group-Object ruleId | Sort-Object Count -Descending | Format-Table Count, Name -AutoSize
             }
         }
         else {
             # No portal filter -- show everything
             Write-Host "`n=== Summary ==="
             Write-Host "Errors: $($errors.Count), Warnings: $($warnings.Count)"
-            if ($errors.Count -gt 0) {
-                Write-Host "`nErrors by rule:"
-                $errors | Group-Object ruleId | Sort-Object Count -Descending | Format-Table Count, Name -AutoSize
+            if ($errors.Count -gt 0 -or $warnings.Count -gt 0) {
+                Write-Host "`nFindings by rule:"
+                $results | Group-Object { "$($_.effectiveLevel) $($_.ruleId)" } |
+                    Sort-Object { if ($_.Name -like 'error*') { 0 } else { 1 } }, Count -Descending |
+                    ForEach-Object {
+                        $parts = $_.Name -split ' ', 2
+                        [PSCustomObject]@{ Count = $_.Count; Level = $parts[0]; Rule = $parts[1] }
+                    } | Format-Table Count, Level, Rule -AutoSize
             }
-            Write-Host "`nTip: Use -PortalRulesFrom <Results.sarif> to filter to portal-reported rules only."
+            Write-Host "Tip: Use -PortalRulesFrom <Results.sarif> to filter to portal-reported rules only."
         }
     }
     else {
@@ -285,11 +319,11 @@ if (Test-Path $OutputSarif) {
     # Flag findings in test/benchmark paths
     if ($results) {
         $testFindings = @($results | Where-Object {
-            $_.level -eq 'error' -and
+            $_.effectiveLevel -in @('error','warning') -and
             $_.locations[0].physicalLocation.artifactLocation.uri -match '[\\/](Tests?|Benchmarks?|TestUtilities)[\\/]'
         })
         if ($testFindings.Count -gt 0) {
-            Write-Host "`nNote: $($testFindings.Count) error(s) are in test/benchmark paths and are likely not shipped."
+            Write-Host "`nNote: $($testFindings.Count) finding(s) are in test/benchmark paths and are likely not shipped."
         }
     }
 }
