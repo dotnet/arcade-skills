@@ -7,7 +7,7 @@
 - **How to reproduce locally**:
   1. Build: `build.cmd -subset clr+libs -c Release` (full) or `build.cmd -subset libs -c Release` (managed only)
   2. Pack: `build.cmd -subset libs -c Release -pack`
-  3. Scan: `BinSkim.exe analyze "artifacts\packages\Release\Shipping\*.nupkg"` (extract first)
+  3. Scan: Extract .nupkg files first, then scan the extracted binaries (see `Invoke-BinSkimScan.ps1 -PackagesDir` for automated extraction)
 - **Quirks**:
   - Massive repo — full build takes a long time; target specific subsets
   - Ships runtime installers, host binaries, and crossgen output — NuGet scanning alone is insufficient

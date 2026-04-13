@@ -73,10 +73,15 @@ if (-not $BinSkimPath) {
     }
 }
 
-# Validate BinSkim
+# Validate BinSkim — try filesystem first, then PATH
 if (-not (Test-Path $BinSkimPath)) {
-    $installDocPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\references\binskim-install.md"))
-    throw "BinSkim not found at $BinSkimPath. See $installDocPath."
+    $onPath = Get-Command $BinSkimPath -ErrorAction SilentlyContinue
+    if ($onPath) {
+        $BinSkimPath = $onPath.Source
+    } else {
+        $installDocPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\references\binskim-install.md"))
+        throw "BinSkim not found at $BinSkimPath. See $installDocPath."
+    }
 }
 
 if (-not $OutputSarif) {
@@ -124,10 +129,10 @@ elseif (-not $PackagesDir) {
                 Write-Host "Found $nupkgCount .nupkg files in $full"
                 break
             }
-            # Check for direct DLLs (pkgassets style)
-            $dllCount = (Get-ChildItem $full -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue | Measure-Object).Count
+            # Check for direct binaries (pkgassets style)
+            $dllCount = (Get-ChildItem $full -Recurse -Include "*.dll","*.exe" -ErrorAction SilentlyContinue | Measure-Object).Count
             if ($dllCount -gt 0) {
-                Write-Host "Found $dllCount DLLs in $full (no .nupkg - scanning directly)"
+                Write-Host "Found $dllCount binaries in $full (no .nupkg - scanning directly)"
                 $fullGlob = Join-Path $full '**'
                 & $BinSkimPath analyze $fullGlob --recurse --output $OutputSarif --pretty-print --force 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
                 $scanExitCode = $LASTEXITCODE
