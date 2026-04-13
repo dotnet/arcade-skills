@@ -59,8 +59,8 @@ $ErrorActionPreference = 'Stop'
 
 # Validate BinSkim
 if (-not (Test-Path $BinSkimPath)) {
-    Write-Error "BinSkim not found at $BinSkimPath. See references/binskim-install.md."
-    exit 1
+    $installDocPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\references\binskim-install.md"))
+    throw "BinSkim not found at $BinSkimPath. See $installDocPath."
 }
 
 if (-not $OutputSarif) {
@@ -77,13 +77,12 @@ if ($ScanDir) {
         $target = Join-Path $RepoRoot $ScanDir
     }
     if (-not (Test-Path $target)) {
-        Write-Error "Scan directory not found: $target"
-        exit 1
+        throw "Scan directory not found: $target"
     }
     $allFiles = Get-ChildItem $target -Recurse -Include "*.dll","*.exe"
     $fileCount = ($allFiles | Measure-Object).Count
     $testFiles = @($allFiles | Where-Object { $_.FullName -match '[\\/](Tests?|Benchmarks?|TestUtilities)[\\/]' })
-    Write-Host "Scanning $fileCount DLL/EXE files in $target"
+    Write-Host "Scanning $fileCount files in $target"
     if ($testFiles.Count -gt 0) {
         Write-Host "  Note: $($testFiles.Count) files are in test/benchmark directories and are likely not shipped."
     }
@@ -94,26 +93,26 @@ if ($ScanDir) {
 # Mode 2: Auto-discover or extract .nupkg and scan
 elseif (-not $PackagesDir) {
     # Search common locations
+    # Common artifact locations (Windows-centric; adapt separators for other platforms)
     $candidates = @(
-        "artifacts\packages\Release\Shipping"
-        "artifacts\packages\Release\NonShipping"
-        "artifacts\pkgassets"
+        (Join-Path $RepoRoot "artifacts\packages\Release\Shipping")
+        (Join-Path $RepoRoot "artifacts\packages\Release\NonShipping")
+        (Join-Path $RepoRoot "artifacts\pkgassets")
     )
     $foundDirect = $false
-    foreach ($c in $candidates) {
-        $full = Join-Path $RepoRoot $c
+    foreach ($full in $candidates) {
         if (Test-Path $full) {
             $nupkgCount = (Get-ChildItem $full -Filter "*.nupkg" -ErrorAction SilentlyContinue | Measure-Object).Count
             if ($nupkgCount -gt 0) {
                 $PackagesDir = $full
-                Write-Host "Found $nupkgCount .nupkg files in $c"
+                Write-Host "Found $nupkgCount .nupkg files in $full"
                 break
             }
             # Check for direct DLLs (pkgassets style)
             $dllCount = (Get-ChildItem $full -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue | Measure-Object).Count
             if ($dllCount -gt 0) {
-                Write-Host "Found $dllCount DLLs in $c (no .nupkg - scanning directly)"
-                & $BinSkimPath analyze "$full\**;-:file|$full\**\_.pdb" --recurse --output $OutputSarif --pretty-print --force
+                Write-Host "Found $dllCount DLLs in $full (no .nupkg - scanning directly)"
+                & $BinSkimPath analyze "$full\**;-:file|$full\**\_.pdb" --recurse --output $OutputSarif --pretty-print --force 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
                 $scanExitCode = $LASTEXITCODE
                 Write-Host "Results written to $OutputSarif"
                 $foundDirect = $true
@@ -122,8 +121,7 @@ elseif (-not $PackagesDir) {
         }
     }
     if (-not $PackagesDir -and -not $foundDirect) {
-        Write-Error "No .nupkg files found in common locations. Build with -pack first, or specify -PackagesDir or -ScanDir."
-        exit 1
+        throw "No .nupkg files found in common locations. Build with -pack first, or specify -PackagesDir or -ScanDir."
     }
 }
 
@@ -240,7 +238,13 @@ if (Test-Path $OutputSarif) {
     }
 
     # Summarize ERR997 (PDB not found) from SARIF toolConfigurationNotifications
-    $configNotifs = $sarif.runs[0].invocations[0].toolConfigurationNotifications
+    $configNotifs = $null
+    if ($sarif.runs -and $sarif.runs.Count -gt 0) {
+        $firstRun = $sarif.runs[0]
+        if ($firstRun.invocations -and $firstRun.invocations.Count -gt 0) {
+            $configNotifs = $firstRun.invocations[0].toolConfigurationNotifications
+        }
+    }
     if ($configNotifs) {
         $pdbErrors = @($configNotifs | Where-Object { $_.descriptor.id -eq 'ERR997.ExceptionLoadingPdb' })
         if ($pdbErrors.Count -gt 0) {
@@ -267,4 +271,4 @@ if (Test-Path $OutputSarif) {
     }
 }
 
-exit $scanExitCode
+$global:LASTEXITCODE = $scanExitCode
