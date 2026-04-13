@@ -147,7 +147,7 @@ Known BinSkim configurations for major dotnet product repositories. These profil
 - **Published artifacts**: Built binaries only — no NuGet packages, no installers
 - **es-metadata.yml**: `org: nettel`, `path: PerfView`, `isProduction: true`
 - **Known findings (central portal)**: BA2027 and BA2004 (different required rules from dotnet repos due to `nettel` org):
-  - `EtwClrProfiler.dll` (BA2027 × 22 instances) — **C++ source in repo** (`src/EtwClrProfiler/`), fixable with compiler flags
+  - `EtwClrProfiler.dll` (BA2027 × 22 instances) — **C++ source in repo** (`src/EtwClrProfiler/`); BA2027 (EnableSourceLink) on native C++ binaries requires `/d1sourcelink` or PDB embedding approach rather than the .NET SourceLink project property — may warrant an exception instead
   - `xunit.*.dll` (5 DLLs, BA2027 + BA2004) — third-party test framework, shouldn't be in shipped artifacts
   - `Microsoft.Diagnostics.Tracing.TraceEvent.AutomatedAnalysis.Analyzers.dll` (BA2004) — first-party managed assembly
 - **Native code**: Yes — `src/EtwClrProfiler/ETWClrProfilerX64.vcxproj` and `ETWClrProfilerX86.vcxproj` (requires MSVC)

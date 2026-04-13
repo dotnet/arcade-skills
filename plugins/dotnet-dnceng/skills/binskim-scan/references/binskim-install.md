@@ -42,9 +42,14 @@ Invoke-WebRequest -Uri $url -OutFile "$outDir/binskim.nupkg"
 Expand-Archive -Path "$outDir/binskim.nupkg" -DestinationPath "$outDir/extracted" -Force
 
 # 4. Verify — pick the right platform binary
-$exe = Get-ChildItem "$outDir/extracted/tools" -Recurse -Filter "BinSkim*" |
-    Where-Object { $_.Name -match '^BinSkim(\.exe)?$' } | Select-Object -First 1
-Write-Host "BinSkim at: $($exe.FullName)"
+$rid = if ($IsWindows -or $env:OS -eq 'Windows_NT') { 'win-x64' }
+       elseif ($IsLinux) { if ([Runtime.InteropServices.RuntimeInformation]::OSArchitecture -eq 'Arm64') { 'linux-arm64' } else { 'linux-x64' } }
+       elseif ($IsMacOS) { 'osx-x64' }
+       else { throw "Unsupported OS — see platform paths below and pick manually" }
+$binName = if ($rid -like 'win-*') { 'BinSkim.exe' } else { 'BinSkim' }
+$exe = Join-Path $outDir "extracted/tools/net9.0/$rid/$binName"
+if (-not (Test-Path $exe)) { throw "BinSkim not found at: $exe" }
+Write-Host "BinSkim at: $exe"
 ```
 
 ### Platform-specific paths inside the package

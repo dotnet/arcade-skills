@@ -149,10 +149,17 @@ if ($PackagesDir) {
             foreach ($entry in $zip.Entries) {
                 $ext = [System.IO.Path]::GetExtension($entry.Name)
                 if ($relevantExtensions -contains $ext) {
-                    $targetPath = Join-Path $pkgExtractDir (Split-Path $entry.FullName)
-                    New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
+                    # Guard against path traversal (Zip Slip) — ensure entry stays under extract dir
                     $targetFile = Join-Path $pkgExtractDir $entry.FullName
-                    [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $targetFile, $true)
+                    $resolvedTarget = [System.IO.Path]::GetFullPath($targetFile)
+                    $resolvedBase = [System.IO.Path]::GetFullPath($pkgExtractDir)
+                    if (-not $resolvedTarget.StartsWith($resolvedBase, [System.StringComparison]::OrdinalIgnoreCase)) {
+                        Write-Warning "Skipping suspicious zip entry: $($entry.FullName)"
+                        continue
+                    }
+                    $targetPath = Split-Path $resolvedTarget
+                    New-Item -ItemType Directory -Path $targetPath -Force | Out-Null
+                    [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $resolvedTarget, $true)
                     $extracted++
                 }
             }

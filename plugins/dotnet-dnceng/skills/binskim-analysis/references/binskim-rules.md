@@ -10,7 +10,6 @@ These apply to `.dll` and `.exe` files built with MSVC or the Windows SDK.
 |------|------|----------|-------------|
 | BA2001 | LoadImageAboveFourGigabyteAddress | Error | Link with `/LARGEADDRESSAWARE` |
 | BA2002 | DoNotIncorporateVulnerableDependencies | Error | Update vulnerable static libs (e.g., OpenSSL) |
-| BA2003 | EnableStackProtection | Error | Related to BA2011; don't use `/GS-` |
 | BA2004 | EnableSecureSourceCodeHashing | Error | Compile with `/ZH:SHA_256` (MSVC 16.4+) |
 | BA2005 | DoNotShipVulnerableBinaries | Error | Update binaries with known CVEs |
 | BA2006 | BuildWithSecureTools | Error | Use a supported compiler version |
