@@ -6,13 +6,13 @@ BinSkim is distributed as a NuGet content package, **not** a dotnet global tool.
 
 ```powershell
 # Windows
-Test-Path "C:\git\binskim-tool\extracted\tools\net9.0\win-x64\BinSkim.exe"
+Test-Path "$env:USERPROFILE\.binskim\extracted\tools\net9.0\win-x64\BinSkim.exe"
 
 # Linux/macOS
 # Linux
-test -x ~/binskim-tool/extracted/tools/net9.0/linux-x64/BinSkim
+test -x ~/.binskim/extracted/tools/net9.0/linux-x64/BinSkim
 # macOS
-test -x ~/binskim-tool/extracted/tools/net9.0/osx-x64/BinSkim
+test -x ~/.binskim/extracted/tools/net9.0/osx-x64/BinSkim
 ```
 
 If it exists, you're done.
@@ -31,9 +31,9 @@ Write-Host "Latest: $latest"
 $url = "https://api.nuget.org/v3-flatcontainer/microsoft.codeanalysis.binskim/$latest/microsoft.codeanalysis.binskim.$latest.nupkg"
 
 # Windows
-$outDir = "C:\git\binskim-tool"
+$outDir = "$env:USERPROFILE\.binskim"
 # Linux/macOS
-# $outDir = "$HOME/binskim-tool"
+# $outDir = "$HOME/.binskim"
 
 New-Item -ItemType Directory -Path $outDir -Force | Out-Null
 Invoke-WebRequest -Uri $url -OutFile "$outDir/binskim.nupkg"
@@ -63,12 +63,12 @@ tools/net9.0/osx-x64/BinSkim           # macOS
 
 On Linux/macOS, make the binary executable after extraction:
 ```bash
-chmod +x ~/binskim-tool/extracted/tools/net9.0/linux-x64/BinSkim
+chmod +x ~/.binskim/extracted/tools/net9.0/linux-x64/BinSkim
 ```
 
 ## Upgrading
 
-Delete `C:\git\binskim-tool\extracted\` and re-run the installation steps. The NuGet flat container API always returns the latest version list.
+Delete `~/.binskim/extracted/` (or `$env:USERPROFILE\.binskim\extracted\` on Windows) and re-run the installation steps. The NuGet flat container API always returns the latest version list.
 
 ## Troubleshooting
 

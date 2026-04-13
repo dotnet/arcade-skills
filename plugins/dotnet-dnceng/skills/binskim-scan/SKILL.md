@@ -28,8 +28,8 @@ Run BinSkim locally against a dotnet repository to find binary security issues. 
 ## Prerequisites
 
 - **BinSkim**: See [references/binskim-install.md](references/binskim-install.md) for installation.
-  - Windows: `C:\git\binskim-tool\extracted\tools\net9.0\win-x64\BinSkim.exe`
-  - Linux: `~/binskim-tool/extracted/tools/net9.0/linux-x64/BinSkim`
+  - Windows: `~\.binskim\extracted\tools\net9.0\win-x64\BinSkim.exe`
+  - Linux: `~/.binskim/extracted/tools/net9.0/linux-x64/BinSkim`
 - **Build toolchain**: .NET SDK (managed builds). For native code: MSVC + CMake on Windows, gcc/clang + CMake on Linux. See [references/build-prereqs.md](references/build-prereqs.md).
 - **Repo cloned locally**: Typically under `C:\git\<repo-name>` (Windows) or `~/git/<repo-name>` (Linux).
 
