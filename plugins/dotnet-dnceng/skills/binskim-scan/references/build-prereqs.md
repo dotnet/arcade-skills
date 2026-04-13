@@ -54,7 +54,7 @@ You can still scan:
 2. **Pre-built native blobs from NuGet cache** — many repos consume pre-built native libraries via NuGet packages:
    ```powershell
    # Find native DLLs in NuGet cache for a specific package
-   Get-ChildItem "$env:USERPROFILE\.nuget\packages\<package-name>" -Recurse -Filter "*.dll" |
+   Get-ChildItem (Join-Path (Resolve-Path ~/.nuget/packages) "<package-name>") -Recurse -Filter "*.dll" |
      Where-Object { $_.DirectoryName -match 'native' }
    ```
 3. **Isolated package restore** — get all package native blobs without building:

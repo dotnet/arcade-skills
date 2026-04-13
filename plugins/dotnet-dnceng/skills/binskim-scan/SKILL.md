@@ -78,10 +78,10 @@ build.cmd -c Release -pack
 **Extracting .nupkg for scanning** (mirrors `eng/common/sdl/extract-artifact-packages.ps1`):
 
 ```powershell
-$nupkgDir = "artifacts\packages\Release\Shipping"
-$extractDir = "artifacts\extracted-for-scan"
+$nupkgDir = Join-Path "artifacts" "packages" "Release" "Shipping"
+$extractDir = Join-Path "artifacts" "extracted-for-scan"
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-Get-ChildItem "$nupkgDir\*.nupkg" | ForEach-Object {
+Get-ChildItem (Join-Path $nupkgDir "*.nupkg") | ForEach-Object {
     $dest = Join-Path $extractDir $_.BaseName
     New-Item -ItemType Directory -Path $dest -Force | Out-Null
     $zip = [System.IO.Compression.ZipFile]::OpenRead($_.FullName)
@@ -105,13 +105,13 @@ Get-ChildItem "$nupkgDir\*.nupkg" | ForEach-Object {
 **Preferred: Use the helper script** (from the skill's `scripts/` directory, or provide its full path):
 
 ```powershell
-$script = "plugins\dotnet-dnceng\skills\binskim-scan\scripts\Invoke-BinSkimScan.ps1"
+$script = Join-Path "plugins" "dotnet-dnceng" "skills" "binskim-scan" "scripts" "Invoke-BinSkimScan.ps1"
 
 # Scan a directory:
-& $script -RepoRoot C:\git\machinelearning -ScanDir artifacts\pkgassets
+& $script -RepoRoot C:\git\machinelearning -ScanDir (Join-Path "artifacts" "pkgassets")
 
 # Filter to portal-reported rules only:
-& $script -RepoRoot C:\git\machinelearning -ScanDir artifacts\pkgassets -PortalRulesFrom C:\temp\Results.sarif
+& $script -RepoRoot C:\git\machinelearning -ScanDir (Join-Path "artifacts" "pkgassets") -PortalRulesFrom C:\temp\Results.sarif
 
 # Auto-discover scan targets:
 & $script -RepoRoot C:\git\machinelearning
