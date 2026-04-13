@@ -17,7 +17,8 @@
     Path for the SARIF output file. Defaults to binskim-results.sarif in the repo root.
 
 .PARAMETER BinSkimPath
-    Path to BinSkim.exe. Defaults to C:\git\binskim-tool\extracted\tools\net9.0\win-x64\BinSkim.exe.
+    Path to BinSkim executable. Auto-detected based on platform (e.g. ~/.binskim/tools/net9.0/<rid>/BinSkim).
+    Override with an explicit path if BinSkim is installed elsewhere.
 
 .PARAMETER ScanDir
     Scan a directory directly instead of extracting .nupkg files. Useful for pkgassets/ or
@@ -101,7 +102,7 @@ if ($ScanDir) {
     if ($testFiles.Count -gt 0) {
         Write-Host "  Note: $($testFiles.Count) files are in test/benchmark directories and are likely not shipped."
     }
-    & $BinSkimPath analyze "$target\**;-:file|$target\**\_.pdb" --recurse --output $OutputSarif --pretty-print --force 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
+    & $BinSkimPath analyze "$target\**;-:file|$target\**\_.pdb" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite" 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
     $scanExitCode = $LASTEXITCODE
     Write-Host "Results written to $OutputSarif"
 }
@@ -127,7 +128,7 @@ elseif (-not $PackagesDir) {
             $dllCount = (Get-ChildItem $full -Recurse -Filter "*.dll" -ErrorAction SilentlyContinue | Measure-Object).Count
             if ($dllCount -gt 0) {
                 Write-Host "Found $dllCount DLLs in $full (no .nupkg - scanning directly)"
-                & $BinSkimPath analyze "$full\**;-:file|$full\**\_.pdb" --recurse --output $OutputSarif --pretty-print --force 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
+                & $BinSkimPath analyze "$full\**;-:file|$full\**\_.pdb" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite" 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
                 $scanExitCode = $LASTEXITCODE
                 Write-Host "Results written to $OutputSarif"
                 $foundDirect = $true
@@ -192,7 +193,7 @@ if ($PackagesDir) {
     Write-Host "`nScanning $totalFiles DLL/EXE files from extracted packages..."
 
     # Run BinSkim (exclude _.pdb like the official pipeline does)
-    & $BinSkimPath analyze "$extractDir\**;-:file|$extractDir\**\_.pdb" --recurse --output $OutputSarif --pretty-print --force 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
+    & $BinSkimPath analyze "$extractDir\**;-:file|$extractDir\**\_.pdb" --recurse --output $OutputSarif --log "PrettyPrint;ForceOverwrite" 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
     $scanExitCode = $LASTEXITCODE
     Write-Host "`nResults written to $OutputSarif"
 }
