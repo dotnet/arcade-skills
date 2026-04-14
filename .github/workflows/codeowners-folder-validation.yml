@@ -172,7 +172,7 @@ jobs:
 
       - name: Create or update issue for validation failures
         if: (steps.audit.outputs.has_missing == 'true' || steps.audit.outputs.has_insufficient_owners == 'true') && github.event_name != 'pull_request'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           MISSING_JSON: ${{ steps.audit.outputs.missing_json }}
           INSUFFICIENT_OWNERS_JSON: ${{ steps.audit.outputs.insufficient_owners_json }}
