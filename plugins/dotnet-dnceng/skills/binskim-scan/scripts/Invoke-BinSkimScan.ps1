@@ -79,7 +79,7 @@ if (-not (Test-Path $BinSkimPath)) {
     if ($onPath) {
         $BinSkimPath = $onPath.Source
     } else {
-        $installDocPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\references\binskim-install.md"))
+        $installDocPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".." "references" "binskim-install.md"))
         throw "BinSkim not found at $BinSkimPath. See $installDocPath."
     }
 }
