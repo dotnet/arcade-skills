@@ -47,7 +47,7 @@ $rid = if ($IsWindows -or $env:OS -eq 'Windows_NT') { 'win-x64' }
        elseif ($IsMacOS) { 'osx-x64' }
        else { throw "Unsupported OS — see platform paths below and pick manually" }
 $binName = if ($rid -like 'win-*') { 'BinSkim.exe' } else { 'BinSkim' }
-$exe = Join-Path $outDir "extracted/tools/net9.0/$rid/$binName"
+$exe = Join-Path -Path $outDir -ChildPath 'extracted' -AdditionalChildPath 'tools', 'net9.0', $rid, $binName
 if (-not (Test-Path $exe)) { throw "BinSkim not found at: $exe" }
 Write-Host "BinSkim at: $exe"
 ```
