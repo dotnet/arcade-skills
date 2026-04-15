@@ -124,16 +124,20 @@ $script = Join-Path "plugins" "dotnet-dnceng" "skills" "binskim-scan" "scripts" 
 $binskim = Join-Path $HOME ".binskim" "tools" "net9.0" "linux-x64" "BinSkim"   # Linux
 # $binskim = Join-Path $HOME ".binskim" "tools" "net9.0" "win-x64" "BinSkim.exe" # Windows
 $targetGlob = Join-Path "artifacts" "pkgassets" "**"
-& $binskim analyze $targetGlob --recurse --output binskim-results.sarif --pretty-print --force
+& $binskim analyze $targetGlob --recurse --output binskim-results.sarif --log PrettyPrint --force
 ```
 
-> **Don't filter to `*.dll` only** — scan `**` and let BinSkim decide what's a PE binary. This catches `.exe` files too.
+> **Don't filter to `*.dll` only** — scan `**` and let BinSkim decide what's analyzable. This catches `.exe`, `.sys`, `.so`, `.dylib`, and extensionless Mach-O executables. BinSkim identifies binary format by magic bytes, not file extension.
 
 ### Step 4: Analyze Results
 
 ```powershell
 $sarif = Get-Content -Raw binskim-results.sarif | ConvertFrom-Json
-$results = $sarif.runs[0].results
+# IMPORTANT: Results.sarif may have multiple runs (BinSkim, roslynanalyzers, etc.)
+# Filter to the BinSkim run by tool name — don't assume runs[0]
+$binskimRun = $sarif.runs | Where-Object { $_.tool.driver.name -like '*BinSkim*' } | Select-Object -First 1
+if (-not $binskimRun) { $binskimRun = $sarif.runs[0] }  # fallback
+$results = $binskimRun.results
 $errors = $results | Where-Object { $_.level -eq 'error' }
 $warnings = $results | Where-Object { $_.level -eq 'warning' }
 Write-Host "Errors: $($errors.Count), Warnings: $($warnings.Count)"
@@ -158,11 +162,42 @@ Local scans are a **superset** — more findings than the portal is expected. Us
 BinSkim ships for Windows, Linux (x64, arm64), and macOS (x64):
 - Windows: `tools/net9.0/win-x64/BinSkim.exe`
 - Linux: `tools/net9.0/linux-x64/BinSkim` (`chmod +x`)
-- macOS: `tools/net9.0/osx-x64/BinSkim`
+- macOS: `tools/net9.0/osx-x64/BinSkim` (x64 only — no arm64 runtime in package; use Rosetta on Apple Silicon)
 
-**Each OS build produces different native binaries with potentially different BinSkim findings.** A Windows scan does not cover Linux `.so` or macOS `.dylib` files, and vice versa. If the repo ships native binaries for multiple platforms, scan on each target OS — not just Windows.
+**Each OS build produces different native binaries with potentially different BinSkim findings.** If the repo ships native binaries for multiple platforms, you need to scan binaries from each target OS — not just Windows.
 
-Use `build.sh` on Linux/macOS. If the official pipeline only runs BinSkim on Windows legs, flag this as a coverage gap — the pipeline should scan all OS configurations that produce shipped native artifacts.
+Use `build.sh` on Linux/macOS to build for those platforms. If the official pipeline only runs BinSkim on Windows legs, flag this as a coverage gap — the pipeline should scan all OS configurations that produce shipped native artifacts.
+
+### Cross-platform scanning — any binary on any OS
+
+**BinSkim can scan PE, ELF, and Mach-O binaries on any OS.** BinSkim identifies binary format by magic bytes (not file extension or host OS). The Windows build can analyze Linux `.so` files and macOS `.dylib` files, and vice versa. All the binary parsing is pure managed code with no platform-specific dependencies.
+
+This means you can:
+- Scan macOS `.dylib` files on a Windows dev machine
+- Scan Linux `.so` files on a Windows dev machine
+- Download official build artifacts from any platform and scan them locally, regardless of your OS
+
+**The key requirement is passing the right file patterns.** BinSkim discovers files via glob patterns you supply (e.g., `*.dll`). If you only pass `*.dll`, it won't find `.dylib` or `.so` files — not because it can't analyze them, but because the glob doesn't match. Use `**` (all files) or explicit patterns like `*.dylib *.so` to scan non-PE binaries.
+
+> **Why do official pipelines miss non-Windows binaries?** The 1ES/Guardian SDL template invokes BinSkim with Windows-centric glob patterns (matching `.dll`, `.exe`, `.sys`). Mach-O and ELF binaries are never enumerated — they aren't "rejected", they're simply never passed to BinSkim. This is a configuration gap in how the pipeline invokes BinSkim, not a BinSkim limitation.
+
+### Scanning downloaded official artifacts
+
+There are two main scenarios for local BinSkim scanning:
+
+- **Verifying a local fix**: Build the repo (or sub-repo) locally and scan the output. This is the normal workflow.
+- **Analyzing platforms not covered by official SDL**: If official runs don't scan certain platforms (e.g., Linux/macOS binaries), you can download official build artifacts and scan them locally on any OS — BinSkim can analyze PE, ELF, and Mach-O binaries on any platform. This is also useful for initial triage before fixing anything.
+
+For the artifact download approach, official BinSkim and Guardian SARIF files from the SDL artifacts give you the same information without re-scanning. Re-scanning downloaded artifacts is only needed when official SDL doesn't cover a platform. BinSkim can analyze binaries from any platform on any OS, so you don't need a macOS machine to scan `.dylib` files.
+
+To scan downloaded artifacts:
+
+1. **Download build artifacts** from AzDO (use `ado-dnceng-pipelines_download_artifact` or REST API)
+2. **Extract native binaries** — artifacts often contain `.tar.gz` inside `.nupkg` or zip files
+   - For `.tar.gz` extraction: use `tar.exe` (built into Windows 10+) or 7-Zip
+   - PowerShell 7.4+ on .NET 8+ also supports tar via `[System.Formats.Tar.TarFile]::ExtractToDirectory()`
+3. **Identify native binaries** by file header magic bytes (ELF: `\x7fELF`, Mach-O: `\xfe\xed\xfa\xce`/`\xcf\xfa\xed\xfe`)
+4. **Scan with BinSkim** using the appropriate platform binary
 
 ## Before/After Comparison
 

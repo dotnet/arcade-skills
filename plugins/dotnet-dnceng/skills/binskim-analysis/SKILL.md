@@ -49,6 +49,19 @@ To investigate official results, download the SDL artifact from the repo's offic
 #   VMR repos:   drop_VMR_Vertical_Build_Windows_x64_sdl_analysis
 # Some repos have multiple SDL legs — check ALL OS legs (Windows, Linux, macOS)
 # Each OS build produces different native binaries with potentially different findings
+#
+# ⚠️ NON-WINDOWS SDL ARTIFACTS MAY BE EMPTY. Some pipelines may have a bug where
+#    BinSkim only runs on Windows SDL legs. Linux/macOS SDL artifacts may exist but contain 0-byte
+#    SARIF files. Always check file sizes before parsing — don't assume non-Windows legs
+#    have results.
+#
+# ⚠️ LARGE PIPELINE ARTIFACTS: For large artifacts (>100MB), the AzDO REST API may return
+#    an HTML sign-in page if you use $format=zip directly. Instead:
+#    1. GET the artifact metadata first:
+#       GET .../_apis/build/builds/{buildId}/artifacts?artifactName={name}&api-version=7.1
+#    2. Extract the downloadUrl from the response: .resource.downloadUrl
+#    3. GET that URL with a bearer token to download the actual content
+#    This CDN-based download works reliably for any artifact size.
 
 # Key files inside the artifact:
 # - binskim/001/binskim.sarif    <- Raw BinSkim output (everything found)
@@ -95,7 +108,11 @@ Always compare both files to understand what Guardian filtered:
 
 ```powershell
 $raw = (Get-Content "binskim\001\binskim.sarif" -Raw | ConvertFrom-Json).runs[0].results
-$merged = (Get-Content "Results.sarif" -Raw | ConvertFrom-Json).runs[0].results
+# IMPORTANT: Results.sarif contains multiple runs (BinSkim, roslynanalyzers, prefast, etc.)
+# Filter to the BinSkim run — don't assume runs[0] is BinSkim
+$mergedSarif = Get-Content "Results.sarif" -Raw | ConvertFrom-Json
+$binskimRun = $mergedSarif.runs | Where-Object { $_.tool.driver.name -like '*BinSkim*' } | Select-Object -First 1
+$merged = if ($binskimRun) { $binskimRun.results } else { $mergedSarif.runs[0].results }
 
 Write-Host "Raw BinSkim findings: $($raw.Count)"
 Write-Host "After Guardian filtering: $($merged.Count)"
@@ -124,7 +141,20 @@ After examining results, check whether the scan covers everything the repo ships
 
 **Common gap — unstaged binaries**: Native C++ binaries built by `.vcxproj` often output to project-local `Release\` directories, not the main `artifacts\bin\` staging area. Guardian generates `.gdntoolinput` from the staging directories, so these binaries get Prefast coverage (source analysis) but miss BinSkim (binary analysis). This is a pipeline artifact staging config issue.
 
-**Common gap — missing OS coverage**: Each OS build configuration produces different native binaries (e.g., Linux `.so`, macOS `.dylib`, Windows `.dll`). If the official pipeline only runs BinSkim on Windows SDL legs, Linux and macOS native binaries are not scanned at all. **Flag this clearly as a coverage gap that needs fixing** — all OS configurations that produce shipped native binaries should have BinSkim SDL legs. Check the pipeline YAML for SDL legs on each OS, and compare with the set of OS-specific artifacts the repo publishes.
+**Common gap — missing OS coverage**: Each OS build configuration produces different native binaries (e.g., Linux `.so`, macOS `.dylib`, Windows `.dll`). If the official pipeline only runs BinSkim on Windows SDL legs, Linux and macOS native binaries are not scanned at all. **Flag this clearly as a coverage gap that needs fixing.** Note: this gap is typically caused by the 1ES/Guardian SDL template using Windows-centric glob patterns (matching `.dll`/`.exe`/`.sys`) rather than a BinSkim limitation — BinSkim can scan PE, ELF, and Mach-O binaries on any OS using magic-byte detection. To close the gap, either configure broader glob patterns in the existing SDL legs, or add BinSkim scanning steps that target non-Windows artifacts with appropriate patterns (`*.dylib`, `*.so`, or `**`).
+
+## Classification Framework
+
+When analyzing findings, classify each into one of four buckets to determine the right action:
+
+| Bucket | Description | Action |
+|--------|-------------|--------|
+| **First-party shipped** | Binary built from repo source, included in shipping packages | Fix in repo — highest priority |
+| **Foreign shipped** | Third-party binary (from NuGet/vendored), included in shipping packages | File upstream issue, update package, or request SDL exception |
+| **First-party non-shipped** | Binary built from repo source, in test/NonShipping only | Fix for hygiene (low priority), or exclude from scan scope |
+| **Foreign non-shipped** | Third-party binary, in test/NonShipping only | Suppress — should not appear in official scans if artifact staging is correct |
+
+To classify: check the SARIF artifact path for `Shipping` vs `NonShipping`, and search the repo for the binary's source project (`.vcxproj`/`.csproj`) vs NuGet package origin.
 
 ## Fix Ownership
 

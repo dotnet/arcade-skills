@@ -18,7 +18,11 @@ The raw `binskim.sarif` is available in the SDL build artifacts (e.g., `drop_bui
 
 Guardian filters BinSkim findings before reporting them to the central portal. The primary mechanism is **SDL policy requirement mappings** — an internal, centrally-managed policy that defines which BinSkim rules are required for SDL compliance. Only findings for rules with applicable policy mappings are promoted to `Results.sarif` and the portal. Other findings are silently dropped.
 
-**The required rules vary by service tree org** (from `es-metadata.yml`). For example, `devdiv` org repos (most `dotnet/*` repos) have BA2008, BA2009, and BA2021 as required rules, while `nettel` org repos (e.g., `microsoft/perfview`) have BA2004 and BA2027 instead. See [binskim-rules.md](binskim-rules.md) for the observed requirements table.
+**The required rules vary by service tree org** (from `es-metadata.yml`). See the complete SDL requirement table in [binskim-rules.md](binskim-rules.md#sdl-requirement-status-all-rules).
+
+### BA2022 filtering explained
+
+BA2022 (SignSecurely) can produce **thousands** of raw findings in repos with many unsigned binaries. In BinSkim 4.x, unsigned binaries fire `Error_DidNotVerify` with `CRYPT_E_FILE_ERROR` — this is NOT "not applicable", it's an actual error-level finding. Guardian filters ALL of these because `CRYPT_E_FILE_ERROR` indicates the binary is simply unsigned (not improperly signed). Don't be alarmed by large BA2022 counts in raw SARIF — they will all be filtered.
 
 This filtering is:
 
@@ -27,7 +31,7 @@ This filtering is:
 - **Not a human suppression**: No one in your repo explicitly chose to hide these findings
 - **Centrally managed**: The SDL team maintains which rules have policy mappings
 
-The practical implication: **your local BinSkim scan will find more issues than the portal reports.** This is expected and correct.
+The practical implication: **your local BinSkim scan will find more issues than the portal reports.** The filtered-out findings should still be examined — some may represent real security gaps that aren't yet SDL-required but are still worth fixing.
 
 ## Suppression mechanisms
 
@@ -53,7 +57,10 @@ The primary filtering is SDL Policy. To explicitly suppress a specific finding t
 
 ```powershell
 $raw = (Get-Content "binskim\001\binskim.sarif" -Raw | ConvertFrom-Json).runs[0].results
-$merged = (Get-Content "Results.sarif" -Raw | ConvertFrom-Json).runs[0].results
+# IMPORTANT: Results.sarif has multiple runs — filter to BinSkim
+$mergedSarif = Get-Content "Results.sarif" -Raw | ConvertFrom-Json
+$binskimRun = $mergedSarif.runs | Where-Object { $_.tool.driver.name -like '*BinSkim*' } | Select-Object -First 1
+$merged = if ($binskimRun) { $binskimRun.results } else { $mergedSarif.runs[0].results }
 
 Write-Host "Raw BinSkim findings: $($raw.Count)"
 Write-Host "After Guardian filtering: $($merged.Count)"
