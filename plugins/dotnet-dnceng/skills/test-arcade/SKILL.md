@@ -49,8 +49,6 @@ pwsh ./scripts/Test-Arcade.ps1 -Arcade /path/to/arcade -TestRepo /path/to/test-r
 pwsh ./scripts/Test-Arcade.ps1 -Arcade /path/to/arcade -TestRepo /path/to/test-repo -SignCheck -SignCheckDir /path/to/files
 ```
 
-A bash wrapper (`test-arcade.sh`) is also provided for backward compatibility, forwarding `--flag` arguments to the PowerShell script.
-
 ## Step 0: Verify Repos Are Cloned
 
 Both the Arcade repo and the test repo must be cloned locally. The test repo can be any .NET repo that consumes the Arcade SDK (e.g., `arcade-validation`, `runtime`, `sdk`, `aspnetcore`).
