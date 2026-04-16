@@ -14,19 +14,29 @@ dot.net
 microsoft.com
 
 # Tools
-aka.ms/dotnet-trace
-aka.ms/perfcollect
+aka.ms
 api.nuget.org
 msdl.microsoft.com
 nuget.org/account/trustedpublishing
 dotnetcli.blob.core.windows.net
 liquid.microsoft.com
+msbuildlog.com
+live.msbuildlog.com
 
 # Platforms
+dev.azure.com
 
 # Repos
+github.com/dotnet/arcade
 github.com/dotnet/arcade-skills
+github.com/dotnet/diagnostics
+github.com/dotnet/dnceng
+github.com/dotnet/dotnet
+github.com/dotnet/runtime
+github.com/jaredpar/runfo
+github.com/lewing/maestro.mcp
 github.com/microsoft/binskim
+github.com/orgs/dotnet
 
 # MCP ecosystem
 code.visualstudio.com
