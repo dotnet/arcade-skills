@@ -4,11 +4,11 @@ How the script sets up a local NuGet feed from Arcade build artifacts and config
 
 ## Overview
 
-After Arcade is built with `--pack`, NuGet packages are output to `artifacts/packages/Release/NonShipping/`. The script uses `dotnet nuget push` to populate a hierarchical local feed from these packages, then registers the feed as a NuGet source for the test repo.
+After Arcade is built with `--pack`, NuGet packages are output to `artifacts/packages/Release/NonShipping/`. The script uses `dotnet nuget push` to copy these packages into a flat local feed directory, then registers the feed as a NuGet source for the test repo.
 
 ## Feed Initialization with `dotnet nuget push`
 
-The `dotnet nuget push` command, when targeting a local folder source, copies each package into a hierarchical feed layout:
+The `dotnet nuget push` command, when targeting a local folder source, copies each `.nupkg` file directly into the target directory (flat layout):
 
 ```powershell
 $ArcadePackagesPath = Join-Path $ArcadePath 'artifacts/packages/Release/NonShipping'
@@ -20,26 +20,22 @@ Get-ChildItem -Path $ArcadePackagesPath -Filter '*.nupkg' | ForEach-Object {
 **Flat input** (what Arcade produces):
 ```
 artifacts/packages/Release/NonShipping/
-├── Microsoft.DotNet.Arcade.Sdk.10.0.0-beta.25291001.1.nupkg
-├── Microsoft.DotNet.Helix.Sdk.10.0.0-beta.25291001.1.nupkg
-├── Microsoft.DotNet.SignTool.10.0.0-beta.25291001.1.nupkg
+├── Microsoft.DotNet.Arcade.Sdk.{version}.nupkg
+├── Microsoft.DotNet.Helix.Sdk.{version}.nupkg
+├── Microsoft.DotNet.SignCheckTask.{version}.nupkg
 └── ...
 ```
 
-**Hierarchical output** (what `dotnet nuget push` creates):
+**Flat output** (what `dotnet nuget push` creates in the feed directory):
 ```
-.arcade-local-feed/
-├── microsoft.dotnet.arcade.sdk/
-│   └── 10.0.0-beta.25291001.1/
-│       ├── microsoft.dotnet.arcade.sdk.10.0.0-beta.25291001.1.nupkg
-│       └── microsoft.dotnet.arcade.sdk.10.0.0-beta.25291001.1.nupkg.sha512
-├── microsoft.dotnet.helix.sdk/
-│   └── 10.0.0-beta.25291001.1/
-│       ├── ...
-└── ...
+arcade-local-feed/
+├── Microsoft.DotNet.Arcade.Sdk.{version}.nupkg
+├── Microsoft.DotNet.Helix.Sdk.{version}.nupkg
+├── Microsoft.DotNet.SignCheckTask.{version}.nupkg
+└── ... (40+ packages)
 ```
 
-The hierarchical layout is a [local NuGet feed format](https://learn.microsoft.com/en-us/nuget/hosting-packages/local-feeds) that NuGet can restore from directly.
+The flat folder format is a valid [local NuGet feed](https://learn.microsoft.com/en-us/nuget/hosting-packages/local-feeds) that NuGet can restore from directly.
 
 The `--skip-duplicate` flag prevents errors when a package already exists in the feed (e.g., when re-running without `-CleanFeed`).
 
@@ -84,7 +80,7 @@ NuGet resolves packages by checking sources in the order listed in `NuGet.config
 2. Falls back to Azure DevOps feeds and nuget.org for packages not in the local feed
 
 The locally-built Arcade packages will be found because:
-- The exact version (e.g., `10.0.0-beta.25291001.1`) only exists in the local feed
+- The exact version (e.g., `11.0.0-beta.31216.1`) only exists in the local feed
 - `global.json` is updated to request this exact version
 - NuGet caches are cleared, so no stale cached version can interfere
 
@@ -94,7 +90,8 @@ If you need to configure the feed manually (e.g., the script failed partway thro
 
 ```powershell
 # 1. Create feed from packages
-$feedPath = "/path/to/feed"
+$feedPath = Join-Path ([System.IO.Path]::GetTempPath()) 'arcade-local-feed'
+New-Item -ItemType Directory -Path $feedPath -Force | Out-Null
 Get-ChildItem /path/to/arcade/artifacts/packages/Release/NonShipping/*.nupkg | ForEach-Object {
     dotnet nuget push $_.FullName --source $feedPath --skip-duplicate
 }

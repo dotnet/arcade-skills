@@ -29,9 +29,16 @@ Build the Arcade SDK from a local checkout, publish the artifacts to a local NuG
 
 ## Prerequisites
 
+Before running this skill, ensure the following are available:
+
 - **PowerShell 7+** (`pwsh`): the script is implemented in PowerShell Core for cross-platform portability
 - **Git**: repos must be cloned locally
 - **Network access**: Azure DevOps package feeds (dev.azure.com/dnceng) must be reachable for NuGet restore
+- **Local clones**: both the `dotnet/arcade` repo and a test repo (e.g., `arcade-validation`, `runtime`, `sdk`) must be cloned locally.
+
+### Optional: Binlog MCP Tool
+
+For investigating build failures, the [mcp-binlog-tool](https://github.com/baronfel/binlog-mcp) can parse `.binlog` files produced during builds.
 
 ## Quick Start
 
@@ -56,7 +63,7 @@ Both the Arcade repo and the test repo must be cloned locally. The test repo can
 - The `-Arcade` argument points to the local `dotnet/arcade` checkout with the changes to test
 - The `-TestRepo` argument points to any Arcade-consuming repo to validate against
 
-The local NuGet feed is stored at `.arcade-local-feed/` inside the skill directory (hidden). It is **not cleaned up** between runs — use `-CleanFeed` to explicitly clear it when needed (e.g., after switching branches or testing a different Arcade change).
+The local NuGet feed is stored at `arcade-local-feed/` inside the system temp directory (e.g., `$env:TEMP/arcade-local-feed` on Windows, `/tmp/arcade-local-feed` on Linux/macOS). It is **not cleaned up** between runs — use `-CleanFeed` to explicitly clear it when needed (e.g., after switching branches or testing a different Arcade change). Because this is a shared path, stale packages from previous runs may persist; always use `-CleanFeed` when switching Arcade branches.
 
 ## Step 1: Run the Script
 
@@ -66,7 +73,7 @@ Run `scripts/Test-Arcade.ps1` with the required `-Arcade` and `-TestRepo` argume
 2. **Reset repos** — deletes `.packages` and `artifacts` directories in both repos to ensure a clean state
 3. **Create feed** — creates the feed directory if it doesn't exist (only cleans it when `-CleanFeed` is passed)
 4. **Build Arcade** — runs the repo's build script (`build.sh` on Linux/macOS, `Build.cmd` on Windows) with `--configuration Release --pack` and an auto-generated future-dated `OfficialBuildId`
-5. **Configure local NuGet feed** — uses `dotnet nuget push` to populate a hierarchical local feed from `artifacts/packages/Release/NonShipping`, clears all NuGet caches, and adds the feed as a named source (`ArcadeLocalFeed`) to the test repo's `NuGet.config` using `--configfile`
+5. **Configure local NuGet feed** — uses `dotnet nuget push` to populate a flat local feed from `artifacts/packages/Release/NonShipping`, clears all NuGet caches, and adds the feed as a named source (`ArcadeLocalFeed`) to the test repo's `NuGet.config` using `--configfile`
 6. **Update global.json** — finds the built `Microsoft.DotNet.Arcade.Sdk` package, extracts its version, and updates existing `Microsoft.DotNet.Arcade.Sdk` and `Microsoft.DotNet.Helix.Sdk` entries in the test repo's `global.json` (only keys already present are modified)
 7. **Build test repo** — runs the repo's build script
 8. **Signing Validation** *(optional, `-SignCheck`)* — runs the SDK task `SigningValidation` against the test repo's output packages. Defaults to `artifacts/packages/<config>/NonShipping`; override with `-SignCheckDir`
@@ -119,8 +126,8 @@ Example output format:
 | 5 | Build test repo | ✅ |
 | 6 | Signing Validation | ✅ *(if -SignCheck)* |
 
-Arcade SDK version: 10.0.0-beta.<future-date>.1
-Packages published to: .arcade-local-feed/
+Arcade SDK version: {VersionPrefix}-beta.<OfficialBuildId>
+Packages published to: <temp-dir>/arcade-local-feed/
 ```
 
 When `-SignCheck` is used, also include the SignCheck results. Read the per-file outcomes from `artifacts/log/Debug/signcheck.xml` and the summary from `signcheck.log`:

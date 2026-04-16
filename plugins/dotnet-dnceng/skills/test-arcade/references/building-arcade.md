@@ -37,9 +37,9 @@ The `OfficialBuildId` property controls the prerelease version suffix of all pac
 ```
 
 **Example:**
-- `VersionPrefix` in Arcade is `10.0.0` (from `eng/Versions.props`)
-- `OfficialBuildId` = `20310318.1` (auto-generated future date)
-- Resulting version: `10.0.0-beta.25310318.1`
+- `VersionPrefix` in Arcade is `11.0.0` (from `eng/Versions.props`)
+- `OfficialBuildId` = `31216.1` (auto-generated future date)
+- Resulting version: `11.0.0-beta.31216.1`
 
 The script **auto-generates a future-dated OfficialBuildId** (current date + 5 years) to ensure the locally-built version is **always newer** than any officially published version. This prevents package version conflicts — a real official build may have already used a past or present date, so the ID must always be in the future.
 
@@ -84,13 +84,13 @@ The script initializes the local feed from **NonShipping** packages because that
 
 ## Platform-Specific Build Commands
 
-| Platform | Build Command | Pack Flag |
-|----------|--------------|-----------|
-| Linux | `./build.sh` | `--pack` |
-| macOS | `./build.sh` | `--pack` |
-| Windows | `Build.cmd` | `-pack` |
+| Platform | Build Command | Configuration Flag | Pack Flag |
+|----------|--------------|-------------------|-----------|
+| Linux | `./build.sh` | `--configuration` | `--pack` |
+| macOS | `./build.sh` | `--configuration` | `--pack` |
+| Windows | `Build.cmd` | `-configuration` | `-pack` |
 
-The script auto-detects the platform-appropriate build script (`build.sh` on Linux/macOS, `Build.cmd` on Windows) and adjusts flag syntax automatically (e.g., `--pack` vs `-pack`).
+The script auto-detects the platform-appropriate build script (`build.sh` on Linux/macOS, `Build.cmd` on Windows) and adjusts flag syntax automatically (e.g., `--configuration` vs `-configuration`, `--pack` vs `-pack`). On Windows, `Build.cmd` invokes `eng/common/build.ps1` via Windows PowerShell, which requires single-dash (`-`) parameter prefixes — double-dash (`--`) prefixes are not recognized as named parameters and cause `MSB1001: Unknown switch` errors.
 
 ## Reproducing Official CI Builds
 

@@ -9,11 +9,11 @@ In .NET repos that use Arcade, `global.json` has an `msbuild-sdks` section that 
 ```json
 {
   "tools": {
-    "dotnet": "10.0.100"
+    "dotnet": "11.0.100-preview.3.26170.106"
   },
   "msbuild-sdks": {
-    "Microsoft.DotNet.Arcade.Sdk": "10.0.0-beta.25100.1",
-    "Microsoft.DotNet.Helix.Sdk": "10.0.0-beta.25100.1"
+    "Microsoft.DotNet.Arcade.Sdk": "11.0.0-beta.26100.1",
+    "Microsoft.DotNet.Helix.Sdk": "11.0.0-beta.26100.1"
   }
 }
 ```
@@ -26,10 +26,10 @@ The script replaces existing version pins with the exact version of the locally-
 
 ```
 # Before (exact version pin — most repos)
-"Microsoft.DotNet.Arcade.Sdk": "10.0.0-beta.25100.1"
+"Microsoft.DotNet.Arcade.Sdk": "11.0.0-beta.26100.1"
 
 # After
-"Microsoft.DotNet.Arcade.Sdk": "10.0.0-beta.25291001.1"
+"Microsoft.DotNet.Arcade.Sdk": "11.0.0-beta.31216.1"
 ```
 
 The script updates any existing value (not just wildcards). Both `Microsoft.DotNet.Arcade.Sdk` and `Microsoft.DotNet.Helix.Sdk` are updated to the same version, since they are always released together from the same Arcade build. Only keys that already exist in `global.json` are modified — the script does not add new entries.
@@ -39,8 +39,8 @@ The script updates any existing value (not just wildcards). Both `Microsoft.DotN
 The version is extracted from the package filename:
 
 ```
-Microsoft.DotNet.Arcade.Sdk.10.0.0-beta.25291001.1.nupkg
-                             └──────────────────────┘
+Microsoft.DotNet.Arcade.Sdk.{version}.nupkg
+                           └──────────────────────┘
                                     version
 ```
 
@@ -54,7 +54,7 @@ $arcadeVersion = $arcadeSdkPkg.Name -replace '^Microsoft\.DotNet\.Arcade\.Sdk\.'
 Most repos pin to an exact version:
 
 ```json
-"Microsoft.DotNet.Arcade.Sdk": "10.0.0-beta.25100.1"
+"Microsoft.DotNet.Arcade.Sdk": "11.0.0-beta.26100.1"
 ```
 
 The script handles this automatically — it replaces whatever version value is currently present with the locally-built version using `ConvertFrom-Json`/`ConvertTo-Json`.
@@ -85,7 +85,7 @@ Get-Content /path/to/test-repo/global.json | Select-String 'msbuild-sdks' -Conte
 Expected output should show the locally-built version (matching the OfficialBuildId used):
 ```json
 "msbuild-sdks": {
-    "Microsoft.DotNet.Arcade.Sdk": "10.0.0-beta.25291001.1",
-    "Microsoft.DotNet.Helix.Sdk": "10.0.0-beta.25291001.1"
+    "Microsoft.DotNet.Arcade.Sdk": "11.0.0-beta.31216.1",
+    "Microsoft.DotNet.Helix.Sdk": "11.0.0-beta.31216.1"
 }
 ```

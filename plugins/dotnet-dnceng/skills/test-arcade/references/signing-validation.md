@@ -27,6 +27,8 @@ cd "$TEST_PATH" && ./eng/common/sdk-task.sh --task SigningValidation --restore \
 
 Because the test repo's `global.json` has been pinned to the locally-built Arcade SDK version, SignCheck runs from the **local build artifacts** — not from a published feed. This is what makes it useful for testing SignCheck code changes.
 
+> ⚠️ **The `SigningValidation.proj` restore needs the local feed.** SignCheck resolves `Microsoft.DotNet.SignCheckTask` at the same version as the pinned Arcade SDK. Since this version only exists in the local feed, the local feed path must be passed via `/p:RestoreAdditionalProjectSources` so that the SDK task's restore can find it. The script handles this automatically.
+
 ## Default Directory
 
 When `-SignCheck` is passed without `-SignCheckDir`, the script auto-detects the test repo's package output:
@@ -191,7 +193,7 @@ pwsh ./scripts/Test-Arcade.ps1 -SignCheck -SignCheckDir /path/to/files
 **Diagnosis**:
 1. Check `artifacts/log/Debug/signcheck.errors.log` for specific file names
 2. Check `artifacts/log/Debug/signcheck.log` for the full scan report
-3. Open `SigningValidation.binlog` in [MSBuild Structured Log Viewer](https://msbuildlog.com/) for detailed task execution
+3. Open `SigningValidation.binlog` with the `mcp-binlog-tool` MCP server for detailed task execution analysis
 
 **Common causes**:
 - Files not listed in `eng/Signing.props`

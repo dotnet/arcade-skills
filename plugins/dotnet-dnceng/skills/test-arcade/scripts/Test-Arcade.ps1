@@ -46,7 +46,7 @@ if ($SignCheckDir) {
 # ─── Resolve paths ───────────────────────────────────────────────────────────
 $ScriptDir = Split-Path -Parent $PSCommandPath
 $SkillDir = Split-Path -Parent $ScriptDir
-$FeedPath = Join-Path $SkillDir '.arcade-local-feed'
+$FeedPath = Join-Path ([System.IO.Path]::GetTempPath()) 'arcade-local-feed'
 
 $ArcadePath = Resolve-Path -Path $Arcade -ErrorAction SilentlyContinue
 $TestPath = Resolve-Path -Path $TestRepo -ErrorAction SilentlyContinue
@@ -139,8 +139,9 @@ if ($SkipArcadeBuild) {
     Write-Host "Building Arcade (OfficialBuildId=$OfficialBuildId)..."
 
     $buildScript = Get-BuildScript $ArcadePath
+    $configFlag = if ($buildScript.EndsWith('.cmd')) { '-configuration' } else { '--configuration' }
     $packFlag = if ($buildScript.EndsWith('.cmd')) { '-pack' } else { '--pack' }
-    Invoke-BuildScript $buildScript @('--configuration', 'Release', $packFlag, "/p:OfficialBuildId=$OfficialBuildId")
+    Invoke-BuildScript $buildScript @($configFlag, 'Release', $packFlag, "/p:OfficialBuildId=$OfficialBuildId")
 
     # ─── Configure local NuGet feed ──────────────────────────────────────────
     Write-Host "Configuring local NuGet feed..."
@@ -248,9 +249,11 @@ if ($SignCheck) {
     $extraArgs += "/p:RestoreAdditionalProjectSources=$FeedPath"
 
     $sdkTaskScript = Get-SdkTaskScript $TestPath
+    $taskFlag = if ($sdkTaskScript.EndsWith('.ps1')) { '-task' } else { '--task' }
+    $restoreFlag = if ($sdkTaskScript.EndsWith('.ps1')) { '-restore' } else { '--restore' }
     Push-Location $TestPath
     try {
-        Invoke-BuildScript $sdkTaskScript @('--task', 'SigningValidation', '--restore', "/p:PackageBasePath=$SignCheckDir") + $extraArgs
+        Invoke-BuildScript $sdkTaskScript (@($taskFlag, 'SigningValidation', $restoreFlag, "/p:PackageBasePath=$SignCheckDir") + $extraArgs)
     } finally {
         Pop-Location
     }

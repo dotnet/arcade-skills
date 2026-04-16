@@ -61,10 +61,21 @@ $OfficialBuildId = "{0}.1" -f (Get-Date).AddYears(5).ToString('yyyyMMdd')
 **Cause**: Feed path doesn't contain the expected package, or NuGet cache is stale.
 
 **Fix**:
-1. Verify the package exists in the feed: `Get-ChildItem .arcade-local-feed -Recurse -Filter 'Microsoft.DotNet.Arcade.Sdk.*.nupkg'`
+1. Verify the package exists in the feed: `Get-ChildItem (Join-Path ([System.IO.Path]::GetTempPath()) 'arcade-local-feed') -Filter 'Microsoft.DotNet.Arcade.Sdk.*.nupkg'`
 2. Clear NuGet caches: `dotnet nuget locals all --clear`
 3. Verify the source is registered: `dotnet nuget list source --configfile /path/to/NuGet.config`
 4. Check that `global.json` version matches the package version exactly
+
+### SignCheck restore: "Unable to find package Microsoft.DotNet.SignCheckTask"
+
+**Symptom**: SignCheck fails with `NU1102: Unable to find package Microsoft.DotNet.SignCheckTask with version (>= ...)`. The error lists remote feeds but not the local feed.
+
+**Cause**: The `SigningValidation.proj` file runs from inside the NuGet packages cache (not the test repo directory), so it doesn't inherit the test repo's `NuGet.config`. The local feed must be passed explicitly via `/p:RestoreAdditionalProjectSources`.
+
+**Fix**:
+1. Verify the SignCheckTask package exists in the local feed: `Get-ChildItem (Join-Path ([System.IO.Path]::GetTempPath()) 'arcade-local-feed') -Filter 'Microsoft.DotNet.SignCheckTask.*.nupkg'`
+2. Ensure the script passes `/p:RestoreAdditionalProjectSources=$FeedPath` to the SDK task invocation
+3. Clear NuGet caches and retry: `dotnet nuget locals all --clear`
 
 ### Version mismatch between global.json and packages
 
@@ -73,7 +84,7 @@ $OfficialBuildId = "{0}.1" -f (Get-Date).AddYears(5).ToString('yyyyMMdd')
 **Cause**: The version in `global.json` doesn't exactly match the `.nupkg` filename.
 
 **Fix**:
-- Check the exact version: `Get-ChildItem .arcade-local-feed -Recurse -Filter 'Microsoft.DotNet.Arcade.Sdk.*.nupkg'`
+- Check the exact version: `Get-ChildItem (Join-Path ([System.IO.Path]::GetTempPath()) 'arcade-local-feed') -Filter 'Microsoft.DotNet.Arcade.Sdk.*.nupkg'`
 - Compare with `global.json`: `Get-Content /path/to/test-repo/global.json | Select-String 'Arcade'`
 - The script handles this automatically, but manual runs may have mismatches
 
@@ -113,14 +124,14 @@ $OfficialBuildId = "{0}.1" -f (Get-Date).AddYears(5).ToString('yyyyMMdd')
 
 ## Investigating Build Logs
 
-For detailed build diagnostics, use the MSBuild binary log (`.binlog`):
+For detailed build diagnostics, use the MSBuild binary log (`.binlog`). The `mcp-binlog-tool` MCP server can parse these files directly:
 
 ```powershell
 # Find binlog files
 Get-ChildItem /path/to/repo/artifacts/log -Recurse -Filter '*.binlog'
 
-# View structured log (requires MSBuild Structured Log Viewer)
-# https://msbuildlog.com/
+# The mcp-binlog-tool (baronfel.binlog.mcp) can open and query these files
+# See the Prerequisites section in SKILL.md for setup
 ```
 
 Key locations:

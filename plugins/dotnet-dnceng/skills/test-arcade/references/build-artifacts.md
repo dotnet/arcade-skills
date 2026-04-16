@@ -49,39 +49,35 @@ These are the primary packages consumed by repos using Arcade:
 
 ## Version Format
 
-The Arcade SDK version is determined by the `OfficialBuildId` property:
+The Arcade SDK version is determined by the `OfficialBuildId` property and the `VersionPrefix` from `eng/Versions.props`:
 
 ```
-{major}.{minor}.{patch}-beta.{OfficialBuildId}
+{VersionPrefix}-beta.{OfficialBuildId}
 ```
 
-For example, with `OfficialBuildId=20291001.1`:
+For example, with `VersionPrefix=11.0.0` and `OfficialBuildId=31216.1`:
 ```
-10.0.0-beta.25291001.1
+11.0.0-beta.31216.1
 ```
 
 The version is embedded in the `.nupkg` filename:
 ```
-Microsoft.DotNet.Arcade.Sdk.10.0.0-beta.25291001.1.nupkg
+Microsoft.DotNet.Arcade.Sdk.11.0.0-beta.31216.1.nupkg
 ```
 
 ## Local Feed Structure
 
-The script uses `dotnet nuget push` to populate a hierarchical local feed under `.arcade-local-feed/` in the skill directory:
+The script uses `dotnet nuget push` to copy packages into a flat local feed under the system temp directory (`<temp-dir>/arcade-local-feed/`):
 
 ```
-.arcade-local-feed/
-├── microsoft.dotnet.arcade.sdk/
-│   └── 10.0.0-beta.25291001.1/
-│       ├── microsoft.dotnet.arcade.sdk.10.0.0-beta.25291001.1.nupkg
-│       └── microsoft.dotnet.arcade.sdk.10.0.0-beta.25291001.1.nupkg.sha512
-├── microsoft.dotnet.helix.sdk/
-│   └── 10.0.0-beta.25291001.1/
-│       ├── ...
-└── ...
+arcade-local-feed/
+├── Microsoft.DotNet.Arcade.Sdk.{version}.nupkg
+├── Microsoft.DotNet.Helix.Sdk.{version}.nupkg
+├── Microsoft.DotNet.SignCheckTask.{version}.nupkg
+└── ... (40+ packages)
 ```
 
-This directory is registered as a NuGet source named `ArcadeLocalFeed` in the test repo's `NuGet.config` via `--configfile`.
+This flat folder format is a valid [local NuGet feed](https://learn.microsoft.com/en-us/nuget/hosting-packages/local-feeds) that NuGet can restore from directly. It is registered as a NuGet source named `ArcadeLocalFeed` in the test repo's `NuGet.config` via `--configfile`.
 
 ## global.json Updates
 
@@ -91,11 +87,11 @@ The script updates the test repo's `global.json` to reference the locally-built 
 ```json
 {
   "tools": {
-    "dotnet": "10.0.100"
+    "dotnet": "11.0.100"
   },
   "msbuild-sdks": {
-    "Microsoft.DotNet.Arcade.Sdk": "10.0.0-beta.25100.1",
-    "Microsoft.DotNet.Helix.Sdk": "10.0.0-beta.25100.1"
+    "Microsoft.DotNet.Arcade.Sdk": "11.0.0-beta.26100.1",
+    "Microsoft.DotNet.Helix.Sdk": "11.0.0-beta.26100.1"
   }
 }
 ```
@@ -104,11 +100,11 @@ The script updates the test repo's `global.json` to reference the locally-built 
 ```json
 {
   "tools": {
-    "dotnet": "10.0.100"
+    "dotnet": "11.0.100"
   },
   "msbuild-sdks": {
-    "Microsoft.DotNet.Arcade.Sdk": "10.0.0-beta.25291001.1",
-    "Microsoft.DotNet.Helix.Sdk": "10.0.0-beta.25291001.1"
+    "Microsoft.DotNet.Arcade.Sdk": "11.0.0-beta.31216.1",
+    "Microsoft.DotNet.Helix.Sdk": "11.0.0-beta.31216.1"
   }
 }
 ```
