@@ -12,3 +12,4 @@
 /plugins/dotnet-dnceng/skills/flow-analysis/ @lewing @danmoseley
 /plugins/dotnet-dnceng/skills/flow-tracing/ @lewing @danmoseley
 /plugins/dotnet-dnceng/skills/maestro-cli/ @lewing @danmoseley
+/plugins/dotnet-dnceng/skills/test-arcade/ @ellahathaway @dotnet/dnceng
