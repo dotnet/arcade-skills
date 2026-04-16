@@ -78,7 +78,7 @@ build.cmd -c Release -pack
 **Extracting .nupkg for scanning** (mirrors `eng/common/sdl/extract-artifact-packages.ps1`):
 
 ```powershell
-$nupkgDir = Join-Path "artifacts" "packages" "Release" "Shipping"
+$nupkgDir = [System.IO.Path]::Combine("artifacts", "packages", "Release", "Shipping")
 $extractDir = Join-Path "artifacts" "extracted-for-scan"
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 Get-ChildItem (Join-Path $nupkgDir "*.nupkg") | ForEach-Object {
@@ -105,7 +105,7 @@ Get-ChildItem (Join-Path $nupkgDir "*.nupkg") | ForEach-Object {
 **Preferred: Use the helper script** (from the skill's `scripts/` directory, or provide its full path):
 
 ```powershell
-$script = Join-Path "plugins" "dotnet-dnceng" "skills" "binskim-scan" "scripts" "Invoke-BinSkimScan.ps1"
+$script = [System.IO.Path]::Combine("plugins", "dotnet-dnceng", "skills", "binskim-scan", "scripts", "Invoke-BinSkimScan.ps1")
 
 # Scan a directory:
 & $script -RepoRoot C:\git\machinelearning -ScanDir (Join-Path "artifacts" "pkgassets")
@@ -121,8 +121,8 @@ $script = Join-Path "plugins" "dotnet-dnceng" "skills" "binskim-scan" "scripts" 
 
 ```powershell
 # Adjust path to your platform – see binskim-install.md for installation
-$binskim = Join-Path $HOME ".binskim" "tools" "net9.0" "linux-x64" "BinSkim"   # Linux
-# $binskim = Join-Path $HOME ".binskim" "tools" "net9.0" "win-x64" "BinSkim.exe" # Windows
+$binskim = [System.IO.Path]::Combine($HOME, ".binskim", "tools", "net9.0", "linux-x64", "BinSkim")   # Linux
+# $binskim = [System.IO.Path]::Combine($HOME, ".binskim", "tools", "net9.0", "win-x64", "BinSkim.exe") # Windows
 $targetGlob = Join-Path "artifacts" "pkgassets" "**"
 & $binskim analyze $targetGlob --recurse --output binskim-results.sarif --log PrettyPrint --force
 ```

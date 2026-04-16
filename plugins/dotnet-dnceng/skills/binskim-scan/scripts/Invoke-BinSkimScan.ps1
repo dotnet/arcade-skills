@@ -61,13 +61,13 @@ $ErrorActionPreference = 'Stop'
 # Default BinSkimPath based on platform
 if (-not $BinSkimPath) {
     if ($IsWindows -or $env:OS -eq 'Windows_NT') {
-        $BinSkimPath = Join-Path $env:USERPROFILE ".binskim" "extracted" "tools" "net9.0" "win-x64" "BinSkim.exe"
+        $BinSkimPath = [System.IO.Path]::Combine($env:USERPROFILE, ".binskim", "extracted", "tools", "net9.0", "win-x64", "BinSkim.exe")
     } elseif ($IsLinux) {
         $arch = [Runtime.InteropServices.RuntimeInformation]::OSArchitecture
         $rid = if ($arch -eq 'Arm64') { 'linux-arm64' } else { 'linux-x64' }
-        $BinSkimPath = Join-Path $HOME ".binskim" "extracted" "tools" "net9.0" $rid "BinSkim"
+        $BinSkimPath = [System.IO.Path]::Combine($HOME, ".binskim", "extracted", "tools", "net9.0", $rid, "BinSkim")
     } elseif ($IsMacOS) {
-        $BinSkimPath = Join-Path $HOME ".binskim" "extracted" "tools" "net9.0" "osx-x64" "BinSkim"
+        $BinSkimPath = [System.IO.Path]::Combine($HOME, ".binskim", "extracted", "tools", "net9.0", "osx-x64", "BinSkim")
     } else {
         $BinSkimPath = "BinSkim"  # Fall back to PATH
     }
@@ -79,7 +79,7 @@ if (-not (Test-Path $BinSkimPath)) {
     if ($onPath) {
         $BinSkimPath = $onPath.Source
     } else {
-        $installDocPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".." "references" "binskim-install.md"))
+        $installDocPath = [System.IO.Path]::GetFullPath((Join-Path (Join-Path (Join-Path $PSScriptRoot "..") "references") "binskim-install.md"))
         throw "BinSkim not found at $BinSkimPath. See $installDocPath."
     }
 }
@@ -116,9 +116,9 @@ if ($ScanDir) {
 elseif (-not $PackagesDir) {
     # Search common locations
     $candidates = @(
-        (Join-Path $RepoRoot "artifacts" "packages" "Release" "Shipping")
-        (Join-Path $RepoRoot "artifacts" "packages" "Release" "NonShipping")
-        (Join-Path $RepoRoot "artifacts" "pkgassets")
+        [System.IO.Path]::Combine($RepoRoot, "artifacts", "packages", "Release", "Shipping")
+        [System.IO.Path]::Combine($RepoRoot, "artifacts", "packages", "Release", "NonShipping")
+        [System.IO.Path]::Combine($RepoRoot, "artifacts", "pkgassets")
     )
     $foundDirect = $false
     foreach ($full in $candidates) {
@@ -149,6 +149,9 @@ elseif (-not $PackagesDir) {
 
 # Mode 2 continued: Extract and scan .nupkg files if we found packages (not direct DLLs)
 if ($PackagesDir) {
+    if (-not (Test-Path $PackagesDir)) {
+        throw "PackagesDir not found: $PackagesDir"
+    }
     $extractDir = Join-Path $RepoRoot "artifacts" "extracted-for-binskim"
     if (Test-Path $extractDir) {
         Remove-Item $extractDir -Recurse -Force
@@ -241,7 +244,9 @@ if (Test-Path $OutputSarif) {
         $portalRules = $null
         if ($PortalRulesFrom -and (Test-Path $PortalRulesFrom)) {
             $portalSarif = Get-Content $PortalRulesFrom -Raw | ConvertFrom-Json
-            $portalResults = $portalSarif.runs | ForEach-Object { $_.results } | Where-Object { $_ }
+            $portalResults = $portalSarif.runs |
+                Where-Object { $_.tool.driver.name -match 'BinSkim' } |
+                ForEach-Object { $_.results } | Where-Object { $_ }
             if ($portalResults) {
                 $portalRules = @($portalResults | ForEach-Object { $_.ruleId } | Sort-Object -Unique)
                 Write-Host "`nPortal-reported rules (from Results.sarif): $($portalRules -join ', ')"

@@ -1,0 +1,2 @@
+github.com/microsoft/binskim
+liquid.microsoft.com
