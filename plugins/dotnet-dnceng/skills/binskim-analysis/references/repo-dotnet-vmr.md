@@ -17,7 +17,7 @@
   - BA2008: 46 (all foreign, these survive filtering to portal)
   - ERR997: 25,809 ExceptionLoadingPdb notifications (PDBs not co-located)
 - **Linux scan (local, ELF on Windows)**: All 5 SDL-required BA3xxx rules PASS. BA3031 (SafeStack, not required) fails on 32 binaries.
-- **macOS scan**: Not yet done. Can be scanned from any OS (BinSkim analyzes Mach-O by magic bytes) — just pass `*.dylib` or `**` as the target glob. Download macOS build artifacts and scan locally.
+- **macOS scan (local, Mach-O on Windows)**: 35 unique binaries (14 executables + 21 dylibs) per arch. BA5001 (PIE): 14 executables pass, dylibs correctly NotApplicable. BA5002 (No exec stack): all 35 pass. **Zero failures** on both arm64 and x64. Foreign binaries (node, python3) also pass.
 - **Sub-repo attribution** (from release/10.0.3xx raw SARIF):
   - vstest: 138 raw findings
   - msbuild: 128 raw findings
