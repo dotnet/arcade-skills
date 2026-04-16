@@ -2,13 +2,11 @@
 
 ## Result Categories
 
-**Known Issues section**: Failures matching existing GitHub issues — these are tracked and being investigated.
+**Known Issues section**: Failures matching existing GitHub issues.
 
-**Build Analysis check status**: The "Build Analysis" GitHub check is **green** only when *every* failure is matched to a known issue. If it's **red**, at least one failure is unaccounted for — do NOT claim "all failures are known issues" just because some known issues were found. You must verify each failing job is covered by a specific known issue before calling it safe to retry.
+**Build Analysis check status**: Green = *every* failure matched a known issue. Red = at least one unmatched. Verify each failing job is covered before calling it safe to retry.
 
 **Canceled/timed-out jobs**: Jobs canceled due to earlier stage failures or AzDO timeouts. Dependency-canceled jobs don't need investigation. **Timeout-canceled jobs may have all-passing Helix results** — the "failure" is just the AzDO job wrapper timing out, not actual test failures. To verify: get the Helix job pass/fail summary for each job in the timed-out build (include passed work items). If all work items passed, the build effectively passed.
-
-> ❌ **Don't dismiss timed-out builds.** A build marked "failed" due to a 3-hour AzDO timeout can have 100% passing Helix work items. Check before concluding it failed.
 
 **PR Change Correlation**: Files changed by PR appearing in failures — likely PR-related.
 
@@ -17,6 +15,8 @@
 **Helix failures**: Test failures on distributed infrastructure.
 
 **Local test failures**: Some repos (e.g., dotnet/sdk) run tests directly on build agents. These can also match known issues — search for the test name with the "Known Build Error" label.
+
+**Unmatched failures**: If a failure has no known issue match and is not PR-related, it may be a candidate for a new Known Build Error issue. See [kbe-issue-creation.md](kbe-issue-creation.md) for when and how to file one.
 
 ## Per-Failure Details
 

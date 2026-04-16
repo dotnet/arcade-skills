@@ -3,6 +3,13 @@
 
 # CI/CD and engineering
 /.github/workflows/ @lewing @danmoseley @viktorhofer
+/eng/ @danmoseley @lewing
 
 # Skills
 /plugins/dotnet-dnceng/skills/ci-analysis/ @lewing @danmoseley
+/plugins/dotnet-dnceng/skills/known-issue-history/ @lewing @danmoseley
+/plugins/dotnet-dnceng/skills/ci-crash-dump/ @lewing @danmoseley
+/plugins/dotnet-dnceng/skills/flow-analysis/ @lewing @danmoseley
+/plugins/dotnet-dnceng/skills/flow-tracing/ @lewing @danmoseley
+/plugins/dotnet-dnceng/skills/maestro-cli/ @lewing @danmoseley
+/plugins/dotnet-dnceng/skills/test-arcade/ @ellahathaway @dotnet/dnceng

@@ -12,14 +12,15 @@ Read `recommendationHint` as a starting point, then layer in context:
 | `KNOWN_ISSUES_DETECTED` | Known tracked issues found — but this does NOT mean all failures are covered. Check the Build Analysis check status: if it's red, some failures are unmatched. Only recommend retry for failures that specifically match a known issue; investigate the rest. |
 | `LIKELY_PR_RELATED` | Failures correlate with PR changes. Lead with "fix these before retrying" and list `correlatedFiles`. |
 | `POSSIBLY_TRANSIENT` | Failures could not be automatically classified — does NOT mean they are transient. Use `failedJobDetails` to investigate each failure individually. |
-| `REVIEW_REQUIRED` | Could not auto-determine cause. Review failures manually. |
+| `REVIEW_REQUIRED` | Could not auto-determine cause. Review failures manually. If Build Analysis is red and failures are not PR-related, suggest filing a Known Build Error issue — see [kbe-issue-creation.md](kbe-issue-creation.md). |
 | `MERGE_CONFLICTS` | PR has merge conflicts — CI won't run. Tell the user to resolve conflicts. Offer to analyze a previous build by ID. |
 | `NO_BUILDS` | No AzDO builds found (CI not triggered). Offer to check if CI needs to be triggered or analyze a previous build. |
 
-## Layering Nuance
+## Refining with Context
 
-Then layer in nuance the heuristic can't capture:
+Refine the recommendation with context the heuristic can't capture:
 
+- **Unmatched novel failures**: Build Analysis is red and some failures don't match any known issue or PR correlation → suggest the user consider filing a Known Build Error issue. **Before drafting any issue, you MUST first**: (1) download/extract the actual failure log, (2) run `scripts/Test-KnownIssuePattern.ps1 -ErrorMessage "<pattern>" -LogFile <log>` (or `-ErrorPattern` for regex), (3) confirm the script outputs `RESULT: PASS`. Only then draft a `gh issue create` command. Do NOT skip validation — patterns that look correct often don't match due to invisible characters, line breaks, or log formatting. See [kbe-issue-creation.md](kbe-issue-creation.md).
 - **Mixed signals**: Some failures match known issues AND some correlate with PR changes → separate them. Known issues = safe to retry; correlated = fix first.
 - **Canceled jobs with recoverable results**: If `canceledJobNames` is non-empty, mention that canceled jobs may have passing Helix results (see [failure-interpretation.md](failure-interpretation.md) — Recovering Results).
 - **Build still in progress**: If `lastBuildJobSummary.pending > 0`, note that more failures may appear.
