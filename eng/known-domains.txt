@@ -33,9 +33,7 @@ code.visualstudio.com
 github.com/modelcontextprotocol
 github.com/open-telemetry/semantic-conventions
 
-# Example paths used in skill documentation
-github.com/yourusername
-github.com/username
+
 
 
 
