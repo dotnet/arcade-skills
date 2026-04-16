@@ -36,8 +36,9 @@ Common issues when building and testing Arcade locally, with diagnosis steps and
 **Cause**: Build ran without the `--pack` flag.
 
 **Fix**: Ensure the build command includes `--pack`:
-```bash
-./build.sh --configuration Release --pack /p:OfficialBuildId=$(date -d '+5 years' +%Y%m%d).1
+```powershell
+$OfficialBuildId = "{0}.1" -f (Get-Date).AddYears(5).ToString('yyyyMMdd')
+./build.sh --configuration Release --pack /p:OfficialBuildId=$OfficialBuildId
 ```
 
 ## Feed Configuration Failures

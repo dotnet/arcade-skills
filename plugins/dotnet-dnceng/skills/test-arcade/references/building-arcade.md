@@ -6,9 +6,10 @@ How Arcade is built by the script and the key build parameters that control pack
 
 The script builds Arcade with:
 
-```bash
+```powershell
 # OfficialBuildId is auto-generated as a future date (current date + 5 years)
-./build.sh --configuration Release --pack /p:OfficialBuildId=$(date -d '+5 years' +%Y%m%d).1
+$OfficialBuildId = "{0}.1" -f (Get-Date).AddYears(5).ToString('yyyyMMdd')
+./build.sh --configuration Release --pack /p:OfficialBuildId=$OfficialBuildId
 ```
 
 ### Flags Explained
@@ -58,7 +59,7 @@ arcade/artifacts/
 │       │   ├── Microsoft.DotNet.Arcade.Sdk.*.nupkg
 │       │   ├── Microsoft.DotNet.Helix.Sdk.*.nupkg
 │       │   └── ... (50+ packages)
-│       └── Shipping/             ← Also copied to feed by the script
+│       └── Shipping/             ← Not copied by the script (add manually if needed)
 │           └── ...
 ├── bin/                          ← Compiled binaries (not used by feed)
 ├── log/
@@ -72,7 +73,7 @@ arcade/artifacts/
 - **NonShipping**: SDK packages, build tasks, internal tooling — these are what consuming repos resolve via `global.json` MSBuild SDK references
 - **Shipping**: Packages intended for public NuGet.org feeds (e.g., `Microsoft.DotNet.XUnitExtensions`)
 
-The script initializes the local feed from **NonShipping** packages because that's where the MSBuild SDK packages live. Shipping packages are also copied to ensure all dependencies are available.
+The script initializes the local feed from **NonShipping** packages because that's where the MSBuild SDK packages live. Shipping packages are **not** copied by default — if specific Shipping packages are needed, they can be added manually.
 
 ## Build Configurations
 

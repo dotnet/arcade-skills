@@ -29,15 +29,15 @@ Because the test repo's `global.json` has been pinned to the locally-built Arcad
 
 ## Default Directory
 
-When `--signcheck` is passed without `--signcheck-dir`, the script auto-detects the test repo's package output:
+When `-SignCheck` is passed without `-SignCheckDir`, the script auto-detects the test repo's package output:
 
 ```
 $TEST_PATH/artifacts/packages/<config>/NonShipping
 ```
 
-It checks `Debug` first, then `Release`, using whichever exists. If neither is found, the script exits with an error suggesting `--pack` or `--signcheck-dir`.
+It checks `Debug` first, then `Release`, using whichever exists. If neither is found, the script exits with an error suggesting `--pack` or `-SignCheckDir`.
 
-> ⚠️ Some repos (e.g., arcade-validation) do not produce packages with the default `./build.sh`. If you need packages in the default location, build with `./build.sh --pack`. Alternatively, point `--signcheck-dir` at any directory containing files to validate.
+> ⚠️ Some repos (e.g., arcade-validation) do not produce packages with the default `./build.sh`. If you need packages in the default location, build with `./build.sh --pack`. Alternatively, point `-SignCheckDir` at any directory containing files to validate.
 
 ## MSBuild Properties
 
@@ -180,8 +180,8 @@ Total Files: 3, Signed: 1, Unsigned: 0, Skipped: 2, Excluded: 0, Skipped & Exclu
 **Cause**: The test repo build didn't produce packages.
 
 **Fix**: Either build with `--pack` or specify a directory explicitly:
-```bash
-./scripts/test-arcade.sh --signcheck --signcheck-dir /path/to/files
+```powershell
+pwsh ./scripts/Test-Arcade.ps1 -SignCheck -SignCheckDir /path/to/files
 ```
 
 ### SignCheck reports unsigned files

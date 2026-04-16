@@ -67,17 +67,21 @@ Microsoft.DotNet.Arcade.Sdk.10.0.0-beta.25291001.1.nupkg
 
 ## Local Feed Structure
 
-The script copies packages into a flat directory used as a local NuGet feed source:
+The script uses `dotnet nuget push` to populate a hierarchical local feed under `.arcade-local-feed/` in the skill directory:
 
 ```
-/tmp/arcade-local-feed/
-├── Microsoft.DotNet.Arcade.Sdk.10.0.0-beta.25291001.1.nupkg
-├── Microsoft.DotNet.Helix.Sdk.10.0.0-beta.25291001.1.nupkg
-├── Microsoft.DotNet.Build.Tasks.Feed.10.0.0-beta.25291001.1.nupkg
+.arcade-local-feed/
+├── microsoft.dotnet.arcade.sdk/
+│   └── 10.0.0-beta.25291001.1/
+│       ├── microsoft.dotnet.arcade.sdk.10.0.0-beta.25291001.1.nupkg
+│       └── microsoft.dotnet.arcade.sdk.10.0.0-beta.25291001.1.nupkg.sha512
+├── microsoft.dotnet.helix.sdk/
+│   └── 10.0.0-beta.25291001.1/
+│       ├── ...
 └── ...
 ```
 
-This directory is registered as a NuGet source named `local-arcade-feed` in the test repo's `NuGet.config`.
+This directory is registered as a NuGet source named `ArcadeLocalFeed` in the test repo's `NuGet.config` via `--configfile`.
 
 ## global.json Updates
 

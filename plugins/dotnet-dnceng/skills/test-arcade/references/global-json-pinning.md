@@ -22,17 +22,17 @@ When the repo builds, MSBuild resolves these SDK packages from configured NuGet 
 
 ## What the Script Does
 
-The script replaces wildcard version pins (`"*"`) with the exact version of the locally-built Arcade SDK:
+The script replaces existing version pins with the exact version of the locally-built Arcade SDK:
 
 ```bash
-# Before (wildcard pin — used in some repos)
-"Microsoft.DotNet.Arcade.Sdk": "*"
+# Before (exact version pin — most repos)
+"Microsoft.DotNet.Arcade.Sdk": "10.0.0-beta.25100.1"
 
 # After
 "Microsoft.DotNet.Arcade.Sdk": "10.0.0-beta.25291001.1"
 ```
 
-Both `Microsoft.DotNet.Arcade.Sdk` and `Microsoft.DotNet.Helix.Sdk` are updated to the same version, since they are always released together from the same Arcade build.
+The script updates any existing value (not just wildcards). Both `Microsoft.DotNet.Arcade.Sdk` and `Microsoft.DotNet.Helix.Sdk` are updated to the same version, since they are always released together from the same Arcade build. Only keys that already exist in `global.json` are modified — the script does not add new entries.
 
 ### Version Extraction
 
@@ -51,18 +51,13 @@ basename "$pkg" | sed -n 's/Microsoft\.DotNet\.Arcade\.Sdk\.\(.*\)\.nupkg/\1/p'
 
 ## Repos with Exact Version Pins
 
-Some repos pin to an exact version rather than `"*"`:
+Most repos pin to an exact version:
 
 ```json
 "Microsoft.DotNet.Arcade.Sdk": "10.0.0-beta.25100.1"
 ```
 
-The script's current `sed` replacement targets the wildcard `*` pattern. For repos with exact version pins, you'll need to manually update `global.json` or adjust the sed pattern:
-
-```bash
-# Replace any existing version (not just wildcard)
-sed -i 's/"Microsoft.DotNet.Arcade.Sdk": "[^"]*"/"Microsoft.DotNet.Arcade.Sdk": "NEW_VERSION"/' global.json
-```
+The script handles this automatically — it replaces whatever version value is currently present with the locally-built version using `ConvertFrom-Json`/`ConvertTo-Json`.
 
 ## Which SDKs to Update
 

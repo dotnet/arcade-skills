@@ -44,15 +44,14 @@ The `--skip-duplicate` flag prevents errors when a package already exists in the
 
 ## Registering the Feed
 
-After creating the feed, the script registers it as a NuGet source:
+After creating the feed, the script registers it as a named NuGet source in the test repo's `NuGet.config` using `--configfile`:
 
-```bash
-# Run from the test repo directory so it modifies the repo's NuGet.config
-cd /path/to/test-repo
-dotnet nuget add source /tmp/arcade-local-feed
+```powershell
+# The script uses --configfile to target the repo's NuGet.config explicitly
+dotnet nuget add source $FeedPath --name ArcadeLocalFeed --configfile "$TestPath/NuGet.config"
 ```
 
-This adds a `<packageSource>` entry to the test repo's `NuGet.config`. The local feed takes priority alongside other configured sources (e.g., Azure DevOps feeds, nuget.org).
+This adds a `<packageSource>` entry to the test repo's `NuGet.config`. The `--configfile` flag ensures the user-level NuGet config is not modified. The local feed operates alongside other configured sources (e.g., Azure DevOps feeds, nuget.org).
 
 ## Clearing NuGet Caches
 
@@ -92,19 +91,19 @@ The locally-built Arcade packages will be found because:
 
 If you need to configure the feed manually (e.g., the script failed partway through):
 
-```bash
+```powershell
 # 1. Create feed from packages
-for nupkg in /path/to/arcade/artifacts/packages/Release/NonShipping/*.nupkg; do
-    dotnet nuget push "$nupkg" --source /tmp/arcade-local-feed --skip-duplicate
-done
+$feedPath = "/path/to/feed"
+Get-ChildItem /path/to/arcade/artifacts/packages/Release/NonShipping/*.nupkg | ForEach-Object {
+    dotnet nuget push $_.FullName --source $feedPath --skip-duplicate
+}
 
 # 2. Clear caches
 dotnet nuget locals all --clear
 
-# 3. Add source (from test repo directory)
-cd /path/to/test-repo
-dotnet nuget add source /tmp/arcade-local-feed
+# 3. Add source (explicitly targeting the test repo's NuGet.config)
+dotnet nuget add source $feedPath --name ArcadeLocalFeed --configfile /path/to/test-repo/NuGet.config
 
 # 4. Verify
-dotnet nuget list source
+dotnet nuget list source --configfile /path/to/test-repo/NuGet.config
 ```

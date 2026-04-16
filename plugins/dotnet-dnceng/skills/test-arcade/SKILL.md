@@ -29,24 +29,27 @@ Build the Arcade SDK from a local checkout, publish the artifacts to a local NuG
 
 ## Prerequisites
 
+- **PowerShell 7+** (`pwsh`): the script is implemented in PowerShell Core for cross-platform portability
 - **Git**: repos must be cloned locally
 - **Network access**: Azure DevOps package feeds (dev.azure.com/dnceng) must be reachable for NuGet restore
 
 ## Quick Start
 
-```bash
+```powershell
 # Full build-and-test
-./scripts/test-arcade.sh --arcade /path/to/arcade --test-repo /path/to/test-repo
+pwsh ./scripts/Test-Arcade.ps1 -Arcade /path/to/arcade -TestRepo /path/to/test-repo
 
 # Clean the local feed before running (e.g., after switching arcade branches)
-./scripts/test-arcade.sh --arcade /path/to/arcade --test-repo /path/to/test-repo --clean-feed
+pwsh ./scripts/Test-Arcade.ps1 -Arcade /path/to/arcade -TestRepo /path/to/test-repo -CleanFeed
 
 # Build and run Signing Validation (SignCheck) on test repo output
-./scripts/test-arcade.sh --arcade /path/to/arcade --test-repo /path/to/test-repo --signcheck
+pwsh ./scripts/Test-Arcade.ps1 -Arcade /path/to/arcade -TestRepo /path/to/test-repo -SignCheck
 
 # Run SignCheck against a custom directory
-./scripts/test-arcade.sh --arcade /path/to/arcade --test-repo /path/to/test-repo --signcheck --signcheck-dir /path/to/files
+pwsh ./scripts/Test-Arcade.ps1 -Arcade /path/to/arcade -TestRepo /path/to/test-repo -SignCheck -SignCheckDir /path/to/files
 ```
+
+A bash wrapper (`test-arcade.sh`) is also provided for backward compatibility, forwarding `--flag` arguments to the PowerShell script.
 
 ## Step 0: Verify Repos Are Cloned
 
@@ -59,30 +62,31 @@ The local NuGet feed is stored at `.arcade-local-feed/` inside the skill directo
 
 ## Step 1: Run the Script
 
-Run `scripts/test-arcade.sh` with the required `--arcade` and `--test-repo` arguments. The script performs these phases in order:
+Run `scripts/Test-Arcade.ps1` with the required `-Arcade` and `-TestRepo` arguments. The script performs these phases in order:
 
 1. **Validate** — confirms the arcade and test repo directories exist
 2. **Reset repos** — deletes `.packages` and `artifacts` directories in both repos to ensure a clean state
 3. **Create feed** — creates the feed directory if it doesn't exist (only cleans it when `--clean-feed` is passed)
-4. **Build Arcade** — runs `./build.sh --configuration Release --pack` with an auto-generated future-dated `OfficialBuildId` in the arcade repo
-5. **Configure local NuGet feed** — uses `dotnet nuget push` to populate a hierarchical local feed from `artifacts/packages/Release/NonShipping`, clears all NuGet caches, and adds the feed as a source for the test repo
-6. **Update global.json** — finds the built `Microsoft.DotNet.Arcade.Sdk` package, extracts its version, and updates the test repo's `global.json` to replace version pins for both `Microsoft.DotNet.Arcade.Sdk` and `Microsoft.DotNet.Helix.Sdk` with the exact built version
-7. **Build test repo** — runs `./build.sh` in the test repo
-8. **Signing Validation** *(optional, `--signcheck`)* — runs `eng/common/sdk-task.sh --task SigningValidation` against the test repo's output packages. Defaults to `artifacts/packages/<config>/NonShipping`; override with `--signcheck-dir`
+4. **Build Arcade** — runs the repo's build script (`build.sh` on Linux/macOS, `Build.cmd` on Windows) with `--configuration Release --pack` and an auto-generated future-dated `OfficialBuildId`
+5. **Configure local NuGet feed** — uses `dotnet nuget push` to populate a hierarchical local feed from `artifacts/packages/Release/NonShipping`, clears all NuGet caches, and adds the feed as a named source (`ArcadeLocalFeed`) to the test repo's `NuGet.config` using `--configfile`
+6. **Update global.json** — finds the built `Microsoft.DotNet.Arcade.Sdk` package, extracts its version, and updates existing `Microsoft.DotNet.Arcade.Sdk` and `Microsoft.DotNet.Helix.Sdk` entries in the test repo's `global.json` (only keys already present are modified)
+7. **Build test repo** — runs the repo's build script
+8. **Signing Validation** *(optional, `-SignCheck`)* — runs the SDK task `SigningValidation` against the test repo's output packages. Defaults to `artifacts/packages/<config>/NonShipping`; override with `-SignCheckDir`
 
 ### Script Arguments
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `--arcade <path>` | ✅ | Path to the local `dotnet/arcade` checkout |
-| `--test-repo <path>` | ✅ | Path to the Arcade-consuming repo to test against |
-| `--clean-feed` | ❌ | Delete and recreate the local feed directory before running. Use when switching branches or testing a different Arcade change |
-| `--signcheck` | ❌ | Run Signing Validation (SignCheck) after building the test repo. Checks files in `artifacts/packages/<config>/NonShipping` by default |
-| `--signcheck-dir <path>` | ❌ | Directory to validate with SignCheck. Implies `--signcheck`. Use to check a custom directory instead of the default |
+| `-Arcade <path>` | ✅ | Path to the local `dotnet/arcade` checkout |
+| `-TestRepo <path>` | ✅ | Path to the Arcade-consuming repo to test against |
+| `-CleanFeed` | ❌ | Delete and recreate the local feed directory before running. Use when switching branches or testing a different Arcade change |
+| `-SignCheck` | ❌ | Run Signing Validation (SignCheck) after building the test repo. Checks files in `artifacts/packages/<config>/NonShipping` by default |
+| `-SignCheckDir <path>` | ❌ | Directory to validate with SignCheck. Implies `-SignCheck`. Use to check a custom directory instead of the default |
+| `-SkipArcadeBuild` | ❌ | Skip the Arcade build step and reuse existing artifacts. Only resets the test repo |
 
 ## Step 2: Interpret Results
 
-The script streams build output to stdout/stderr in real time. It exits on the first failure (`set -e`). Check the exit code and output to determine success or failure.
+The script streams build output to stdout/stderr in real time. It exits on the first failure (`$ErrorActionPreference = 'Stop'`). Check the exit code and output to determine success or failure.
 
 ### Common Failure Scenarios
 
@@ -118,10 +122,10 @@ Example output format:
 | 6 | Signing Validation | ✅ *(if --signcheck)* |
 
 Arcade SDK version: 10.0.0-beta.<future-date>.1
-Packages published to: /tmp/arcade-local-feed
+Packages published to: .arcade-local-feed/
 ```
 
-When `--signcheck` is used, also include the SignCheck results. Read the per-file outcomes from `artifacts/log/Debug/signcheck.xml` and the summary from `signcheck.log`:
+When `-SignCheck` is used, also include the SignCheck results. Read the per-file outcomes from `artifacts/log/Debug/signcheck.xml` and the summary from `signcheck.log`:
 
 ```
 **SignCheck results** (from `signcheck.xml`):
@@ -141,7 +145,7 @@ If any phase fails, include the error details and remediation guidance from the 
 
 ## Anti-Patterns
 
-> ❌ **Don't reuse a stale feed directory.** The script resets the feed on each run, but if you're running steps manually, always clear the feed and NuGet caches before re-testing with new Arcade changes.
+> ❌ **Don't reuse a stale feed directory.** The script only resets the feed when run with `-CleanFeed`. If you're re-running without that flag or running steps manually, always clear the feed and NuGet caches before re-testing with new Arcade changes.
 
 > ❌ **Don't assume build failures are Arcade's fault.** The test repo may have its own issues. Compare with a build against the official Arcade SDK to isolate the cause.
 
