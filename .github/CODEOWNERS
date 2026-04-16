@@ -3,6 +3,7 @@
 
 # CI/CD and engineering
 /.github/workflows/ @lewing @danmoseley @viktorhofer
+/eng/ @danmoseley @lewing
 
 # Skills
 /plugins/dotnet-dnceng/skills/ci-analysis/ @lewing @danmoseley
