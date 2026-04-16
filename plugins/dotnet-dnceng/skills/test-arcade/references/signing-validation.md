@@ -4,20 +4,20 @@ How the script validates file signatures using the Arcade SDK's SigningValidatio
 
 ## Overview
 
-SignCheck is a tool that scans files, archives, and packages to ensure their contents have valid signatures. It is bundled as part of the Arcade SDK (`Microsoft.DotNet.SignCheckTask`) and invoked via the shared `sdk-task.sh` entry point.
+SignCheck is a tool that scans files, archives, and packages to ensure their contents have valid signatures. It is bundled as part of the Arcade SDK (`Microsoft.DotNet.SignCheckTask`) and invoked via the shared SDK task entry point (`sdk-task.sh` on Linux/macOS, `sdk-task.ps1` on Windows).
 
-The `--signcheck` flag in the test script runs SignCheck against the test repo's build output after the build completes. This validates that Arcade's signing infrastructure (including any local changes to SignCheck itself) works correctly end-to-end.
+The `-SignCheck` flag in the test script runs SignCheck against the test repo's build output after the build completes. This validates that Arcade's signing infrastructure (including any local changes to SignCheck itself) works correctly end-to-end.
 
 ## Invocation
 
-The script runs:
+The script runs (on Linux/macOS; on Windows it uses `eng/common/sdk-task.ps1`):
 
 ```bash
 cd "$TEST_PATH" && ./eng/common/sdk-task.sh --task SigningValidation --restore \
     /p:PackageBasePath="$SIGNCHECK_DIR"
 ```
 
-### What `sdk-task.sh` Does Internally
+### What the SDK task script Does Internally
 
 1. Initializes the Arcade toolset via `eng/common/tools.sh`
 2. Locates `SigningValidation.proj` inside the resolved Arcade SDK package
@@ -144,15 +144,15 @@ The XML file contains one `<File>` element per scanned file with per-file outcom
 
 To quickly extract results from the XML:
 
-```bash
+```powershell
 # Show all file outcomes
-cat artifacts/log/Debug/signcheck.xml
+Get-Content artifacts/log/Debug/signcheck.xml
 
 # List only unsigned files (errors)
-grep 'Outcome="Unsigned"' artifacts/log/Debug/signcheck.xml
+Select-String 'Outcome="Unsigned"' artifacts/log/Debug/signcheck.xml
 
 # Count outcomes
-grep -oP 'Outcome="\K[^"]+' artifacts/log/Debug/signcheck.xml | sort | uniq -c
+([xml](Get-Content artifacts/log/Debug/signcheck.xml)).SignCheckResults.File | Group-Object Outcome
 ```
 
 ### Reading Results from `signcheck.log`

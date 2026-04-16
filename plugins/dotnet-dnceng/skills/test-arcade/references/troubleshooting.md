@@ -50,7 +50,7 @@ $OfficialBuildId = "{0}.1" -f (Get-Date).AddYears(5).ToString('yyyyMMdd')
 **Cause**: Usually a duplicate source name or invalid NuGet.config.
 
 **Fix**:
-- Remove existing source first: `dotnet nuget remove source local-arcade-feed --configfile /path/to/NuGet.config`
+- Remove existing source first: `dotnet nuget remove source ArcadeLocalFeed --configfile /path/to/NuGet.config`
 - Verify NuGet.config is valid XML
 - Check file permissions on NuGet.config
 
@@ -61,7 +61,7 @@ $OfficialBuildId = "{0}.1" -f (Get-Date).AddYears(5).ToString('yyyyMMdd')
 **Cause**: Feed path doesn't contain the expected package, or NuGet cache is stale.
 
 **Fix**:
-1. Verify the package exists in the feed: `ls /tmp/arcade-local-feed/Microsoft.DotNet.Arcade.Sdk.*.nupkg`
+1. Verify the package exists in the feed: `Get-ChildItem .arcade-local-feed -Recurse -Filter 'Microsoft.DotNet.Arcade.Sdk.*.nupkg'`
 2. Clear NuGet caches: `dotnet nuget locals all --clear`
 3. Verify the source is registered: `dotnet nuget list source --configfile /path/to/NuGet.config`
 4. Check that `global.json` version matches the package version exactly
@@ -73,8 +73,8 @@ $OfficialBuildId = "{0}.1" -f (Get-Date).AddYears(5).ToString('yyyyMMdd')
 **Cause**: The version in `global.json` doesn't exactly match the `.nupkg` filename.
 
 **Fix**:
-- Check the exact version: `ls /tmp/arcade-local-feed/Microsoft.DotNet.Arcade.Sdk.*.nupkg`
-- Compare with `global.json`: `cat /path/to/test-repo/global.json | grep Arcade`
+- Check the exact version: `Get-ChildItem .arcade-local-feed -Recurse -Filter 'Microsoft.DotNet.Arcade.Sdk.*.nupkg'`
+- Compare with `global.json`: `Get-Content /path/to/test-repo/global.json | Select-String 'Arcade'`
 - The script handles this automatically, but manual runs may have mismatches
 
 ## Test Repo Build Failures
@@ -106,7 +106,7 @@ $OfficialBuildId = "{0}.1" -f (Get-Date).AddYears(5).ToString('yyyyMMdd')
 **Symptom**: Build fails with "No space left on device".
 
 **Fix**:
-- Clean previous artifacts: `rm -rf /path/to/arcade/artifacts /path/to/test-repo/artifacts`
+- Clean previous artifacts: `Remove-Item -Recurse -Force /path/to/arcade/artifacts, /path/to/test-repo/artifacts`
 - Clean NuGet caches: `dotnet nuget locals all --clear`
 - Remove old feed directories
 
@@ -115,9 +115,9 @@ $OfficialBuildId = "{0}.1" -f (Get-Date).AddYears(5).ToString('yyyyMMdd')
 
 For detailed build diagnostics, use the MSBuild binary log (`.binlog`):
 
-```bash
+```powershell
 # Find binlog files
-find /path/to/repo/artifacts/log -name "*.binlog"
+Get-ChildItem /path/to/repo/artifacts/log -Recurse -Filter '*.binlog'
 
 # View structured log (requires MSBuild Structured Log Viewer)
 # https://msbuildlog.com/

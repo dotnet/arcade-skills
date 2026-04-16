@@ -10,10 +10,11 @@ After Arcade is built with `--pack`, NuGet packages are output to `artifacts/pac
 
 The `dotnet nuget push` command, when targeting a local folder source, copies each package into a hierarchical feed layout:
 
-```bash
-for nupkg in "$ARCADE_PACKAGES_PATH"/*.nupkg; do
-    dotnet nuget push "$nupkg" --source "$FEED_PATH" --skip-duplicate
-done
+```powershell
+$ArcadePackagesPath = Join-Path $ArcadePath 'artifacts/packages/Release/NonShipping'
+Get-ChildItem -Path $ArcadePackagesPath -Filter '*.nupkg' | ForEach-Object {
+    dotnet nuget push $_.FullName --source $FeedPath --skip-duplicate
+}
 ```
 
 **Flat input** (what Arcade produces):
@@ -27,7 +28,7 @@ artifacts/packages/Release/NonShipping/
 
 **Hierarchical output** (what `dotnet nuget push` creates):
 ```
-/tmp/arcade-local-feed/
+.arcade-local-feed/
 ├── microsoft.dotnet.arcade.sdk/
 │   └── 10.0.0-beta.25291001.1/
 │       ├── microsoft.dotnet.arcade.sdk.10.0.0-beta.25291001.1.nupkg
@@ -40,7 +41,7 @@ artifacts/packages/Release/NonShipping/
 
 The hierarchical layout is a [local NuGet feed format](https://learn.microsoft.com/en-us/nuget/hosting-packages/local-feeds) that NuGet can restore from directly.
 
-The `--skip-duplicate` flag prevents errors when a package already exists in the feed (e.g., when re-running without `--clean-feed`).
+The `--skip-duplicate` flag prevents errors when a package already exists in the feed (e.g., when re-running without `-CleanFeed`).
 
 ## Registering the Feed
 

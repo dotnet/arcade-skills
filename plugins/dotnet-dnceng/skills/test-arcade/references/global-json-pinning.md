@@ -24,7 +24,7 @@ When the repo builds, MSBuild resolves these SDK packages from configured NuGet 
 
 The script replaces existing version pins with the exact version of the locally-built Arcade SDK:
 
-```bash
+```
 # Before (exact version pin — most repos)
 "Microsoft.DotNet.Arcade.Sdk": "10.0.0-beta.25100.1"
 
@@ -45,8 +45,8 @@ Microsoft.DotNet.Arcade.Sdk.10.0.0-beta.25291001.1.nupkg
 ```
 
 Using:
-```bash
-basename "$pkg" | sed -n 's/Microsoft\.DotNet\.Arcade\.Sdk\.\(.*\)\.nupkg/\1/p'
+```powershell
+$arcadeVersion = $arcadeSdkPkg.Name -replace '^Microsoft\.DotNet\.Arcade\.Sdk\.', '' -replace '\.nupkg$', ''
 ```
 
 ## Repos with Exact Version Pins
@@ -78,8 +78,8 @@ If the test repo uses these, they should also be updated to the locally-built ve
 
 After the script runs, confirm the update:
 
-```bash
-cat /path/to/test-repo/global.json | grep -A1 "msbuild-sdks"
+```powershell
+Get-Content /path/to/test-repo/global.json | Select-String 'msbuild-sdks' -Context 0,3
 ```
 
 Expected output should show the locally-built version (matching the OfficialBuildId used):

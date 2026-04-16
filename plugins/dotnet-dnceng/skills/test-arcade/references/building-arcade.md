@@ -90,7 +90,7 @@ The script initializes the local feed from **NonShipping** packages because that
 | macOS | `./build.sh` | `--pack` |
 | Windows | `Build.cmd` | `-pack` |
 
-The script uses `./build.sh` (Linux/macOS). For Windows environments, replace with `Build.cmd` and adjust flag syntax (use `-` instead of `--`).
+The script auto-detects the platform-appropriate build script (`build.sh` on Linux/macOS, `Build.cmd` on Windows) and adjusts flag syntax automatically (e.g., `--pack` vs `-pack`).
 
 ## Reproducing Official CI Builds
 

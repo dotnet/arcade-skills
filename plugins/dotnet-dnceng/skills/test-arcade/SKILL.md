@@ -53,10 +53,10 @@ pwsh ./scripts/Test-Arcade.ps1 -Arcade /path/to/arcade -TestRepo /path/to/test-r
 
 Both the Arcade repo and the test repo must be cloned locally. The test repo can be any .NET repo that consumes the Arcade SDK (e.g., `arcade-validation`, `runtime`, `sdk`, `aspnetcore`).
 
-- The `--arcade` argument points to the local `dotnet/arcade` checkout with the changes to test
-- The `--test-repo` argument points to any Arcade-consuming repo to validate against
+- The `-Arcade` argument points to the local `dotnet/arcade` checkout with the changes to test
+- The `-TestRepo` argument points to any Arcade-consuming repo to validate against
 
-The local NuGet feed is stored at `.arcade-local-feed/` inside the skill directory (hidden). It is **not cleaned up** between runs — use `--clean-feed` to explicitly clear it when needed (e.g., after switching branches or testing a different Arcade change).
+The local NuGet feed is stored at `.arcade-local-feed/` inside the skill directory (hidden). It is **not cleaned up** between runs — use `-CleanFeed` to explicitly clear it when needed (e.g., after switching branches or testing a different Arcade change).
 
 ## Step 1: Run the Script
 
@@ -64,7 +64,7 @@ Run `scripts/Test-Arcade.ps1` with the required `-Arcade` and `-TestRepo` argume
 
 1. **Validate** — confirms the arcade and test repo directories exist
 2. **Reset repos** — deletes `.packages` and `artifacts` directories in both repos to ensure a clean state
-3. **Create feed** — creates the feed directory if it doesn't exist (only cleans it when `--clean-feed` is passed)
+3. **Create feed** — creates the feed directory if it doesn't exist (only cleans it when `-CleanFeed` is passed)
 4. **Build Arcade** — runs the repo's build script (`build.sh` on Linux/macOS, `Build.cmd` on Windows) with `--configuration Release --pack` and an auto-generated future-dated `OfficialBuildId`
 5. **Configure local NuGet feed** — uses `dotnet nuget push` to populate a hierarchical local feed from `artifacts/packages/Release/NonShipping`, clears all NuGet caches, and adds the feed as a named source (`ArcadeLocalFeed`) to the test repo's `NuGet.config` using `--configfile`
 6. **Update global.json** — finds the built `Microsoft.DotNet.Arcade.Sdk` package, extracts its version, and updates existing `Microsoft.DotNet.Arcade.Sdk` and `Microsoft.DotNet.Helix.Sdk` entries in the test repo's `global.json` (only keys already present are modified)
@@ -95,7 +95,7 @@ The script streams build output to stdout/stderr in real time. It exits on the f
 | `Could not extract Arcade version` | Package filename doesn't match expected pattern | Check `.nupkg` filenames in NonShipping directory |
 | Test repo restore fails | NuGet feed not configured correctly or cache is stale | Run `dotnet nuget locals all --clear`; verify feed path contains `.nupkg` files |
 | Test repo build fails | Arcade changes broke compatibility | Compare with a build against official Arcade; check for breaking API changes |
-| SignCheck: no packages directory | Test repo didn't produce packages | Build with `--pack`, or specify `--signcheck-dir` pointing to existing files |
+| SignCheck: no packages directory | Test repo didn't produce packages | Build with `--pack`, or specify `-SignCheckDir` pointing to existing files |
 | SignCheck: signing validation fails | Unsigned or incorrectly signed files found | Review SignCheck log in `artifacts/log/`; update `eng/Signing.props` or exclusions as needed |
 | Network errors during restore | Azure DevOps feeds unreachable | Check network/VPN; verify feed URLs in NuGet.config |
 
@@ -117,7 +117,7 @@ Example output format:
 | 3 | Configure feed | ✅ |
 | 4 | Update global.json | ✅ |
 | 5 | Build test repo | ✅ |
-| 6 | Signing Validation | ✅ *(if --signcheck)* |
+| 6 | Signing Validation | ✅ *(if -SignCheck)* |
 
 Arcade SDK version: 10.0.0-beta.<future-date>.1
 Packages published to: .arcade-local-feed/
