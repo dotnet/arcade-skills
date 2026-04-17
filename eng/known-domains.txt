@@ -1,70 +1,49 @@
 # Known domains for skill/agent content
 #
-# URLs pointing to domains not on this list will produce warnings
-# during PR validation.
+# URLs pointing to domains not on this list will fail reference validation.
 #
 # To add a domain: include it in your PR and a reviewer will approve it
 # alongside the skill content.
 #
 # Format: one domain per line. Lines starting with # are comments.
 # Entries containing a slash match URLs with that exact prefix followed by
-# '/', '?', '#', or end-of-URL. Entries without a slash match the domain
-# and all its subdomains.
+# '/', '?', '#', or end-of-URL. Entries without a slash match the domain and all its subdomains.
 
-# Microsoft
-aka.ms
-learn.microsoft.com
+# Standards
+dot.net
 microsoft.com
 
-# .NET ecosystem
-dot.net
-helix.dot.net
-maestro.dot.net
-nuget.org
-
-# Azure DevOps
-dev.azure.com
-dnceng-public.visualstudio.com
-
-# Microsoft internal (referenced in onboarding docs)
-eng.ms
-servicetree.msft.ms
-
-# GitHub — dotnet org repos used by skills in this repo
-github.com/dotnet/arcade
-github.com/dotnet/arcade-services
-github.com/dotnet/arcade-skills
-github.com/dotnet/aspire
-github.com/dotnet/aspnetcore
-github.com/dotnet/dnceng
-github.com/dotnet/diagnostics
-github.com/dotnet/dotnet
-github.com/dotnet/efcore
-github.com/dotnet/emsdk
-github.com/dotnet/extensions
-github.com/dotnet/fsharp
-github.com/dotnet/installer
-github.com/dotnet/maui
-github.com/dotnet/maui-labs
-github.com/dotnet/msbuild
-github.com/dotnet/razor
-github.com/dotnet/roslyn
-github.com/dotnet/runtime
-github.com/dotnet/Scaffolding
-github.com/dotnet/sdk
-github.com/dotnet/skills
-github.com/dotnet/source-build
-github.com/dotnet/templating
-github.com/dotnet/test-templates
-github.com/dotnet/winforms
-github.com/dotnet/wpf
-github.com/dotnet/xdt
-github.com/orgs/dotnet/projects
-
-# GitHub — other Microsoft-owned repos
-github.com/jaredpar/runfo
-github.com/lewing/maestro.mcp
-
 # Tools
+aka.ms
+api.nuget.org
+msdl.microsoft.com
+nuget.org/account/trustedpublishing
+dotnetcli.blob.core.windows.net
+liquid.microsoft.com
 msbuildlog.com
 live.msbuildlog.com
+
+# Platforms
+dev.azure.com
+
+# Repos
+github.com/dotnet/arcade
+github.com/dotnet/arcade-skills
+github.com/dotnet/diagnostics
+github.com/dotnet/dnceng
+github.com/dotnet/dotnet
+github.com/dotnet/runtime
+github.com/jaredpar/runfo
+github.com/lewing/maestro.mcp
+github.com/microsoft/binskim
+github.com/orgs/dotnet
+
+# MCP ecosystem
+code.visualstudio.com
+github.com/modelcontextprotocol
+github.com/open-telemetry/semantic-conventions
+
+
+
+
+
