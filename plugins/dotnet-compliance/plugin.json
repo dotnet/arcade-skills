@@ -1,0 +1,17 @@
+{
+  "name": "dotnet-compliance",
+  "version": "0.1.0",
+  "description": "Skills for .NET compliance and security: BinSkim scanning, SDL analysis",
+  "author": {
+    "name": "dotnet"
+  },
+  "license": "MIT",
+  "keywords": [
+    "dotnet",
+    "compliance",
+    "security",
+    "binskim",
+    "sdl"
+  ],
+  "skills": "./skills"
+}
