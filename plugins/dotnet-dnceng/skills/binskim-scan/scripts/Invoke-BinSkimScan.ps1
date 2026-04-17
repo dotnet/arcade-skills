@@ -100,10 +100,12 @@ if ($ScanDir) {
     if (-not (Test-Path $target)) {
         throw "Scan directory not found: $target"
     }
-    $allFiles = Get-ChildItem $target -Recurse -Include "*.dll","*.exe"
+    # Count all files — BinSkim's ** glob scans everything and skips non-binary formats.
+    # On Linux, native binaries may be extensionless or .so; on macOS, .dylib.
+    $allFiles = Get-ChildItem $target -Recurse -File
     $fileCount = ($allFiles | Measure-Object).Count
     $testFiles = @($allFiles | Where-Object { $_.FullName -match '[\\/](Tests?|Benchmarks?|TestUtilities)[\\/]' })
-    Write-Host "Scanning $fileCount files in $target"
+    Write-Host "Scanning directory with $fileCount files in $target"
     if ($testFiles.Count -gt 0) {
         Write-Host "  Note: $($testFiles.Count) files are in test/benchmark directories and are likely not shipped."
     }
@@ -129,10 +131,10 @@ elseif (-not $PackagesDir) {
                 Write-Host "Found $nupkgCount .nupkg files in $full"
                 break
             }
-            # Check for direct binaries (pkgassets style)
-            $dllCount = (Get-ChildItem $full -Recurse -Include "*.dll","*.exe" -ErrorAction SilentlyContinue | Measure-Object).Count
-            if ($dllCount -gt 0) {
-                Write-Host "Found $dllCount binaries in $full (no .nupkg - scanning directly)"
+            # Check for scannable binaries (pkgassets style) — includes extensionless ELF, .so, .dylib
+            $fileCount = (Get-ChildItem $full -Recurse -File -ErrorAction SilentlyContinue | Measure-Object).Count
+            if ($fileCount -gt 0) {
+                Write-Host "Found $fileCount files in $full (no .nupkg - scanning directly)"
                 $fullGlob = Join-Path $full '**'
                 & $BinSkimPath analyze $fullGlob --recurse --output $OutputSarif --log PrettyPrint --force 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
                 $scanExitCode = $LASTEXITCODE
@@ -158,7 +160,9 @@ if ($PackagesDir) {
     }
     New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
 
-    $relevantExtensions = @('.dll', '.exe', '.pdb')
+    # Extract PE, PDB, and native binary formats (Linux .so, macOS .dylib, drivers .sys).
+    # Extensionless ELF binaries in nupkgs are uncommon, but include them via empty-string match below.
+    $relevantExtensions = @('.dll', '.exe', '.pdb', '.so', '.dylib', '.sys', '')
     $nupkgs = Get-ChildItem $PackagesDir -Filter "*.nupkg"
     Write-Host "Extracting $($nupkgs.Count) packages..."
 
@@ -197,9 +201,9 @@ if ($PackagesDir) {
         }
     }
 
-    # Count total scan targets
-    $totalFiles = (Get-ChildItem $extractDir -Recurse -Include "*.dll","*.exe" | Measure-Object).Count
-    Write-Host "`nScanning $totalFiles DLL/EXE files from extracted packages..."
+    # Count total scan targets (BinSkim will skip non-binary formats automatically)
+    $totalFiles = (Get-ChildItem $extractDir -Recurse -File | Measure-Object).Count
+    Write-Host "`nScanning $totalFiles files from extracted packages..."
 
     # Run BinSkim (exclude _.pdb like the official pipeline does)
     $extractGlob = Join-Path $extractDir '**'
