@@ -124,7 +124,7 @@ $script = [System.IO.Path]::Combine("plugins", "dotnet-dnceng", "skills", "binsk
 $binskim = [System.IO.Path]::Combine($HOME, ".binskim", "tools", "net9.0", "linux-x64", "BinSkim")   # Linux
 # $binskim = [System.IO.Path]::Combine($HOME, ".binskim", "tools", "net9.0", "win-x64", "BinSkim.exe") # Windows
 $targetGlob = Join-Path "artifacts" "pkgassets" "**"
-& $binskim analyze $targetGlob --recurse --output binskim-results.sarif --log PrettyPrint --force
+& $binskim analyze $targetGlob --recurse --output binskim-results.sarif --log PrettyPrint --force --Hashes False
 ```
 
 > **Don't filter to `*.dll` only** — scan `**` and let BinSkim decide what's analyzable. This catches `.exe`, `.sys`, `.so`, `.dylib`, and extensionless Mach-O executables. BinSkim identifies binary format by magic bytes, not file extension.

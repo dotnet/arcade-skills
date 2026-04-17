@@ -12,8 +12,8 @@
 /plugins/dotnet-dnceng/skills/flow-analysis/ @lewing @danmoseley
 /plugins/dotnet-dnceng/skills/flow-tracing/ @lewing @danmoseley
 /plugins/dotnet-dnceng/skills/maestro-cli/ @lewing @danmoseley
-/plugins/dotnet-dnceng/skills/binskim-scan/ @lewing @danmoseley
-/plugins/dotnet-dnceng/skills/binskim-analysis/ @lewing @danmoseley
+/plugins/dotnet-compliance/skills/binskim-scan/ @lewing @danmoseley
+/plugins/dotnet-compliance/skills/binskim-analysis/ @lewing @danmoseley
 /plugins/dotnet-dnceng/skills/helix-investigation/ @lewing @danmoseley
 /plugins/dotnet-dnceng/skills/pipeline-investigation/ @lewing @danmoseley
 /plugins/dotnet-dnceng/agents/ @lewing @danmoseley
