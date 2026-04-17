@@ -110,7 +110,7 @@ if ($ScanDir) {
         Write-Host "  Note: $($testFiles.Count) files are in test/benchmark directories and are likely not shipped."
     }
     $targetGlob = Join-Path $target '**'
-    & $BinSkimPath analyze $targetGlob --recurse --output $OutputSarif --log PrettyPrint --force 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
+    & $BinSkimPath analyze $targetGlob --recurse --output $OutputSarif --log PrettyPrint --force --Hashes False 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
     $scanExitCode = $LASTEXITCODE
     Write-Host "Results written to $OutputSarif"
 }
@@ -136,7 +136,7 @@ elseif (-not $PackagesDir) {
             if ($fileCount -gt 0) {
                 Write-Host "Found $fileCount files in $full (no .nupkg - scanning directly)"
                 $fullGlob = Join-Path $full '**'
-                & $BinSkimPath analyze $fullGlob --recurse --output $OutputSarif --log PrettyPrint --force 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
+                & $BinSkimPath analyze $fullGlob --recurse --output $OutputSarif --log PrettyPrint --force --Hashes False 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
                 $scanExitCode = $LASTEXITCODE
                 Write-Host "Results written to $OutputSarif"
                 $foundDirect = $true
@@ -208,7 +208,7 @@ if ($PackagesDir) {
     # Run BinSkim (exclude _.pdb like the official pipeline does)
     $extractGlob = Join-Path $extractDir '**'
     $excludeGlob = Join-Path $extractDir '**' '_.pdb'
-    & $BinSkimPath analyze "$extractGlob;-:file|$excludeGlob" --recurse --output $OutputSarif --log PrettyPrint --force 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
+    & $BinSkimPath analyze "$extractGlob;-:file|$excludeGlob" --recurse --output $OutputSarif --log PrettyPrint --force --Hashes False 2>&1 | Where-Object { $_ -notmatch 'ERR997' }
     $scanExitCode = $LASTEXITCODE
     Write-Host "`nResults written to $OutputSarif"
 }
