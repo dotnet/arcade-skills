@@ -697,17 +697,69 @@ function Get-AzDOTimeline {
 }
 
 function Get-FailedJobs {
-    param($Timeline)
+    param($Timeline, [int]$BuildId = 0)
 
     if ($null -eq $Timeline -or $null -eq $Timeline.records) {
         return @()
     }
 
-    $failedJobs = $Timeline.records | Where-Object {
-        $_.type -eq "Job" -and $_.result -eq "failed"
+    # Use a list to avoid O(n²) array concatenation
+    $failedJobs = [System.Collections.Generic.List[object]]::new()
+    foreach ($job in $Timeline.records) {
+        if ($job.type -eq "Job" -and $job.result -eq "failed") {
+            $failedJobs.Add($job)
+        }
     }
 
-    return $failedJobs
+    # Check for retried jobs: result is null/pending but previousAttempts has failures
+    if ($BuildId -gt 0) {
+        $retriedJobs = @($Timeline.records | Where-Object {
+            $_.type -eq "Job" -and $null -eq $_.result -and @($_.previousAttempts).Count -gt 0
+        })
+        foreach ($job in $retriedJobs) {
+            # Iterate all previous attempts (most recent first) to find failed ones
+            $attempts = @($job.previousAttempts)
+            for ($i = $attempts.Count - 1; $i -ge 0; $i--) {
+                $prevTimelineId = $attempts[$i].timelineId
+                if (-not $prevTimelineId) { continue }
+                try {
+                    $prevUrl = "https://dev.azure.com/$Organization/$Project/_apis/build/builds/$BuildId/timeline/${prevTimelineId}?api-version=7.0"
+                    $prevTimeline = Invoke-CachedRestMethod -Uri $prevUrl -TimeoutSec $TimeoutSec -AsJson
+                    if ($prevTimeline -and $prevTimeline.records) {
+                        $prevFailed = @($prevTimeline.records | Where-Object {
+                            $_.type -eq "Job" -and $_.result -eq "failed" -and $_.name -eq $job.name
+                        })
+                        if ($prevFailed.Count -gt 0) {
+                            $attemptNum = $attempts[$i].attempt
+                            Write-Host "  Found failed attempt $attemptNum for retried job: $($job.name)" -ForegroundColor Yellow
+                            foreach ($pf in $prevFailed) { $failedJobs.Add($pf) }
+                            # Store child task records in script scope for downstream lookups
+                            # (do NOT mutate $Timeline.records — that corrupts counts)
+                            $failedJobIds = @($prevFailed | ForEach-Object { $_.id })
+                            $childTasks = @($prevTimeline.records | Where-Object {
+                                $_.type -eq "Task" -and $_.parentId -in $failedJobIds
+                            })
+                            if ($childTasks.Count -gt 0) {
+                                if (-not $script:retriedTaskRecords) {
+                                    $script:retriedTaskRecords = [System.Collections.Generic.List[object]]::new()
+                                }
+                                foreach ($ct in $childTasks) {
+                                    if ($ct.id -notin @($script:retriedTaskRecords | ForEach-Object { $_.id })) {
+                                        $script:retriedTaskRecords.Add($ct)
+                                    }
+                                }
+                            }
+                            break  # Found a failed attempt, no need to check older ones
+                        }
+                    }
+                } catch {
+                    Write-Host "  Could not fetch previous attempt timeline for $($job.name)" -ForegroundColor Gray
+                }
+            }
+        }
+    }
+
+    return @($failedJobs)
 }
 
 function Get-CanceledJobs {
@@ -731,8 +783,14 @@ function Get-HelixJobInfo {
         return @()
     }
 
+    # Search both current timeline and retried task records
+    $allRecords = @($Timeline.records)
+    if ($script:retriedTaskRecords -and $script:retriedTaskRecords.Count -gt 0) {
+        $allRecords += @($script:retriedTaskRecords)
+    }
+
     # Find tasks in this job that mention Helix
-    $helixTasks = $Timeline.records | Where-Object {
+    $helixTasks = $allRecords | Where-Object {
         $_.parentId -eq $JobId -and
         $_.name -like "*Helix*" -and
         $_.result -eq "failed"
@@ -1781,6 +1839,7 @@ try {
     $allCanceledJobNames = @()
     $allFailedJobDetails = @()
     $lastBuildJobSummary = $null
+    $script:retriedTaskRecords = $null  # Reset for each analysis run
 
     foreach ($currentBuildId in $buildIds) {
         Write-Host "`n=== Azure DevOps Build $currentBuildId ===" -ForegroundColor Yellow
@@ -1816,7 +1875,7 @@ try {
         }
 
         # Get failed jobs
-        $failedJobs = Get-FailedJobs -Timeline $timeline
+        $failedJobs = Get-FailedJobs -Timeline $timeline -BuildId $currentBuildId
 
         # Get canceled jobs (different from failed - typically due to dependency failures)
         $canceledJobs = Get-CanceledJobs -Timeline $timeline
@@ -2079,7 +2138,12 @@ try {
             }
                 else {
                     # No Helix tasks - this is a build failure, extract actual errors
-                    $buildTasks = $timeline.records | Where-Object {
+                    # Check both current timeline and retried task records
+                    $taskRecords = @($timeline.records)
+                    if ($script:retriedTaskRecords -and $script:retriedTaskRecords.Count -gt 0) {
+                        $taskRecords += @($script:retriedTaskRecords)
+                    }
+                    $buildTasks = $taskRecords | Where-Object {
                         $_.parentId -eq $job.id -and $_.result -eq "failed"
                     }
 
@@ -2114,6 +2178,17 @@ try {
                                     $helixLogUrls = Extract-HelixLogUrls -LogContent $logContent
 
                                     if ($helixLogUrls.Count -gt 0) {
+                                        # Helix URLs found — this task used Helix, so it's not a pure build error.
+                                        # Only reclassify as test-failure if there are no infra-level error indicators;
+                                        # otherwise mark as helix-failure to distinguish from pure build errors.
+                                        $hasInfraMarkers = $buildErrors | Where-Object {
+                                            $_ -match 'DEVICE_NOT_FOUND|XHarness.*timeout|emulator.*boot|simulator.*not found|provisioning.*failed'
+                                        }
+                                        if ($hasInfraMarkers) {
+                                            $jobDetail.errorCategory = "helix-infra-failure"
+                                        } else {
+                                            $jobDetail.errorCategory = "test-failure"
+                                        }
                                         Write-Host "  Helix failures ($($helixLogUrls.Count)):" -ForegroundColor Red
                                         foreach ($helixLog in $helixLogUrls | Select-Object -First 5) {
                                             Write-Host "    - $($helixLog.WorkItem)" -ForegroundColor White
