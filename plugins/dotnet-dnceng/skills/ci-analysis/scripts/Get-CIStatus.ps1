@@ -968,6 +968,94 @@ function Extract-HelixLogUrls {
     return $uniqueUrls.Values
 }
 
+function Invoke-HelixLogAnalysis {
+    param(
+        [string]$LogContent,           # AzDO build log content (already fetched)
+        [hashtable]$JobDetail,         # The jobDetail hashtable to update (mutated in place)
+        [string]$JobName,              # For PR correlation
+        [string]$TaskName,             # For PR correlation
+        [switch]$FetchLogs,            # Whether to fetch console logs (maps to -ShowLogs)
+        [switch]$SearchMihuBot         # Whether to search MihuBot
+    )
+
+    # Extract Helix console log URLs from the build log
+    $helixUrls = Extract-HelixUrls -LogContent $LogContent
+    if ($helixUrls.Count -eq 0) {
+        return $null
+    }
+
+    $correlationData = $null
+
+    if ($FetchLogs) {
+        Write-Host "`n  Helix Console Logs:" -ForegroundColor Yellow
+
+        foreach ($url in $helixUrls | Select-Object -First 3) {
+            Write-Host "`n  $url" -ForegroundColor Gray
+
+            # Extract work item name from URL for known issue search
+            $workItemName = ""
+            if ($url -match '/workitems/([^/]+)/console') {
+                $workItemName = $Matches[1]
+                $JobDetail.helixWorkItems += $workItemName
+            }
+
+            $helixLog = Get-HelixConsoleLog -Url $url
+            if ($helixLog) {
+                $failureInfo = Format-TestFailure -LogContent $helixLog
+                if ($failureInfo) {
+                    Write-Host $failureInfo -ForegroundColor White
+
+                    # Categorize failure from log content
+                    if ($failureInfo -match 'Timed Out \(timeout') {
+                        $JobDetail.errorCategory = "test-timeout"
+                    } elseif ($failureInfo -match 'Exit Code:\s*(139|134|-4)' -or $failureInfo -match 'createdump') {
+                        if ($JobDetail.errorCategory -notin @("crash")) {
+                            $JobDetail.errorCategory = "crash"
+                        }
+                    } elseif ($failureInfo -match 'Traceback \(most recent call last\)' -and $helixLog -match 'Tests run:.*Failures:\s*0') {
+                        if ($JobDetail.errorCategory -notin @("crash", "test-timeout")) {
+                            $JobDetail.errorCategory = "tests-passed-reporter-failed"
+                        }
+                    } elseif ($JobDetail.errorCategory -in @("unclassified", "build-error", "test-failure")) {
+                        $JobDetail.errorCategory = "test-failure"
+                    }
+                    if (-not $JobDetail.errorSnippet) {
+                        $JobDetail.errorSnippet = $failureInfo.Substring(0, [Math]::Min(200, $failureInfo.Length))
+                    }
+
+                    Show-KnownIssues -TestName $workItemName -ErrorMessage $failureInfo -IncludeMihuBot:$SearchMihuBot
+                }
+                else {
+                    # No failure pattern matched — show tail of log
+                    $lines = $helixLog -split "`n"
+                    $lastLines = $lines | Select-Object -Last 20
+                    $tailText = $lastLines -join "`n"
+                    Write-Host $tailText -ForegroundColor White
+                    if (-not $JobDetail.errorSnippet) {
+                        $JobDetail.errorSnippet = $tailText.Substring(0, [Math]::Min(200, $tailText.Length))
+                    }
+                    Show-KnownIssues -TestName $workItemName -ErrorMessage $tailText -IncludeMihuBot:$SearchMihuBot
+                }
+            }
+        }
+    }
+    elseif ($helixUrls.Count -gt 0) {
+        Write-Host "`n  Helix logs available (use -ShowLogs to fetch):" -ForegroundColor Yellow
+        foreach ($url in $helixUrls | Select-Object -First 3) {
+            Write-Host "    $url" -ForegroundColor Gray
+        }
+    }
+
+    # Return correlation data for PR correlation tracking
+    return @{
+        TaskName = $TaskName
+        JobName = $JobName
+        Errors = @()
+        HelixLogs = @($helixUrls)
+        FailedTests = @($JobDetail.helixWorkItems)
+    }
+}
+
 #endregion Log Parsing Functions
 
 #region Known Issues Search
@@ -2066,71 +2154,12 @@ try {
                                     $jobDetail.errorSnippet = ($failures | Select-Object -First 3 | ForEach-Object { $_.TestName }) -join "; "
                                 }
 
-                            # Extract and optionally fetch Helix URLs
-                            $helixUrls = Extract-HelixUrls -LogContent $logContent
-
-                            if ($helixUrls.Count -gt 0 -and $ShowLogs) {
-                                Write-Host "`n  Helix Console Logs:" -ForegroundColor Yellow
-
-                                foreach ($url in $helixUrls | Select-Object -First 3) {
-                                    Write-Host "`n  $url" -ForegroundColor Gray
-
-                                    # Extract work item name from URL for known issue search
-                                    $workItemName = ""
-                                    if ($url -match '/workitems/([^/]+)/console') {
-                                        $workItemName = $Matches[1]
-                                        $jobDetail.helixWorkItems += $workItemName
-                                    }
-
-                                    $helixLog = Get-HelixConsoleLog -Url $url
-                                    if ($helixLog) {
-                                        $failureInfo = Format-TestFailure -LogContent $helixLog
-                                        if ($failureInfo) {
-                                            Write-Host $failureInfo -ForegroundColor White
-
-                                            # Categorize failure from log content
-                                            if ($failureInfo -match 'Timed Out \(timeout') {
-                                                $jobDetail.errorCategory = "test-timeout"
-                                            } elseif ($failureInfo -match 'Exit Code:\s*(139|134|-4)' -or $failureInfo -match 'createdump') {
-                                                # Crash takes highest precedence — don't downgrade
-                                                if ($jobDetail.errorCategory -notin @("crash")) {
-                                                    $jobDetail.errorCategory = "crash"
-                                                }
-                                            } elseif ($failureInfo -match 'Traceback \(most recent call last\)' -and $helixLog -match 'Tests run:.*Failures:\s*0') {
-                                                # Work item failed (non-zero exit from reporter crash) but all tests passed.
-                                                # The Python traceback is from Helix infrastructure, not from the test itself.
-                                                if ($jobDetail.errorCategory -notin @("crash", "test-timeout")) {
-                                                    $jobDetail.errorCategory = "tests-passed-reporter-failed"
-                                                }
-                                            } elseif ($jobDetail.errorCategory -eq "unclassified") {
-                                                $jobDetail.errorCategory = "test-failure"
-                                            }
-                                            if (-not $jobDetail.errorSnippet) {
-                                                $jobDetail.errorSnippet = $failureInfo.Substring(0, [Math]::Min(200, $failureInfo.Length))
-                                            }
-
-                                            # Search for known issues
-                                            Show-KnownIssues -TestName $workItemName -ErrorMessage $failureInfo -IncludeMihuBot:$SearchMihuBot
-                                        }
-                                        else {
-                                            # No failure pattern matched — show tail of log
-                                            $lines = $helixLog -split "`n"
-                                            $lastLines = $lines | Select-Object -Last 20
-                                            $tailText = $lastLines -join "`n"
-                                            Write-Host $tailText -ForegroundColor White
-                                            if (-not $jobDetail.errorSnippet) {
-                                                $jobDetail.errorSnippet = $tailText.Substring(0, [Math]::Min(200, $tailText.Length))
-                                            }
-                                            Show-KnownIssues -TestName $workItemName -ErrorMessage $tailText -IncludeMihuBot:$SearchMihuBot
-                                        }
-                                    }
-                                }
-                            }
-                            elseif ($helixUrls.Count -gt 0) {
-                                Write-Host "`n  Helix logs available (use -ShowLogs to fetch):" -ForegroundColor Yellow
-                                foreach ($url in $helixUrls | Select-Object -First 3) {
-                                    Write-Host "    $url" -ForegroundColor Gray
-                                }
+                            # Extract and optionally fetch Helix URLs via shared analysis function
+                            $helixResult = Invoke-HelixLogAnalysis -LogContent $logContent `
+                                -JobDetail $jobDetail -JobName $job.name -TaskName $task.name `
+                                -FetchLogs:$ShowLogs -SearchMihuBot:$SearchMihuBot
+                            if ($helixResult) {
+                                $allFailuresForCorrelation += $helixResult
                             }
                         }
                     }
@@ -2174,13 +2203,12 @@ try {
                                         $jobDetail.errorSnippet = $snippet.Substring(0, [Math]::Min(200, $snippet.Length))
                                     }
 
-                                    # Extract Helix log URLs from the full log content
+                                    # Check for Helix log URLs — if found, run full Helix analysis
                                     $helixLogUrls = Extract-HelixLogUrls -LogContent $logContent
 
                                     if ($helixLogUrls.Count -gt 0) {
                                         # Helix URLs found — this task used Helix, so it's not a pure build error.
-                                        # Only reclassify as test-failure if there are no infra-level error indicators;
-                                        # otherwise mark as helix-failure to distinguish from pure build errors.
+                                        # Reclassify based on infra markers
                                         $hasInfraMarkers = $buildErrors | Where-Object {
                                             $_ -match 'DEVICE_NOT_FOUND|XHarness.*timeout|emulator.*boot|simulator.*not found|provisioning.*failed'
                                         }
@@ -2189,13 +2217,13 @@ try {
                                         } else {
                                             $jobDetail.errorCategory = "test-failure"
                                         }
-                                        Write-Host "  Helix failures ($($helixLogUrls.Count)):" -ForegroundColor Red
-                                        foreach ($helixLog in $helixLogUrls | Select-Object -First 5) {
-                                            Write-Host "    - $($helixLog.WorkItem)" -ForegroundColor White
-                                            Write-Host "      Log: $($helixLog.Url)" -ForegroundColor Gray
-                                        }
-                                        if ($helixLogUrls.Count -gt 5) {
-                                            Write-Host "    ... and $($helixLogUrls.Count - 5) more" -ForegroundColor Gray
+
+                                        # Run full Helix console log analysis (same as the Helix branch)
+                                        $helixResult = Invoke-HelixLogAnalysis -LogContent $logContent `
+                                            -JobDetail $jobDetail -JobName $job.name -TaskName $task.name `
+                                            -FetchLogs:$ShowLogs -SearchMihuBot:$SearchMihuBot
+                                        if ($helixResult) {
+                                            $allFailuresForCorrelation += $helixResult
                                         }
                                     }
                                     else {
