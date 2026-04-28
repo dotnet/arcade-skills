@@ -2238,6 +2238,12 @@ try {
 
                                     # Search for known issues
                                     Show-KnownIssues -ErrorMessage ($buildErrors -join "`n") -IncludeMihuBot:$SearchMihuBot
+
+                                    # Check for published test run URLs in the log
+                                    $testRunUrls = Extract-TestRunUrls -LogContent $logContent
+                                    if ($testRunUrls.Count -gt 0) {
+                                        Show-TestRunResults -TestRunUrls $testRunUrls -Org "https://dev.azure.com/$Organization"
+                                    }
                                 }
                                 else {
                                     Write-Host "  (No specific errors extracted from log)" -ForegroundColor Gray
