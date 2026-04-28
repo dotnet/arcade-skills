@@ -714,7 +714,7 @@ function Get-FailedJobs {
     # Check for retried jobs: result is null/pending but previousAttempts has failures
     if ($BuildId -gt 0) {
         $retriedJobs = @($Timeline.records | Where-Object {
-            $_.type -eq "Job" -and $null -eq $_.result -and @($_.previousAttempts).Count -gt 0
+            $_.type -eq "Job" -and $null -eq $_.result -and $null -ne $_.previousAttempts -and $_.previousAttempts.Count -gt 0
         })
         foreach ($job in $retriedJobs) {
             # Iterate all previous attempts (most recent first) to find failed ones
@@ -944,10 +944,13 @@ function Extract-HelixLogUrls {
 
     $urls = @()
 
+    # Normalize line breaks that might split URLs (same as Extract-HelixUrls)
+    $normalizedContent = $LogContent -replace "`r`n", "" -replace "`n", ""
+
     # Match Helix console log URLs from log content
     # Pattern: https://helix.dot.net/api/2019-06-17/jobs/{jobId}/workitems/{workItemName}/console
     $pattern = 'https://helix\.dot\.net/api/[^/]+/jobs/([a-f0-9-]+)/workitems/([^/\s]+)/console'
-    $urlMatches = [regex]::Matches($LogContent, $pattern)
+    $urlMatches = [regex]::Matches($normalizedContent, $pattern)
 
     foreach ($match in $urlMatches) {
         $urls += @{
@@ -984,8 +987,6 @@ function Invoke-HelixLogAnalysis {
         return $null
     }
 
-    $correlationData = $null
-
     if ($FetchLogs) {
         Write-Host "`n  Helix Console Logs:" -ForegroundColor Yellow
 
@@ -1006,14 +1007,17 @@ function Invoke-HelixLogAnalysis {
                     Write-Host $failureInfo -ForegroundColor White
 
                     # Categorize failure from log content
+                    # Guard: never downgrade helix-infra-failure — it indicates root cause is infrastructure
                     if ($failureInfo -match 'Timed Out \(timeout') {
-                        $JobDetail.errorCategory = "test-timeout"
+                        if ($JobDetail.errorCategory -notin @("helix-infra-failure")) {
+                            $JobDetail.errorCategory = "test-timeout"
+                        }
                     } elseif ($failureInfo -match 'Exit Code:\s*(139|134|-4)' -or $failureInfo -match 'createdump') {
-                        if ($JobDetail.errorCategory -notin @("crash")) {
+                        if ($JobDetail.errorCategory -notin @("crash", "helix-infra-failure")) {
                             $JobDetail.errorCategory = "crash"
                         }
                     } elseif ($failureInfo -match 'Traceback \(most recent call last\)' -and $helixLog -match 'Tests run:.*Failures:\s*0') {
-                        if ($JobDetail.errorCategory -notin @("crash", "test-timeout")) {
+                        if ($JobDetail.errorCategory -notin @("crash", "test-timeout", "helix-infra-failure")) {
                             $JobDetail.errorCategory = "tests-passed-reporter-failed"
                         }
                     } elseif ($JobDetail.errorCategory -in @("unclassified", "build-error", "test-failure")) {
@@ -1039,7 +1043,7 @@ function Invoke-HelixLogAnalysis {
             }
         }
     }
-    elseif ($helixUrls.Count -gt 0) {
+    else {
         Write-Host "`n  Helix logs available (use -ShowLogs to fetch):" -ForegroundColor Yellow
         foreach ($url in $helixUrls | Select-Object -First 3) {
             Write-Host "    $url" -ForegroundColor Gray
@@ -1927,9 +1931,9 @@ try {
     $allCanceledJobNames = @()
     $allFailedJobDetails = @()
     $lastBuildJobSummary = $null
-    $script:retriedTaskRecords = $null  # Reset for each analysis run
 
     foreach ($currentBuildId in $buildIds) {
+        $script:retriedTaskRecords = $null  # Reset per build to prevent cross-build leakage
         Write-Host "`n=== Azure DevOps Build $currentBuildId ===" -ForegroundColor Yellow
         Write-Host "URL: https://dev.azure.com/$Organization/$Project/_build/results?buildId=$currentBuildId" -ForegroundColor Gray
 
@@ -2189,14 +2193,6 @@ try {
                                 $buildErrors = Extract-BuildErrors -LogContent $logContent
 
                                 if ($buildErrors.Count -gt 0) {
-                                    # Collect for PR correlation
-                                    $allFailuresForCorrelation += @{
-                                        TaskName = $task.name
-                                        JobName = $job.name
-                                        Errors = $buildErrors
-                                        HelixLogs = @()
-                                        FailedTests = @()
-                                    }
                                     $jobDetail.errorCategory = "build-error"
                                     if (-not $jobDetail.errorSnippet) {
                                         $snippet = ($buildErrors | Select-Object -First 2) -join "; "
@@ -2208,10 +2204,8 @@ try {
 
                                     if ($helixLogUrls.Count -gt 0) {
                                         # Helix URLs found — this task used Helix, so it's not a pure build error.
-                                        # Reclassify based on infra markers
-                                        $hasInfraMarkers = $buildErrors | Where-Object {
-                                            $_ -match 'DEVICE_NOT_FOUND|XHarness.*timeout|emulator.*boot|simulator.*not found|provisioning.*failed'
-                                        }
+                                        # Reclassify based on infra markers in raw log content
+                                        $hasInfraMarkers = $logContent -match 'DEVICE_NOT_FOUND|XHarness.*timeout|emulator.*boot|simulator.*not found|provisioning.*failed'
                                         if ($hasInfraMarkers) {
                                             $jobDetail.errorCategory = "helix-infra-failure"
                                         } else {
@@ -2223,10 +2217,20 @@ try {
                                             -JobDetail $jobDetail -JobName $job.name -TaskName $task.name `
                                             -FetchLogs:$ShowLogs -SearchMihuBot:$SearchMihuBot
                                         if ($helixResult) {
+                                            # Merge build errors into the Helix correlation entry
+                                            $helixResult.Errors = $buildErrors
                                             $allFailuresForCorrelation += $helixResult
                                         }
                                     }
                                     else {
+                                        # Pure build error — no Helix involvement
+                                        $allFailuresForCorrelation += @{
+                                            TaskName = $task.name
+                                            JobName = $job.name
+                                            Errors = $buildErrors
+                                            HelixLogs = @()
+                                            FailedTests = @()
+                                        }
                                         Write-Host "  Build errors:" -ForegroundColor Red
                                         foreach ($err in $buildErrors | Select-Object -First 5) {
                                             Write-Host "    $err" -ForegroundColor White
