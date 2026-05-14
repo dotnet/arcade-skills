@@ -1,0 +1,130 @@
+# Arcade SDL Infrastructure
+
+The shared SDL (Security Development Lifecycle) infrastructure lives in `eng/common/sdl/` in arcade-based repos. This is how BinSkim gets configured and run in official 1ES pipelines.
+
+## Key Files
+
+### `eng/common/sdl/configure-sdl-tool.ps1`
+
+Configures Guardian tools including BinSkim. Key behavior for BinSkim:
+
+```powershell
+# The target pattern it generates:
+"Target < $TargetDirectory\**;-:file|$TargetDirectory\**\_.pdb"
+```
+
+- `$TargetDirectory` is the artifact directory passed from the pipeline
+- Excludes `_.pdb` files (BinSkim crashes on some PDBs — see https://github.com/microsoft/binskim/issues/924)
+- Accepts `$BinskimAdditionalRunConfigParams` for per-repo custom configuration
+
+### `eng/common/sdl/extract-artifact-packages.ps1`
+
+Extracts .nupkg files for scanning. Behavior:
+- Takes `$InputPath` (directory with .nupkg files) and `$ExtractPath` (output)
+- Extracts only `.dll`, `.exe`, `.pdb` files from each .nupkg
+- Creates per-package subdirectories under extract path
+- Runs extraction jobs in parallel
+
+This is what you're reproducing when you locally extract .nupkg files for scanning.
+
+### `eng/common/sdl/execute-all-sdl-tools.ps1`
+
+Orchestrator that runs all SDL tools. Takes:
+- `$ArtifactsDirectory` — what to scan
+- `$ArtifactToolsList` — which tools to run (e.g., `@("binskim")`)
+
+### `eng/common/sdl/run-sdl.ps1`
+
+Executes Guardian with the generated configuration.
+
+## Pipeline YAML Integration
+
+### 1ES Pipeline Template (most repos)
+
+The 1ES pipeline template (`1ES/PipelineTemplate`) handles SDL scanning automatically. Repos configure it via:
+
+```yaml
+# In the pipeline YAML
+extends:
+  template: v1/1ES/Official/PipelineTemplate/...
+  parameters:
+    sdl:
+      binskim:
+        enabled: true
+        scanOutputDirectoryOnly: true  # Only scan published artifacts
+        # analyzeTargetGlob: "..."     # Override default target
+```
+
+### `scanOutputDirectoryOnly`
+
+When `true` (common), BinSkim only scans the directory where the pipeline published its artifacts — typically `artifacts/pkgassets/` or the extracted .nupkg contents. When `false`, it scans the full build output.
+
+### `PipelineAutobaseliningConfig.yml`
+
+Located at `.config/1espt/PipelineAutobaseliningConfig.yml`. This is the 1ES auto-baselining configuration that tracks known findings. If a repo has this but no explicit `sdl.binskim` section in its pipeline YAML, BinSkim runs with default settings via the template.
+
+### Custom Parameters
+
+Some repos pass additional BinSkim configuration:
+
+```yaml
+sdl:
+  binskim:
+    enabled: true
+    additionalRunConfigParams: "--some-flag value"
+```
+
+These map to `BinskimAdditionalRunConfigParams` in `configure-sdl-tool.ps1`.
+
+## Reproducing Locally
+
+To match what the pipeline does:
+
+1. **Build + pack** the repo (produces .nupkg or pkgassets)
+2. **Extract packages** (mirrors `extract-artifact-packages.ps1`):
+   ```powershell
+   $packagesDir = Join-Path "artifacts" "packages" "Release" "Shipping"
+   $extractDir  = Join-Path "artifacts" "extracted"
+   Get-ChildItem (Join-Path $packagesDir "*.nupkg") | ForEach-Object {
+       $dest = Join-Path $extractDir $_.BaseName
+       Expand-Archive $_.FullName $dest -Force
+   }
+   ```
+3. **Run BinSkim** with the same target pattern:
+   ```powershell
+   $extractGlob = Join-Path "artifacts" "extracted" "**"
+   $excludeGlob = Join-Path "artifacts" "extracted" "**" "_.pdb"
+   & $binskim analyze "$extractGlob;-:file|$excludeGlob" --recurse --output results.sarif --pretty-print --force
+   ```
+
+This produces results equivalent to the official pipeline (minus any baseline suppression).
+
+## Understanding the Guardian Output Artifacts
+
+When downloading SDL build artifacts, you'll find several key files:
+
+### `binskim/001/binskim.sarif` — Raw BinSkim output
+
+This is what BinSkim actually found. It contains ALL findings, unfiltered. This is what your local scan should match.
+
+### `Results.sarif` — Guardian-merged output
+
+This is what the central portal sees. Guardian applies filtering/baselining between the raw SARIF and this file. Compare with the raw SARIF to understand what was filtered.
+
+### `break/001/options.json` — Break policy
+
+Controls whether BinSkim can fail the build. Key fields:
+- `IncludeTools`: array of tool names that can break the build (e.g., `["credscan", "fxcop", "roslynanalyzers"]`)
+- `policy`: typically `"Microsoft"`
+- `minSeverity`: typically `"Error"`
+
+If BinSkim isn't in `IncludeTools`, it runs and reports but never gates the build.
+
+### `.gdnbaselines` / `.gdnsuppress` — Guardian filtering files
+
+Generated at runtime by Guardian, not typically checked into source. These files behave differently:
+
+- `.gdnbaselines` are baseline data used by Guardian for comparison workflows, but they do **not** remove findings from reporting or from the merged `Results.sarif`.
+- `.gdnsuppress` files are suppressions that **can** filter findings out of the merged `Results.sarif` and the central portal view.
+
+> 💡 **When investigating a repo's BinSkim status, always download the raw SARIF.** `binskim.sarif` shows what BinSkim actually found. The merged `Results.sarif` and central portal reflect Guardian-processed output after suppression filtering, so they may show only a subset of actual findings.

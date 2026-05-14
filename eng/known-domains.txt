@@ -1,0 +1,49 @@
+# Known domains for skill/agent content
+#
+# URLs pointing to domains not on this list will fail reference validation.
+#
+# To add a domain: include it in your PR and a reviewer will approve it
+# alongside the skill content.
+#
+# Format: one domain per line. Lines starting with # are comments.
+# Entries containing a slash match URLs with that exact prefix followed by
+# '/', '?', '#', or end-of-URL. Entries without a slash match the domain and all its subdomains.
+
+# Standards
+dot.net
+microsoft.com
+
+# Tools
+aka.ms
+api.nuget.org
+msdl.microsoft.com
+nuget.org/account/trustedpublishing
+dotnetcli.blob.core.windows.net
+liquid.microsoft.com
+msbuildlog.com
+live.msbuildlog.com
+
+# Platforms
+dev.azure.com
+
+# Repos
+github.com/dotnet/arcade
+github.com/dotnet/arcade-skills
+github.com/dotnet/diagnostics
+github.com/dotnet/dnceng
+github.com/dotnet/dotnet
+github.com/dotnet/runtime
+github.com/jaredpar/runfo
+github.com/lewing/maestro.mcp
+github.com/microsoft/binskim
+github.com/orgs/dotnet
+
+# MCP ecosystem
+code.visualstudio.com
+github.com/modelcontextprotocol
+github.com/open-telemetry/semantic-conventions
+
+
+
+
+

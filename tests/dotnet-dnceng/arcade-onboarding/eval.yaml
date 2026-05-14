@@ -20,3 +20,43 @@ scenarios:
       - type: "output_contains"
         value: "Publishing.props"
     timeout: 300
+
+  - name: "Identify arcade infrastructure gaps in partially onboarded repo"
+    prompt: "This repo already has a global.json with Arcade SDK but is missing eng/Publishing.props, eng/Signing.props, and es-metadata.yml. What files need to be created?"
+    assertions:
+      - type: "output_contains"
+        value: "Publishing.props"
+      - type: "output_contains"
+        value: "Signing.props"
+      - type: "output_contains"
+        value: "es-metadata"
+    timeout: 120
+
+  - name: "Generate NuGet.config without nuget.org"
+    prompt: "Create a NuGet.config for an arcade-onboarded repo. Should nuget.org be included?"
+    assertions:
+      - type: "output_contains"
+        value: "dotnet-public"
+      - type: "output_not_contains"
+        value: "nuget.org"
+    timeout: 120
+
+  - name: "Explain dependency flow setup with darc"
+    prompt: "How do I set up dependency flow for a repo that consumes packages from dotnet/runtime?"
+    assertions:
+      - type: "output_contains"
+        value: "darc"
+      - type: "output_contains"
+        value: "subscription"
+      - type: "output_contains"
+        value: "Version.Details.xml"
+    timeout: 120
+
+  - name: "Configure signing for official builds"
+    prompt: "How do I configure code signing for an arcade-onboarded repo's official build pipeline?"
+    assertions:
+      - type: "output_contains"
+        value: "Signing.props"
+      - type: "output_contains"
+        value: "enableMicrobuild"
+    timeout: 120
