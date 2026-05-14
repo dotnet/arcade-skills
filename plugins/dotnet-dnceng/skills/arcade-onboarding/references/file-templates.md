@@ -14,8 +14,6 @@ Templates for all files that must be created or modified when onboarding a repos
 - [eng/Signing.props](#engsigningprops)
 - [eng/SignCheckExclusionsFile.txt](#engsigncheckexclusionsfiletxt)
 - [es-metadata.yml](#es-metadatayml)
-- [NuGet.config](#nugetconfig)
-- [eng/Publishing.props](#engpublishingprops)
 
 ## global.json
 
@@ -335,13 +333,12 @@ Exclusions for post-build SignCheck validation. This is **separate** from `Signi
 **Important:** This file must be consistent with `Signing.props`. If you set `CertificateName="None"` for `.js` in `Signing.props`, you must also exclude `*.js` in `SignCheckExclusionsFile.txt`. Otherwise the post-build validation will flag those files as unsigned.
 
 **Reference:** Pattern from [dotnet/Scaffolding](https://github.com/dotnet/Scaffolding/blob/main/eng/SignCheckExclusionsFile.txt).
-```
 
 ## es-metadata.yml
 
 1ES Inventory-as-Code metadata file. Required for all repos in the 1ES ecosystem. This file maps the repository to a Service Tree entry for compliance, telemetry, and issue routing.
 
-**Documentation:** [1ES Inventory as Code](https://eng.ms/docs/coreai/devdiv/one-engineering-system-1es/1es-docs/product-catalog/inventory-as-code/about)
+**Documentation:** [1ES Inventory as Code](https://eng.ms/docs/coreai/devdiv/one-engineering-system-1es/1es-docs/product-catalog/inventory-as-code/about) (Microsoft internal)
 
 ### Template
 
@@ -362,7 +359,7 @@ routing:
 |-------|-------------|---------|
 | `schemaVersion` | Always `0.0.1` (current schema version) | `0.0.1` |
 | `isProduction` | Whether this is a production service/component. Map from `IsShipping`: if `IsShipping=true` → `isProduction: true` | `true` |
-| `accountableOwners.service` | Service Tree UUID. Find at https://servicetree.msft.ms/ | `9d770e15-6208-4284-b347-b2762803623b` |
+| `accountableOwners.service` | Service Tree UUID. Find at https://servicetree.msft.ms/ (Microsoft internal) | `9d770e15-6208-4284-b347-b2762803623b` |
 | `routing.defaultAreaPath.org` | Azure DevOps organization for bug routing (`devdiv` or `dnceng`) | `devdiv` |
 | `routing.defaultAreaPath.path` | Azure DevOps area path for bug routing | `DevDiv\.NET MAUI` |
 
@@ -427,8 +424,8 @@ If the user doesn't know their Service Tree ID or area path, generate the file w
 
 ```yaml
 # TODO: Replace placeholders with actual values
-# Service Tree: https://servicetree.msft.ms/
-# 1ES docs: https://eng.ms/docs/coreai/devdiv/one-engineering-system-1es/1es-docs/product-catalog/inventory-as-code/about
+# Service Tree: https://servicetree.msft.ms/ (Microsoft internal)
+# 1ES docs: https://eng.ms/docs/coreai/devdiv/one-engineering-system-1es/1es-docs/product-catalog/inventory-as-code/about (Microsoft internal)
 schemaVersion: 0.0.1
 isProduction: true
 accountableOwners:
