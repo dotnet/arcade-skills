@@ -8,6 +8,25 @@ set -euo pipefail
 
 TARGET_ROOT="${1:-.}"
 ARCADE_REF="${2:-main}"
+
+# Validate target is an existing directory and resolve to absolute path
+TARGET_ROOT="$(cd "$TARGET_ROOT" 2>/dev/null && pwd)" || {
+  echo "ERROR: Target directory '${1:-.}' does not exist" >&2
+  exit 1
+}
+
+# Validate target is a git repository root
+if ! git -C "$TARGET_ROOT" rev-parse --git-dir >/dev/null 2>&1; then
+  echo "ERROR: '$TARGET_ROOT' is not inside a git repository" >&2
+  exit 1
+fi
+
+# Validate arcade_ref does not start with '-' (prevents git option injection)
+if [[ "$ARCADE_REF" == -* ]]; then
+  echo "ERROR: arcade_ref must not start with '-'" >&2
+  exit 1
+fi
+
 TEMP_DIR=$(mktemp -d)
 
 cleanup() { rm -rf "$TEMP_DIR"; }

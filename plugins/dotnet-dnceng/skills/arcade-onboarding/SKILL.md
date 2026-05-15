@@ -13,7 +13,7 @@ Onboard a .NET repository onto the [dotnet/arcade](https://github.com/dotnet/arc
 2. **Ask the user** about publishing preferences (NuGet.org yes/no, shipping scope) and 1ES metadata
 3. **Create/modify infrastructure files** — global.json, Directory.Build.props/targets, eng/ files, NuGet.config, es-metadata.yml
 4. **Copy eng/common/** — arcade shared build scripts
-5. **Update dependencies via darc** — run `darc update-dependencies` to pull latest coherent Arcade SDK, eng/common, and global.json from the target channel
+5. **Update dependencies via darc** — run `darc update-dependencies` to pull latest coherent Arcade SDK version and global.json from the target channel
 6. **Create Azure Pipelines YAML** — public CI and/or official build definitions
 7. **Set up internal mirror** — configure GitHub → AzDO mirror for official builds
 8. **Map dependencies to darc/maestro** — convert eligible NuGet references to flowable dependencies
@@ -183,7 +183,7 @@ Use the provided helper script to safely copy eng/common:
 ./scripts/copy_eng_common.sh [target_repo_root] [arcade_ref]
 
 # Example: copy eng/common from arcade main branch to current directory
-bash <(curl -s https://raw.githubusercontent.com/dotnet/arcade/main/eng/common/darc-init.sh) || true
+./scripts/copy_eng_common.sh . main
 ```
 
 Or manually with mktemp:
@@ -260,7 +260,8 @@ This will:
 2. Update `eng/Version.Details.xml` with the correct version and SHA
 3. Update `global.json` with the matching Arcade SDK version
 4. Update `eng/Versions.props` if it has any version properties tracked by darc
-5. Update `eng/common/` scripts to match the Arcade SDK version
+
+**Note:** `eng/common/` is NOT updated by this command. It is updated automatically by maestro dependency-update PRs once the Arcade SDK subscription is set up (Step 9).
 
 ### Verify the update
 
@@ -474,7 +475,7 @@ Cross-check generated files against known arcade-onboarded repos for correctness
 | Directory.Build.props | [dotnet/aspire](https://github.com/dotnet/aspire/blob/main/Directory.Build.props) — Arcade SDK import at top |
 | eng/Versions.props | [dotnet/aspire](https://github.com/dotnet/aspire/blob/main/eng/Versions.props) — MajorVersion/MinorVersion/PatchVersion pattern, StabilizePackageVersion |
 | eng/Version.Details.xml | [dotnet/runtime](https://github.com/dotnet/runtime/blob/main/eng/Version.Details.xml) — ProductDependencies/ToolsetDependencies structure |
-| NuGet.config | [dotnet/aspire](https://github.com/dotnet/aspire/blob/main/NuGet.config) — feed URLs, packageSourceMapping |
+| NuGet.config | [dotnet/aspire](https://github.com/dotnet/aspire/blob/main/NuGet.config) — feed URLs, NU1507 suppression |
 | eng/Publishing.props | [dotnet/aspire](https://github.com/dotnet/aspire/blob/main/eng/Publishing.props) — PublishingVersion=3 |
 | es-metadata.yml | [dotnet/maui](https://github.com/dotnet/maui/blob/main/es-metadata.yml), [dotnet/aspire](https://github.com/dotnet/aspire/blob/main/es-metadata.yml), [dotnet/runtime](https://github.com/dotnet/runtime/blob/main/es-metadata.yml) — schemaVersion, isProduction, service tree ID, area path |
 | Official pipeline | [dotnet/aspire](https://github.com/dotnet/aspire/blob/main/eng/pipelines/azure-pipelines.yml) — 1ES template, post-build |
@@ -483,7 +484,7 @@ Cross-check generated files against known arcade-onboarded repos for correctness
 - `VersionPrefix` is computed from `$(MajorVersion).$(MinorVersion).$(PatchVersion)` (not hardcoded)
 - `StabilizePackageVersion` property exists for release cutting
 - CPM (Directory.Packages.props) is compatible with arcade (aspire uses it)
-- Package source mapping prevents NU1507 with CPM + multiple feeds
+- NU1507 suppressed via `<NoWarn>` — do not rely on `packageSourceMapping` alone (official builds inject unlisted feeds)
 
 ## Build Verification
 

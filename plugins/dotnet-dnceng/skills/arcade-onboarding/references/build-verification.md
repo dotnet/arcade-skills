@@ -10,7 +10,7 @@
    ```bash
    git clean -xdf artifacts/
    # Also clean obj/bin in project dirs if they exist outside artifacts/
-   find . -type d \( -name "obj" -o -name "bin" \) -not -path "./eng/*" -not -path "./.dotnet/*" | xargs rm -rf
+   find . -type d \( -name "obj" -o -name "bin" \) -not -path "./eng/*" -not -path "./.dotnet/*" -print0 | xargs -0 rm -rf
    ```
 
 2. **Install required workloads** — if projects target platform-specific TFMs (e.g. `net10.0-android`, `net10.0-ios`):
@@ -130,4 +130,4 @@ Key requirements:
 
 **SBOM requirement (critical):** The `releaseJob` type triggers an SBOM validator that expects `_manifest/spdx_2.2/manifest.spdx.json` alongside the packages. Since `PackageArtifacts` is published by Arcade (not through 1ES `templateContext.outputs`), no SBOM is generated. **You must add a `PrepareArtifacts` job** that downloads the artifact and re-publishes it through `templateContext.outputs` — this generates the SBOM. The `PublishNuGet` job then consumes the SBOM-annotated artifact. Without this, the build fails with `manifest.spdx.json not found`.
 
-Reference implementation: [dotnet/aspire release-publish-nuget.yml](https://github.com/dotnet/aspire/blob/main/eng/pipelines/release-publish-nuget.yml). See [references/pipeline-templates.md](references/pipeline-templates.md#nugetorg-publishing-with-1espublishnuget1) for the full template.
+Reference implementation: [dotnet/aspire release-publish-nuget.yml](https://github.com/dotnet/aspire/blob/main/eng/pipelines/release-publish-nuget.yml). See [pipeline-templates.md](pipeline-templates.md#nugetorg-publishing-with-1espublishnuget1) for the full template.

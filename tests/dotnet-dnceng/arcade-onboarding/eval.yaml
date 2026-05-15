@@ -33,12 +33,12 @@ scenarios:
     timeout: 120
 
   - name: "Generate NuGet.config without nuget.org"
-    prompt: "Create a NuGet.config for an arcade-onboarded repo. Should nuget.org be included?"
+    prompt: "Create a NuGet.config for an arcade-onboarded repo. Output only the XML file content, no explanation."
     assertions:
       - type: "output_contains"
         value: "dotnet-public"
       - type: "output_not_contains"
-        value: "nuget.org"
+        value: "api.nuget.org/v3/index.json"
     timeout: 120
 
   - name: "Explain dependency flow setup with darc"

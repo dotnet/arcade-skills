@@ -66,8 +66,9 @@ For each dependency that should flow via maestro, add an entry:
   </ProductDependencies>
   <ToolsetDependencies>
     <!-- Build toolset -->
+    <!-- URI depends on channel: dotnet/dotnet (VMR) for .NET 9+ SDK channels, dotnet/arcade for .NET Eng - Latest -->
     <Dependency Name="Microsoft.DotNet.Arcade.Sdk" Version="11.0.0-beta.26166.3">
-      <Uri>https://github.com/dotnet/arcade</Uri>
+      <Uri>https://github.com/dotnet/dotnet</Uri>
       <Sha>bcbb938d7e69bdc06ee2ebb9fd8b13725aa43a2d</Sha>
     </Dependency>
   </ToolsetDependencies>
@@ -107,13 +108,20 @@ Then in csproj files:
 ### Creating an Arcade subscription (essential for all onboarded repos):
 
 ```bash
+# For .NET 9+ SDK channels, use dotnet/dotnet (VMR) as source repo:
 darc add-subscription \
-  --channel ".NET Eng - Latest" \
-  --source-repo https://github.com/dotnet/arcade \
+  --channel ".NET 10.0.1xx SDK" \
+  --source-repo https://github.com/dotnet/dotnet \
   --target-repo https://github.com/OWNER/REPO \
   --target-branch main \
   --update-frequency everyDay \
   --standard-automerge
+
+# For .NET Eng - Latest channel, use dotnet/arcade instead:
+# darc add-subscription \
+#   --channel ".NET Eng - Latest" \
+#   --source-repo https://github.com/dotnet/arcade \
+#   ...
 ```
 
 ### Creating a subscription for runtime dependencies:
