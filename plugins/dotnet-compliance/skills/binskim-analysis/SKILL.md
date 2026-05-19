@@ -70,6 +70,30 @@ To investigate official results, download the SDL artifact from the repo's offic
 # - .gdnbaselines                 <- Auto-generated baseline suppressions
 ```
 
+### Downloading via MCP when the agent host suppresses binary tool output
+
+Some agent CLI hosts run the MCP `pipelines_artifact` `download` action successfully but **silently drop the embedded-resource zip** (you see "Tool ran without output or errors" and no file lands anywhere). When that happens, call the MCP HTTP endpoint directly from PowerShell and decode the base64 blob yourself:
+
+1. Find the MCP servers config (the file path is in env, but typically): `Get-ChildItem $env:TEMP -Filter "copilot-mcp-*.json" | Sort LastWriteTime -Descending | Select -First 1 | Get-Content -Raw` — locate the `ado-dnceng` (or `ado-dnceng-public`) entry's `url` (e.g. `http://127.0.0.1:63680`).
+2. POST a `tools/call` JSON-RPC request:
+   ```powershell
+   $req = @{ jsonrpc='2.0'; id=2; method='tools/call'; params=@{
+     name='pipelines_artifact'
+     arguments=@{ action='download'; buildId=<id>; project='internal'; artifactName='<name>' }
+   } } | ConvertTo-Json -Compress -Depth 10
+   $msg = [System.Net.Http.HttpRequestMessage]::new('POST','http://127.0.0.1:63680/')
+   $msg.Headers.Accept.ParseAdd('application/json, text/event-stream')
+   $msg.Content = [System.Net.Http.StringContent]::new($req,[Text.Encoding]::UTF8,'application/json')
+   $client = [System.Net.Http.HttpClient]::new(); $client.Timeout = [TimeSpan]::FromMinutes(15)
+   $body = $client.SendAsync($msg).Result.Content.ReadAsStringAsync().Result
+   ```
+3. Response is **Server-Sent Events**: find the `data: ` line and `ConvertFrom-Json`. The zip is at `result.content[0].resource.blob` (base64). Write with `[IO.File]::WriteAllBytes($path, [Convert]::FromBase64String($blob))` then `Expand-Archive`.
+4. Reusable script template: see `C:\temp\Download-AdoArtifact.ps1` if previously generated, or recreate from the snippet above.
+
+Notes:
+- The MCP-served zip is dedup-compressed and is **much smaller** than the `artifactsize` reported by the artifact list call (a 86 MB "artifactsize" Windows_x64 SDL artifact downloads as a ~5–6 MB zip but contains the full 40+ MB raw and merged SARIF after extraction). Don't be alarmed by the size delta.
+- `az login` / `Connect-AzAccount` may hang indefinitely in non-interactive agent shells — don't rely on them. The MCP HTTP path above uses the MCP server's existing auth so no extra login is needed.
+
 > **Large SARIF files**: For repos with many binaries (especially the VMR), raw and merged SARIF can be **50-80MB+**. Use `Get-Content -Raw | ConvertFrom-Json` and stream results with `Group-Object`.
 
 > **SDL does NOT run on PR validation builds.** It only runs on official/CI pipelines (gated by `Build.Reason != PullRequest`). Users must manually queue the official pipeline for SDL results before merging.
