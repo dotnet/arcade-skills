@@ -11,6 +11,7 @@ description: >
   DO NOT USE FOR: codeflow PR health or staleness (use flow-analysis
   skill), CI build failures (use ci-analysis skill).
   INVOKES: maestro and GitHub MCP tools, Get-SdkVersionTrace.ps1 script.
+allowed-tools: shell
 ---
 
 # Flow Tracing
