@@ -94,7 +94,7 @@ Some agent CLI hosts run the MCP `pipelines_artifact` `download` action successf
 4. Reusable script template: see `C:\temp\Download-AdoArtifact.ps1` if previously generated, or recreate from the snippet above.
 
 Notes:
-- The MCP-served zip is dedup-compressed and is **much smaller** than the `artifactsize` reported by the artifact list call (a 86 MB "artifactsize" Windows_x64 SDL artifact downloads as a ~5–6 MB zip but contains the full 40+ MB raw and merged SARIF after extraction). Don't be alarmed by the size delta.
+- The MCP-served zip is dedup-compressed and is **much smaller** than the `artifactsize` reported by the artifact list call (an 86 MB "artifactsize" Windows_x64 SDL artifact downloads as a ~5–6 MB zip but contains the full 40+ MB raw and merged SARIF after extraction). Don't be alarmed by the size delta.
 - `az login` / `Connect-AzAccount` may hang indefinitely in non-interactive agent shells — don't rely on them. The MCP HTTP path above uses the MCP server's existing auth so no extra login is needed.
 
 > **Large SARIF files**: For repos with many binaries (especially the VMR), raw and merged SARIF can be **50-80MB+**. Use `Get-Content -Raw | ConvertFrom-Json` and stream results with `Group-Object`.
@@ -154,7 +154,7 @@ The delta between raw and merged is what Guardian filtered out based on SDL poli
 
 ## Service Tree and Org Awareness
 
-Which rules the portal reports depends on `es-metadata.yml` — the `routing.defaultAreaPath.org` field determines your SDL policy scope. Different orgs have different required rules. For example, `devdiv` org (most `dotnet/*` repos) requires BA2008/BA2009/BA2021, while `nettel` org requires BA2004/BA2027 instead.
+Which rules the portal reports depends on `es-metadata.yml` — the `routing.defaultAreaPath.org` field determines your SDL policy scope. Different orgs surface different rules. For example, the `devdiv` org (most `dotnet/*` repos) treats BA2008/BA2009/BA2021 as SDL-required (10203-mapped), while the `nettel` org surfaces BA2004/BA2027 as informational findings in the portal. **Neither BA2004 nor BA2027 is SDL-required at the company level** (no 10203 mapping) — but informational portal findings still often get triaged like requirements, so they are worth fixing. See [references/repo-perfview.md](references/repo-perfview.md) for a worked example.
 
 See [references/binskim-rules.md](references/binskim-rules.md) for the full rules tables and the observed portal requirements by org.
 
