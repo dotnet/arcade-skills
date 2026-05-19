@@ -6,7 +6,7 @@
 - **Finding a recent build**: use `ado-dnceng-pipelines_build` with `action=list`, `definitions=[1330]`, `project=internal`, `branchName=refs/heads/main`, `statusFilter=completed`. Pick the most recent `result=Succeeded` to avoid partially-published artifacts.
 - **BinSkim config**: Via 1ES autobaselining — applied at the VMR level, scans outputs from ALL sub-repos
 - **Published artifacts**: Multiple SDL legs, e.g., `drop_VMR_Vertical_Build_Windows_x64_sdl_analysis` (note: `VMR_Vertical_Build`, not `build`)
-- **SDL legs**: 9 Windows legs (x64/x86/arm64 + Pgo variants + BuildPass2 + Workloads), plus Linux/macOS legs (which produce 0-byte BinSkim SARIF). Empirically only ~6 Windows legs contain non-empty BinSkim findings (main 3 + Pgo 3); BuildPass2/3 and Workloads legs are usually empty or contain only BA2024/BA2028 raw entries.
+- **SDL legs**: 12 Windows legs (x64/x86/arm64 across main + Pgo + BuildPass2 + BuildPass3), plus Linux/macOS legs (which produce 0-byte BinSkim SARIF). Empirically only ~6 Windows legs contain non-empty BinSkim findings (main 3 + Pgo 3); BuildPass2/BuildPass3 legs are usually empty or contain only BA2024/BA2028 raw entries.
 - **Artifact-size sanity check**: the `ado-dnceng-pipelines_artifact action=list` response's `artifactsize` field reflects total *uncompressed* dedup-chunk size. The MCP `download` returns a dedup-compressed zip that is typically 5–20× smaller. Verify by extracting and checking `binskim.sarif` size, not the zip size.
 - **⚠️ OS coverage gap**: Linux and macOS SDL legs produce **0-byte** BinSkim SARIF. Native binaries built for those platforms are not scanned. This is confirmed as of build 2950889 (Apr 2026).
 - **es-metadata.yml**: 27 separate `es-metadata.yml` files across sub-repos (root + each src/*), each potentially a distinct SDL compliance boundary
@@ -37,7 +37,7 @@
   3. For fixes: build the specific sub-repo standalone (e.g., `src/arcade`) and scan that
 - **Recommended download workflow** (avoids `az login` hangs):
   1. `ado-dnceng-pipelines_artifact action=list` to enumerate all `*sdl_analysis` artifacts and their sizes
-  2. Skip the 0-byte non-Windows artifacts up front; download only the 12 Windows legs that produce real SARIF (3 main + 3 Pgo + 3 BuildPass2 + 3 BuildPass3, plus `Asset_Registry_Publish`)
+  2. Skip the 0-byte non-Windows artifacts up front; download only the 12 Windows SDL legs that produce real SARIF (3 main + 3 Pgo + 3 BuildPass2 + 3 BuildPass3). Optionally also grab `Asset_Registry_Publish` separately if you need the published-asset manifest for cross-referencing
   3. Use the MCP-HTTP base64 path documented in `SKILL.md` — total download is only ~10 MB of zips and extracts to ~150 MB of SARIF
   4. Parse with PowerShell: walk all `binskim.sarif` files for raw, and the BinSkim run inside each `Results.sarif` for Guardian-filtered. Aggregate by `ruleId` and binary path
 - **Quirks**:

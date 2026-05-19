@@ -74,14 +74,17 @@ To investigate official results, download the SDL artifact from the repo's offic
 
 Some agent CLI hosts run the MCP `pipelines_artifact` `download` action successfully but **silently drop the embedded-resource zip** (you see "Tool ran without output or errors" and no file lands anywhere). When that happens, call the MCP HTTP endpoint directly from PowerShell and decode the base64 blob yourself:
 
-1. Find the MCP servers config (the file path is in env, but typically): `Get-ChildItem $env:TEMP -Filter "copilot-mcp-*.json" | Sort LastWriteTime -Descending | Select -First 1 | Get-Content -Raw` — locate the `ado-dnceng` (or `ado-dnceng-public`) entry's `url` (e.g. `http://127.0.0.1:63680`).
-2. POST a `tools/call` JSON-RPC request:
+1. Find the MCP servers config (the file path is in env, but typically): `Get-ChildItem $env:TEMP -Filter "copilot-mcp-*.json" | Sort LastWriteTime -Descending | Select -First 1 | Get-Content -Raw` — locate the `ado-dnceng` (or `ado-dnceng-public`) entry's `url` and capture it in a variable (the port is assigned per session, so it changes every time):
+   ```powershell
+   $mcpUrl = (Get-Content (Get-ChildItem $env:TEMP -Filter 'copilot-mcp-*.json' | Sort LastWriteTime -Descending | Select -First 1) -Raw | ConvertFrom-Json).mcpServers.'ado-dnceng'.url
+   ```
+2. POST a `tools/call` JSON-RPC request (uses `$mcpUrl` from step 1 — do not hardcode the port):
    ```powershell
    $req = @{ jsonrpc='2.0'; id=2; method='tools/call'; params=@{
      name='pipelines_artifact'
      arguments=@{ action='download'; buildId=<id>; project='internal'; artifactName='<name>' }
    } } | ConvertTo-Json -Compress -Depth 10
-   $msg = [System.Net.Http.HttpRequestMessage]::new('POST','http://127.0.0.1:63680/')
+   $msg = [System.Net.Http.HttpRequestMessage]::new('POST',$mcpUrl)
    $msg.Headers.Accept.ParseAdd('application/json, text/event-stream')
    $msg.Content = [System.Net.Http.StringContent]::new($req,[Text.Encoding]::UTF8,'application/json')
    $client = [System.Net.Http.HttpClient]::new(); $client.Timeout = [TimeSpan]::FromMinutes(15)
