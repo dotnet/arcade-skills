@@ -64,6 +64,18 @@
     Useful when the failed work item doesn't have binlogs (e.g., unit tests) but you need
     to find related build tests that do have binlogs for deeper analysis.
 
+.PARAMETER HelixAccessToken
+    Access token for authenticated Helix API requests. Required when querying Helix jobs
+    started from internal AzDO builds (dnceng/internal) — without it the Helix API silently
+    returns empty arrays or '{"Message":"NotFound"}' rather than 401/403. The token is
+    appended as an access_token query parameter to all Helix API calls.
+
+    Prefer MCP Helix tools or the helix-cli skill when available — they handle auth
+    out-of-band. This parameter is a fallback for environments without those.
+
+    SECURITY: this is a secret. Do not log, echo, or include it in PR comments or
+    issue bodies. The script never prints the wrapped URL.
+
 .EXAMPLE
     .\Get-CIStatus.ps1 -BuildId 1276327
 
@@ -116,7 +128,8 @@ param(
     [int]$CacheTTLSeconds = 30,
     [switch]$ContinueOnError,
     [switch]$SearchMihuBot,
-    [switch]$FindBinlogs
+    [switch]$FindBinlogs,
+    [string]$HelixAccessToken
 )
 
 $ErrorActionPreference = "Stop"
@@ -1452,10 +1465,27 @@ function Get-LocalTestFailures {
 
 #region Helix API Functions
 
+function Get-HelixApiUrl {
+    <#
+    .SYNOPSIS
+        Appends -HelixAccessToken as an access_token query parameter to a Helix API URL.
+    .DESCRIPTION
+        Returns the URL unchanged when no token was supplied. Internal AzDO Helix jobs
+        (dnceng/internal) silently return empty results without auth; the token enables
+        access. Callers must never print the wrapped URL — the token is a secret.
+    #>
+    param([string]$Url)
+    if ($HelixAccessToken) {
+        $separator = if ($Url.Contains('?')) { '&' } else { '?' }
+        return "${Url}${separator}access_token=$HelixAccessToken"
+    }
+    return $Url
+}
+
 function Get-HelixJobDetails {
     param([string]$JobId)
 
-    $url = "https://helix.dot.net/api/2019-06-17/jobs/$JobId"
+    $url = Get-HelixApiUrl "https://helix.dot.net/api/2019-06-17/jobs/$JobId"
 
     try {
         $response = Invoke-CachedRestMethod -Uri $url -TimeoutSec $TimeoutSec -AsJson
@@ -1470,7 +1500,7 @@ function Get-HelixJobDetails {
 function Get-HelixWorkItems {
     param([string]$JobId)
 
-    $url = "https://helix.dot.net/api/2019-06-17/jobs/$JobId/workitems"
+    $url = Get-HelixApiUrl "https://helix.dot.net/api/2019-06-17/jobs/$JobId/workitems"
 
     try {
         $response = Invoke-CachedRestMethod -Uri $url -TimeoutSec $TimeoutSec -AsJson
@@ -1495,7 +1525,7 @@ function Get-HelixWorkItemFiles {
     param([string]$JobId, [string]$WorkItemName)
 
     $encodedWorkItem = [uri]::EscapeDataString($WorkItemName)
-    $url = "https://helix.dot.net/api/2019-06-17/jobs/$JobId/workitems/$encodedWorkItem/files"
+    $url = Get-HelixApiUrl "https://helix.dot.net/api/2019-06-17/jobs/$JobId/workitems/$encodedWorkItem/files"
 
     try {
         $files = Invoke-CachedRestMethod -Uri $url -TimeoutSec $TimeoutSec -AsJson
@@ -1511,7 +1541,7 @@ function Get-HelixWorkItemDetails {
     param([string]$JobId, [string]$WorkItemName)
 
     $encodedWorkItem = [uri]::EscapeDataString($WorkItemName)
-    $url = "https://helix.dot.net/api/2019-06-17/jobs/$JobId/workitems/$encodedWorkItem"
+    $url = Get-HelixApiUrl "https://helix.dot.net/api/2019-06-17/jobs/$JobId/workitems/$encodedWorkItem"
 
     try {
         $response = Invoke-CachedRestMethod -Uri $url -TimeoutSec $TimeoutSec -AsJson
@@ -1541,8 +1571,10 @@ function Get-HelixWorkItemDetails {
 function Get-HelixConsoleLog {
     param([string]$Url)
 
+    # Wrap inside the function so the caller can display $Url without leaking the token.
+    $authedUrl = Get-HelixApiUrl $Url
     try {
-        $response = Invoke-CachedRestMethod -Uri $Url -TimeoutSec $TimeoutSec
+        $response = Invoke-CachedRestMethod -Uri $authedUrl -TimeoutSec $TimeoutSec
         return $response
     }
     catch {

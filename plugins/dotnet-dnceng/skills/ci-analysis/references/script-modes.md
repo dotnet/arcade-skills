@@ -10,6 +10,26 @@
 | `-Repository` | Target repo (default: dotnet/runtime) |
 | `-MaxJobs` | Max failed jobs to show (default: 5) |
 | `-SearchMihuBot` | Search MihuBot for related issues |
+| `-HelixAccessToken` | Access token for internal Helix jobs (dnceng/internal). See [Internal Helix Builds](#internal-helix-builds). |
+
+## Internal Helix Builds
+
+Helix jobs started from the internal AzDO project (`dnceng/internal`) require authentication.
+The Helix REST API does **not** return 401/403 when auth is missing — instead it silently
+returns empty arrays (`[]`) or `{"Message":"NotFound","ActivityId":"..."}`. When Helix
+results appear unexpectedly empty or show `NotFound` for jobs that should exist, the most
+likely cause is missing auth, not a missing job.
+
+**Preferred path**: use MCP Helix tools or the `helix-cli` skill — both handle auth
+out-of-band (DefaultAzureCredential / device-code login) and don't require the user to
+hand a raw token to the script.
+
+**Fallback**: if neither is available, ask the user for a Helix access token and re-run
+the script with `-HelixAccessToken <token>`. The token is appended as an `access_token`
+query parameter to every Helix API call.
+
+> ⚠️ **The Helix access token is a secret.** Never log it, echo it in PR comments, or
+> include it in issue bodies or any other output. The script never prints the wrapped URL.
 
 ## Three Modes
 
