@@ -63,7 +63,7 @@ Other repos have different pipelines - the script discovers them automatically f
 
 - [Helix Portal](https://helix.dot.net/): View Helix jobs and work items (all repos)
 - [Helix API Documentation](https://helix.dot.net/swagger/): Swagger docs for Helix REST API
-- [Build Analysis](https://github.com/dotnet/arcade/blob/main/Documentation/Projects/Build%20Analysis/LandingPage.md): Known issues tracking (arcade infrastructure)
+- [Build Analysis](https://github.com/dotnet/arcade/blob/main/Documentation/Build%20Analysis/LandingPage.md): Known issues tracking (arcade infrastructure)
 - [dnceng-public AzDO](https://dev.azure.com/dnceng-public/public/_build): Public builds for all dotnet repos
 
 ### Repository-specific docs:
