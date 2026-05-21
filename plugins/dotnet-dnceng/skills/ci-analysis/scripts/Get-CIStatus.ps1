@@ -235,11 +235,15 @@ if (-not $NoCache) {
 
 function Get-UrlHash {
     param([string]$Url)
-    
+
+    # Normalize by stripping any access_token before hashing so the cache key is
+    # stable whether the URL was authed or not, and so the raw secret never
+    # contributes to filenames on disk.
+    $normalized = Format-RedactedUrl $Url
     $sha256 = [System.Security.Cryptography.SHA256]::Create()
     try {
         return [System.BitConverter]::ToString(
-            $sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($Url))
+            $sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($normalized))
         ).Replace("-", "")
     }
     finally {
@@ -263,11 +267,11 @@ function Get-CachedResponse {
         $age = (Get-Date) - $cacheInfo.LastWriteTime
 
         if ($age.TotalSeconds -lt $TTLSeconds) {
-            Write-Verbose "Cache hit for $Url (age: $([int]$age.TotalSeconds) sec)"
+            Write-Verbose "Cache hit for $(Format-RedactedUrl $Url) (age: $([int]$age.TotalSeconds) sec)"
             return Get-Content $cacheFile -Raw
         }
         else {
-            Write-Verbose "Cache expired for $Url"
+            Write-Verbose "Cache expired for $(Format-RedactedUrl $Url)"
         }
     }
 
@@ -290,7 +294,7 @@ function Set-CachedResponse {
     try {
         $Content | Set-Content -LiteralPath $tempFile -Force
         Move-Item -LiteralPath $tempFile -Destination $cacheFile -Force
-        Write-Verbose "Cached response for $Url"
+        Write-Verbose "Cached response for $(Format-RedactedUrl $Url)"
     }
     catch {
         # Clean up temp file on failure
@@ -329,7 +333,7 @@ function Invoke-CachedRestMethod {
     }
 
     # Make the actual request
-    Write-Verbose "GET $Uri"
+    Write-Verbose "GET $(Format-RedactedUrl $Uri)"
     $response = Invoke-RestMethod -Uri $Uri -Method Get -TimeoutSec $TimeoutSec
 
     # Cache the response (unless skipping write)
@@ -1496,14 +1500,30 @@ function Get-HelixApiUrl {
     .DESCRIPTION
         Returns the URL unchanged when no token was supplied. Internal AzDO Helix jobs
         (dnceng/internal) silently return empty results without auth; the token enables
-        access. Callers must never print the wrapped URL — the token is a secret.
+        access. The token is URL-encoded so values containing '+', '/', '=' or similar
+        round-trip correctly. Callers must avoid printing the returned URL; verbose
+        logging paths in this script use Format-RedactedUrl to strip the token first.
     #>
     param([string]$Url)
     if ($HelixAccessToken) {
         $separator = if ($Url.Contains('?')) { '&' } else { '?' }
-        return "${Url}${separator}access_token=$HelixAccessToken"
+        $encoded = [uri]::EscapeDataString($HelixAccessToken)
+        return "${Url}${separator}access_token=$encoded"
     }
     return $Url
+}
+
+function Format-RedactedUrl {
+    <#
+    .SYNOPSIS
+        Returns a URL with any access_token query parameter value replaced by ***.
+    .DESCRIPTION
+        Used for verbose logging and cache-key computation so the Helix access token
+        never appears in -Verbose output, cache filenames, or other diagnostic paths.
+    #>
+    param([string]$Url)
+    if (-not $Url) { return $Url }
+    return [regex]::Replace($Url, '(?i)(access_token=)[^&]*', '${1}***')
 }
 
 function Get-HelixJobDetails {

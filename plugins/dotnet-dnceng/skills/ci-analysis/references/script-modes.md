@@ -7,7 +7,7 @@
 | `-PRNumber` | GitHub PR number to analyze |
 | `-BuildId` | Azure DevOps build ID |
 | `-ShowLogs` | Fetch and display Helix console logs |
-| `-Repository` | Target repo (default: dotnet/runtime) |
+| `-Repository` | Target repo. Auto-detected from the current directory's git remote via `gh repo view` when omitted; falls back to `dotnet/runtime` if no GitHub remote can be resolved. |
 | `-MaxJobs` | Max failed jobs to show (default: 5) |
 | `-SearchMihuBot` | Search MihuBot for related issues |
 | `-HelixAccessToken` | Access token for internal Helix jobs (dnceng/internal). See [Internal Helix Builds](#internal-helix-builds). |
@@ -29,7 +29,12 @@ the script with `-HelixAccessToken <token>`. The token is appended as an `access
 query parameter to every Helix API call.
 
 > ⚠️ **The Helix access token is a secret.** Never log it, echo it in PR comments, or
-> include it in issue bodies or any other output. The script never prints the wrapped URL.
+> include it in issue bodies or any other output. The script URL-encodes the token, hashes
+> the redacted URL for cache keys, and replaces `access_token=...` with `access_token=***`
+> in its own verbose log output (`-Verbose`). The tokenized URL is still passed into
+> `Invoke-RestMethod` itself, so any external tracing (PowerShell transcripts, HTTP proxy
+> logs, `Set-PSDebug -Trace`) outside this script's control may still capture it — treat
+> the surrounding environment accordingly.
 
 ## Three Modes
 
