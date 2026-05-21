@@ -17,6 +17,7 @@ on:
       - 'eng/**'
       - '.github/plugin/**'
       - '.claude-plugin/**'
+      - '.github/workflows/validation.yml'
   workflow_dispatch:
 
 permissions:
