@@ -14,7 +14,7 @@
     "azure-devops"
   ],
   "skills": "./skills",
-  "agents": ["agents/CiInvestigator.agent.md"],
+  "agents": ["agents/ci-investigator.agent.md"],
   "mcpServers": {
     "hlx": {
       "command": "dotnet",
