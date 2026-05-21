@@ -20,7 +20,8 @@
     The Helix work item name to query (requires -HelixJob).
 
 .PARAMETER Repository
-    The GitHub repository (owner/repo format). Default: dotnet/runtime
+    The GitHub repository (owner/repo format). When omitted, auto-detected from the
+    current directory's git remote via `gh repo view`. Falls back to dotnet/runtime.
 
 .PARAMETER Organization
     The Azure DevOps organization. Default: dnceng-public
@@ -116,7 +117,7 @@ param(
     [Parameter(ParameterSetName = 'ClearCache', Mandatory = $true)]
     [switch]$ClearCache,
 
-    [string]$Repository = "dotnet/runtime",
+    [string]$Repository,
     [string]$Organization = "dnceng-public",
     [string]$Project = "cbb18261-c48f-4abb-8651-8cdcb5474649",
     [switch]$ShowLogs,
@@ -133,6 +134,29 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# Auto-detect repository from current working directory's git remote when not
+# explicitly supplied, so the script works naturally inside any dotnet repo
+# checkout. Falls back to dotnet/runtime to preserve historical behavior for
+# callers running outside a repo (for example, when invoking with -BuildId only).
+function Resolve-DefaultRepository {
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+        return "dotnet/runtime"
+    }
+    $detected = & gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>$null
+    if ($LASTEXITCODE -eq 0 -and $detected) {
+        $trimmed = $detected.Trim()
+        if ($trimmed) {
+            Write-Verbose "Auto-detected repository from current directory: $trimmed"
+            return $trimmed
+        }
+    }
+    return "dotnet/runtime"
+}
+
+if (-not $Repository) {
+    $Repository = Resolve-DefaultRepository
+}
 
 #region Caching Functions
 
