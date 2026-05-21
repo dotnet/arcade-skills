@@ -8,7 +8,7 @@ on:
       - 'eng/**'
       - '.github/plugin/**'
       - '.claude-plugin/**'
-      - '.github/workflows/pr-validation.yml'
+      - '.github/workflows/validation.yml'
   push:
     branches: [main]
     paths:
@@ -86,6 +86,10 @@ jobs:
         if: always() && !cancelled()
         id: validate
         shell: pwsh
+        env:
+          GH_SERVER_URL: ${{ github.server_url }}
+          GH_REPOSITORY: ${{ github.repository }}
+          GH_RUN_ID: ${{ github.run_id }}
         run: |
           $errors = [System.Collections.Generic.List[string]]::new()
           $warnings = [System.Collections.Generic.List[string]]::new()
@@ -560,7 +564,7 @@ jobs:
           if ($errors.Count -gt 0 -or $warnings.Count -gt 0) {
             $marker = "<!-- pr-validation -->"
             $body = "$marker`n"
-            $runUrl = "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            $runUrl = "$env:GH_SERVER_URL/$env:GH_REPOSITORY/actions/runs/$env:GH_RUN_ID"
             if ($errors.Count -gt 0) {
               $body += "### Structural validation failed with $($errors.Count) error(s)`n`n"
               foreach ($e in $errors) { $body += "- $e`n" }
