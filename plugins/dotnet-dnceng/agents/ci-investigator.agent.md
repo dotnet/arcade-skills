@@ -1,5 +1,5 @@
 ---
-name: CiInvestigator
+name: ci-investigator
 description: >
   Orchestrate CI failure investigations for dotnet repositories. Routes to
   specialized skills based on failure type: ci-analysis for triage, helix-investigation
