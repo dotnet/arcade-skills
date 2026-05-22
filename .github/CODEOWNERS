@@ -1,20 +1,20 @@
 # Default owners for everything in the repo
-* @lewing @danmoseley @viktorhofer
+* @lewing @viktorhofer
 
 # CI/CD and engineering
-/.github/workflows/ @lewing @danmoseley @viktorhofer
-/eng/ @danmoseley @lewing
+/.github/workflows/ @lewing @viktorhofer
+/eng/ @viktorhofer @lewing
 
 # Skills
-/plugins/dotnet-dnceng/skills/ci-analysis/ @lewing @danmoseley
-/plugins/dotnet-dnceng/skills/known-issue-history/ @lewing @danmoseley
-/plugins/dotnet-dnceng/skills/ci-crash-dump/ @lewing @danmoseley
-/plugins/dotnet-dnceng/skills/flow-analysis/ @lewing @danmoseley
-/plugins/dotnet-dnceng/skills/flow-tracing/ @lewing @danmoseley
-/plugins/dotnet-dnceng/skills/maestro-cli/ @lewing @danmoseley
-/plugins/dotnet-compliance/skills/binskim-scan/ @lewing @danmoseley
-/plugins/dotnet-compliance/skills/binskim-analysis/ @lewing @danmoseley
-/plugins/dotnet-dnceng/skills/helix-investigation/ @lewing @danmoseley
-/plugins/dotnet-dnceng/skills/pipeline-investigation/ @lewing @danmoseley
-/plugins/dotnet-dnceng/agents/ @lewing @danmoseley
+/plugins/dotnet-dnceng/skills/ci-analysis/ @lewing @steveisok
+/plugins/dotnet-dnceng/skills/known-issue-history/ @lewing @steveisok
+/plugins/dotnet-dnceng/skills/ci-crash-dump/ @lewing @steveisok
+/plugins/dotnet-dnceng/skills/flow-analysis/ @lewing @steveisok
+/plugins/dotnet-dnceng/skills/flow-tracing/ @lewing @steveisok
+/plugins/dotnet-dnceng/skills/maestro-cli/ @lewing @steveisok
+/plugins/dotnet-compliance/skills/binskim-scan/ @lewing @steveisok
+/plugins/dotnet-compliance/skills/binskim-analysis/ @lewing @steveisok
+/plugins/dotnet-dnceng/skills/helix-investigation/ @lewing @steveisok
+/plugins/dotnet-dnceng/skills/pipeline-investigation/ @lewing @steveisok
+/plugins/dotnet-dnceng/agents/ @lewing @steveisok
 /plugins/dotnet-dnceng/skills/test-arcade/ @ellahathaway @dotnet/dnceng
