@@ -236,9 +236,10 @@ if (-not $NoCache) {
 function Get-UrlHash {
     param([string]$Url)
 
-    # Normalize by stripping any access_token before hashing so the cache key is
-    # stable whether the URL was authed or not, and so the raw secret never
-    # contributes to filenames on disk.
+    # Normalize by redacting any access_token value before hashing so the cache
+    # key is stable across different token values while still distinguishing
+    # URLs based on whether auth parameters are present, and so the raw secret
+    # never contributes to filenames on disk.
     $normalized = Format-RedactedUrl $Url
     $sha256 = [System.Security.Cryptography.SHA256]::Create()
     try {
