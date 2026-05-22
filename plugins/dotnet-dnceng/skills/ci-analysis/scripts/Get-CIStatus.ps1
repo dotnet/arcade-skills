@@ -20,7 +20,8 @@
     The Helix work item name to query (requires -HelixJob).
 
 .PARAMETER Repository
-    The GitHub repository (owner/repo format). Default: dotnet/runtime
+    The GitHub repository (owner/repo format). When omitted, auto-detected from the
+    current directory's git remote via `gh repo view`. Falls back to dotnet/runtime.
 
 .PARAMETER Organization
     The Azure DevOps organization. Default: dnceng-public
@@ -64,6 +65,18 @@
     Useful when the failed work item doesn't have binlogs (e.g., unit tests) but you need
     to find related build tests that do have binlogs for deeper analysis.
 
+.PARAMETER HelixAccessToken
+    Access token for authenticated Helix API requests. Required when querying Helix jobs
+    started from internal AzDO builds (dnceng/internal) — without it the Helix API silently
+    returns empty arrays or '{"Message":"NotFound"}' rather than 401/403. The token is
+    appended as an access_token query parameter to all Helix API calls.
+
+    Prefer MCP Helix tools or the helix-cli skill when available — they handle auth
+    out-of-band. This parameter is a fallback for environments without those.
+
+    SECURITY: this is a secret. Do not log, echo, or include it in PR comments or
+    issue bodies. The script never prints the wrapped URL.
+
 .EXAMPLE
     .\Get-CIStatus.ps1 -BuildId 1276327
 
@@ -104,7 +117,7 @@ param(
     [Parameter(ParameterSetName = 'ClearCache', Mandatory = $true)]
     [switch]$ClearCache,
 
-    [string]$Repository = "dotnet/runtime",
+    [string]$Repository,
     [string]$Organization = "dnceng-public",
     [string]$Project = "cbb18261-c48f-4abb-8651-8cdcb5474649",
     [switch]$ShowLogs,
@@ -116,10 +129,34 @@ param(
     [int]$CacheTTLSeconds = 30,
     [switch]$ContinueOnError,
     [switch]$SearchMihuBot,
-    [switch]$FindBinlogs
+    [switch]$FindBinlogs,
+    [string]$HelixAccessToken
 )
 
 $ErrorActionPreference = "Stop"
+
+# Auto-detect repository from current working directory's git remote when not
+# explicitly supplied, so the script works naturally inside any dotnet repo
+# checkout. Falls back to dotnet/runtime to preserve historical behavior for
+# callers running outside a repo (for example, when invoking with -BuildId only).
+function Resolve-DefaultRepository {
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+        return "dotnet/runtime"
+    }
+    $detected = & gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>$null
+    if ($LASTEXITCODE -eq 0 -and $detected) {
+        $trimmed = $detected.Trim()
+        if ($trimmed) {
+            Write-Verbose "Auto-detected repository from current directory: $trimmed"
+            return $trimmed
+        }
+    }
+    return "dotnet/runtime"
+}
+
+if (-not $Repository) {
+    $Repository = Resolve-DefaultRepository
+}
 
 #region Caching Functions
 
@@ -198,11 +235,16 @@ if (-not $NoCache) {
 
 function Get-UrlHash {
     param([string]$Url)
-    
+
+    # Normalize by redacting any access_token value before hashing so the cache
+    # key is stable across different token values while still distinguishing
+    # URLs based on whether auth parameters are present, and so the raw secret
+    # never contributes to filenames on disk.
+    $normalized = Format-RedactedUrl $Url
     $sha256 = [System.Security.Cryptography.SHA256]::Create()
     try {
         return [System.BitConverter]::ToString(
-            $sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($Url))
+            $sha256.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($normalized))
         ).Replace("-", "")
     }
     finally {
@@ -226,11 +268,11 @@ function Get-CachedResponse {
         $age = (Get-Date) - $cacheInfo.LastWriteTime
 
         if ($age.TotalSeconds -lt $TTLSeconds) {
-            Write-Verbose "Cache hit for $Url (age: $([int]$age.TotalSeconds) sec)"
+            Write-Verbose "Cache hit for $(Format-RedactedUrl $Url) (age: $([int]$age.TotalSeconds) sec)"
             return Get-Content $cacheFile -Raw
         }
         else {
-            Write-Verbose "Cache expired for $Url"
+            Write-Verbose "Cache expired for $(Format-RedactedUrl $Url)"
         }
     }
 
@@ -253,7 +295,7 @@ function Set-CachedResponse {
     try {
         $Content | Set-Content -LiteralPath $tempFile -Force
         Move-Item -LiteralPath $tempFile -Destination $cacheFile -Force
-        Write-Verbose "Cached response for $Url"
+        Write-Verbose "Cached response for $(Format-RedactedUrl $Url)"
     }
     catch {
         # Clean up temp file on failure
@@ -292,7 +334,7 @@ function Invoke-CachedRestMethod {
     }
 
     # Make the actual request
-    Write-Verbose "GET $Uri"
+    Write-Verbose "GET $(Format-RedactedUrl $Uri)"
     $response = Invoke-RestMethod -Uri $Uri -Method Get -TimeoutSec $TimeoutSec
 
     # Cache the response (unless skipping write)
@@ -1452,10 +1494,43 @@ function Get-LocalTestFailures {
 
 #region Helix API Functions
 
+function Get-HelixApiUrl {
+    <#
+    .SYNOPSIS
+        Appends -HelixAccessToken as an access_token query parameter to a Helix API URL.
+    .DESCRIPTION
+        Returns the URL unchanged when no token was supplied. Internal AzDO Helix jobs
+        (dnceng/internal) silently return empty results without auth; the token enables
+        access. The token is URL-encoded so values containing '+', '/', '=' or similar
+        round-trip correctly. Callers must avoid printing the returned URL; verbose
+        logging paths in this script use Format-RedactedUrl to strip the token first.
+    #>
+    param([string]$Url)
+    if ($HelixAccessToken) {
+        $separator = if ($Url.Contains('?')) { '&' } else { '?' }
+        $encoded = [uri]::EscapeDataString($HelixAccessToken)
+        return "${Url}${separator}access_token=$encoded"
+    }
+    return $Url
+}
+
+function Format-RedactedUrl {
+    <#
+    .SYNOPSIS
+        Returns a URL with any access_token query parameter value replaced by ***.
+    .DESCRIPTION
+        Used for verbose logging and cache-key computation so the Helix access token
+        never appears in -Verbose output, cache filenames, or other diagnostic paths.
+    #>
+    param([string]$Url)
+    if (-not $Url) { return $Url }
+    return [regex]::Replace($Url, '(?i)(access_token=)[^&]*', '${1}***')
+}
+
 function Get-HelixJobDetails {
     param([string]$JobId)
 
-    $url = "https://helix.dot.net/api/2019-06-17/jobs/$JobId"
+    $url = Get-HelixApiUrl "https://helix.dot.net/api/2019-06-17/jobs/$JobId"
 
     try {
         $response = Invoke-CachedRestMethod -Uri $url -TimeoutSec $TimeoutSec -AsJson
@@ -1470,7 +1545,7 @@ function Get-HelixJobDetails {
 function Get-HelixWorkItems {
     param([string]$JobId)
 
-    $url = "https://helix.dot.net/api/2019-06-17/jobs/$JobId/workitems"
+    $url = Get-HelixApiUrl "https://helix.dot.net/api/2019-06-17/jobs/$JobId/workitems"
 
     try {
         $response = Invoke-CachedRestMethod -Uri $url -TimeoutSec $TimeoutSec -AsJson
@@ -1495,7 +1570,7 @@ function Get-HelixWorkItemFiles {
     param([string]$JobId, [string]$WorkItemName)
 
     $encodedWorkItem = [uri]::EscapeDataString($WorkItemName)
-    $url = "https://helix.dot.net/api/2019-06-17/jobs/$JobId/workitems/$encodedWorkItem/files"
+    $url = Get-HelixApiUrl "https://helix.dot.net/api/2019-06-17/jobs/$JobId/workitems/$encodedWorkItem/files"
 
     try {
         $files = Invoke-CachedRestMethod -Uri $url -TimeoutSec $TimeoutSec -AsJson
@@ -1511,7 +1586,7 @@ function Get-HelixWorkItemDetails {
     param([string]$JobId, [string]$WorkItemName)
 
     $encodedWorkItem = [uri]::EscapeDataString($WorkItemName)
-    $url = "https://helix.dot.net/api/2019-06-17/jobs/$JobId/workitems/$encodedWorkItem"
+    $url = Get-HelixApiUrl "https://helix.dot.net/api/2019-06-17/jobs/$JobId/workitems/$encodedWorkItem"
 
     try {
         $response = Invoke-CachedRestMethod -Uri $url -TimeoutSec $TimeoutSec -AsJson
@@ -1541,8 +1616,10 @@ function Get-HelixWorkItemDetails {
 function Get-HelixConsoleLog {
     param([string]$Url)
 
+    # Wrap inside the function so the caller can display $Url without leaking the token.
+    $authedUrl = Get-HelixApiUrl $Url
     try {
-        $response = Invoke-CachedRestMethod -Uri $Url -TimeoutSec $TimeoutSec
+        $response = Invoke-CachedRestMethod -Uri $authedUrl -TimeoutSec $TimeoutSec
         return $response
     }
     catch {
