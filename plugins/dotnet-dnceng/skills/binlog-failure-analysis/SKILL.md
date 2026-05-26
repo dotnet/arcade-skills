@@ -193,7 +193,7 @@ Build permalinks as `${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/${PR_HEAD_SH
 
 ### Step 6 — Post inline suggestions (optional, best-effort)
 
-> ℹ️ **This step is best-effort.** Skip it entirely if no error fits cleanly — a high-quality summary comment alone is more valuable than speculative inline edits. The skill is considered successful even when Step 6 produces zero comments. A live example of the comment shape: [YuliiaKovalova/msbuild#2 (discussion_r3304219118)](https://github.com/YuliiaKovalova/msbuild/pull/2#discussion_r3304219118).
+> ℹ️ **This step is best-effort.** Skip it entirely if no error fits cleanly — a high-quality summary comment alone is more valuable than speculative inline edits. The skill is considered successful even when Step 6 produces zero comments.
 
 When (and **only** when) an error has all of the following:
 
