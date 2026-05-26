@@ -40,6 +40,7 @@ Analyze a failed AzDO PR build by reading the **binlog that build already produc
 
 - **Binlog MCP tools** (`mcp-binlog-tool-aitools-*` prefix) — `Microsoft.AITools.BinlogMcp` is wired in `plugins/dotnet-dnceng/plugin.json` as a **separate** MCP server (`mcp-binlog-tool-aitools`) alongside the existing `mcp-binlog-tool` (`baronfel.binlog.mcp`) — no breaking change to other skills. The three tools this skill calls by default are `binlog_overview`, `binlog_errors`, `binlog_warnings`; deeper investigation uses `binlog_diagnose` and `binlog_explain_property`. The server exposes 29 tools total — see Step 3 for the drill-down surface (search, task details, target reasons, double-writes, imports, NuGet, compiler, etc.).
 - **`curl`** for the AzDO REST artifact download.
+- **`jq`** for parsing the AzDO artifacts JSON and the GitHub check-runs payload (Step 2 + `references/azdo-artifact-fetch.md`).
 - **`unzip`** for extracting the artifact.
 - **Azure DevOps access:**
   - Anonymous read for `dev.azure.com/dnceng-public/public` — no token needed.
@@ -89,7 +90,15 @@ ARTIFACTS=$(curl -fsSL \
 # `PostBuildLogs_<StageLabel>_<JobLabel>_Attempt<N>`. dnceng-public legs
 # typically use `Logs_Build_Attempt<N>_<leg>`. Prefer PostBuildLogs* first.
 ARTIFACT_NAME=$(echo "$ARTIFACTS" | jq -r '.value[] | select(.name | test("^PostBuildLogs_|^Logs_Build_")) | .name' | head -1)
+if [ -z "$ARTIFACT_NAME" ]; then
+  echo "No PostBuildLogs_* or Logs_Build_* artifact on build $AZDO_BUILD_ID — pipeline likely doesn't publish a binlog. Post a one-line PR comment noting this and stop."
+  exit 0
+fi
 DOWNLOAD_URL=$(echo "$ARTIFACTS" | jq -r --arg n "$ARTIFACT_NAME" '.value[] | select(.name == $n) | .resource.downloadUrl')
+if [ -z "$DOWNLOAD_URL" ] || [ "$DOWNLOAD_URL" = "null" ]; then
+  echo "Artifact '$ARTIFACT_NAME' has no downloadUrl — unexpected AzDO response shape. Stop."
+  exit 0
+fi
 
 # 2. Download and unzip.
 mkdir -p /tmp/azdo-binlog
@@ -100,6 +109,10 @@ unzip -q -o /tmp/azdo-artifact.zip -d /tmp/azdo-binlog
 #    is typically the newest in the artifact).
 BINLOG=$(find /tmp/azdo-binlog -name '*.binlog' -type f -printf '%T@ %p\n' \
          | sort -nr | head -1 | cut -d' ' -f2-)
+if [ -z "$BINLOG" ]; then
+  echo "Artifact '$ARTIFACT_NAME' extracted but contains no *.binlog — pipeline isn't binlog-producing. Post a one-line PR comment noting this and stop."
+  exit 0
+fi
 ```
 
 Full REST recipe (incl. dnceng/internal auth, fallback when no `PostBuildLogs_*` artifact exists): see `references/azdo-artifact-fetch.md`.

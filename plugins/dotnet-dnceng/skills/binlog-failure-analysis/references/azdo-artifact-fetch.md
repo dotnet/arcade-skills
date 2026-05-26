@@ -2,6 +2,8 @@
 
 Companion reference for `binlog-failure-analysis`. Covers all the edge cases the SKILL.md hand-waves: discovering the build id from a check-run event, authenticating against `dnceng/internal` or `devdiv/DevDiv`, fallback when `PostBuildLogs_*` is absent, and disambiguating multiple binlogs in one artifact.
 
+**Required CLI tools:** `gh` (GitHub CLI), `jq` (JSON parsing), `curl` (HTTP), `unzip` (artifact extraction). All snippets in this file assume the four are on `PATH`.
+
 ## 1. Find the failing AzDO build for a PR
 
 If the caller already knows the build id, skip this section.
@@ -94,7 +96,7 @@ Prefer `PostBuildLogs_*` first; fall back to `Logs_*`; final fallback is "any ar
 
 ### Download
 
-The `downloadUrl` returns a zip when `?format=zip` is appended, regardless of the artifact's underlying storage type. With the modern PipelineArtifact storage you can also use `artifactName` + `?$format=zip` on the artifacts endpoint directly:
+Use the AzDO artifacts endpoint with `artifactName` + `$format=zip` to download the artifact as a zip — this is the canonical pattern used elsewhere in this repo (see `plugins/dotnet-dnceng/skills/ci-analysis/references/helix-artifacts.md`). The `downloadUrl` returned in the artifacts list is also usable when the underlying storage type is `Container` (it points at a pre-formatted zip stream), but the endpoint form is portable across both `Container` and modern `PipelineArtifact` storage:
 
 ```bash
 ZIP_URL="https://dev.azure.com/$AZDO_ORG/$AZDO_PROJECT/_apis/build/builds/$AZDO_BUILD_ID/artifacts?artifactName=$ARTIFACT_NAME&api-version=7.1&\$format=zip"
