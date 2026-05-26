@@ -29,14 +29,6 @@
       "args": [
         "dnx",
         "--yes",
-        "baronfel.binlog.mcp"
-      ]
-    },
-    "mcp-binlog-tool-aitools": {
-      "command": "dotnet",
-      "args": [
-        "dnx",
-        "--yes",
         "--version",
         "1.0.0-preview.26275.1",
         "Microsoft.AITools.BinlogMcp"

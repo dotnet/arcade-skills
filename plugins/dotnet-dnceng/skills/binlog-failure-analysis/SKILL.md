@@ -5,7 +5,7 @@ description: >
   produced — instead of rebuilding locally. Use when an `azure-pipelines` check on
   a GitHub PR transitions to `failure` and you need a structured root-cause analysis
   posted back as a PR review. Downloads `PostBuildLogs_*` / `Logs_Build_*` from the
-  AzDO build artifacts, invokes the `mcp-binlog-tool-aitools` MCP (Microsoft.AITools.BinlogMcp)
+  AzDO build artifacts, invokes the `mcp-binlog-tool` MCP (Microsoft.AITools.BinlogMcp)
   for overview/errors/warnings (with `binlog_diagnose` / `binlog_explain_property` as
   deeper drill-downs when the basics aren't enough), groups symptoms by root cause,
   and emits a single summary comment. Optionally attaches inline `suggestion`
@@ -21,7 +21,7 @@ Analyze a failed AzDO PR build by reading the **binlog that build already produc
 
 > 🛑 **NEVER** use `gh pr review --approve` or `--request-changes`. Only `--comment` is allowed. Approval and blocking are human-only actions.
 
-**Workflow**: gate on `check_run: completed` → resolve PR + build id → download AzDO artifact → invoke `mcp-binlog-tool-aitools` (overview/errors/warnings first; `binlog_diagnose` / `binlog_explain_property` when the cause is non-obvious) → group symptoms by root cause → post a single summary comment → optionally attach ≤10 inline `suggestion` blocks. The agent drives the analysis; tools provide the data.
+**Workflow**: gate on `check_run: completed` → resolve PR + build id → download AzDO artifact → invoke `mcp-binlog-tool` (overview/errors/warnings first; `binlog_diagnose` / `binlog_explain_property` when the cause is non-obvious) → group symptoms by root cause → post a single summary comment → optionally attach ≤10 inline `suggestion` blocks. The agent drives the analysis; tools provide the data.
 
 ## When to use
 
@@ -38,7 +38,7 @@ Analyze a failed AzDO PR build by reading the **binlog that build already produc
 
 ## Prerequisites
 
-- **Binlog MCP tools** (`mcp-binlog-tool-aitools-*` prefix) — `Microsoft.AITools.BinlogMcp` is wired in `plugins/dotnet-dnceng/plugin.json` as a **separate** MCP server (`mcp-binlog-tool-aitools`) alongside the existing `mcp-binlog-tool` (`baronfel.binlog.mcp`) — no breaking change to other skills. The three tools this skill calls by default are `binlog_overview`, `binlog_errors`, `binlog_warnings`; deeper investigation uses `binlog_diagnose` and `binlog_explain_property`. The server exposes 29 tools total — see Step 3 for the drill-down surface (search, task details, target reasons, double-writes, imports, NuGet, compiler, etc.).
+- **Binlog MCP tools** (`mcp-binlog-tool-*` prefix) — `Microsoft.AITools.BinlogMcp` is wired in `plugins/dotnet-dnceng/plugin.json`. The three tools this skill calls by default are `binlog_overview`, `binlog_errors`, `binlog_warnings`; deeper investigation uses `binlog_diagnose` and `binlog_explain_property`. The server exposes 29 tools total — see Step 3 for the drill-down surface (search, task details, target reasons, double-writes, imports, NuGet, compiler, etc.).
 - **`curl`** for the AzDO REST artifact download.
 - **`jq`** for parsing the AzDO artifacts JSON and the GitHub check-runs payload (Step 2 + `references/azdo-artifact-fetch.md`).
 - **`unzip`** for extracting the artifact.
@@ -68,7 +68,7 @@ The skill executes seven sequential steps. Each step gates the next — stop ear
 
 1. **Sanity check** — verify the trigger is a real failure with a known build id.
 2. **Download the binlog** from AzDO build artifacts.
-3. **Dump the binlog as JSON** via `mcp-binlog-tool-aitools` (overview/errors/warnings; drill-down tools on demand).
+3. **Dump the binlog as JSON** via `mcp-binlog-tool` (overview/errors/warnings; drill-down tools on demand).
 4. **Group errors by root cause** using common .NET / MSBuild failure patterns.
 5. **Post the summary comment** on the PR with grouped clusters and proposed fixes.
 6. **Post inline `suggestion` review comments** (≤10, **optional / best-effort**) only when an error has a clear one-line fix on a line touched by the PR diff. Skip if no error fits cleanly.
@@ -119,7 +119,7 @@ Full REST recipe (incl. dnceng/internal auth, fallback when no `PostBuildLogs_*`
 
 ### Step 3 — Dump the binlog as JSON
 
-Use the `mcp-binlog-tool-aitools` MCP server (`Microsoft.AITools.BinlogMcp`). Every tool takes a `binlog_file` argument (no separate `load_binlog` call needed).
+Use the `mcp-binlog-tool` MCP server (`Microsoft.AITools.BinlogMcp`). Every tool takes a `binlog_file` argument (no separate `load_binlog` call needed).
 
 **Always call these three first** — they're cheap and feed Step 4's clustering:
 
