@@ -34,6 +34,16 @@
         "Microsoft.AITools.BinlogMcp"
       ]
     },
+    "mcp-binlog-tool-aitools": {
+      "command": "dotnet",
+      "args": [
+        "dnx",
+        "--yes",
+        "--version",
+        "1.0.0-preview.26275.1",
+        "Microsoft.AITools.BinlogMcp"
+      ]
+    },
     "mihubot": {
       "type": "http",
       "url": "https://mihubot.xyz/mcp"

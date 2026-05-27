@@ -120,7 +120,6 @@ Full REST recipe (incl. dnceng/internal auth, fallback when no `PostBuildLogs_*`
 ### Step 3 — Dump the binlog as JSON
 
 Use the `mcp-binlog-tool` MCP server (`Microsoft.AITools.BinlogMcp`). Every tool takes a `binlog_file` argument (no separate `load_binlog` call needed).
-
 **Always call these three first** — they're cheap and feed Step 4's clustering:
 
 | Tool              | Purpose                       | Output file |
