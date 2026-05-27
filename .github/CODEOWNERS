@@ -16,5 +16,6 @@
 /plugins/dotnet-compliance/skills/binskim-analysis/ @lewing @steveisok
 /plugins/dotnet-dnceng/skills/helix-investigation/ @lewing @steveisok
 /plugins/dotnet-dnceng/skills/pipeline-investigation/ @lewing @steveisok
+/plugins/dotnet-dnceng/skills/binlog-failure-analysis/ @lewing @steveisok
 /plugins/dotnet-dnceng/agents/ @lewing @steveisok
 /plugins/dotnet-dnceng/skills/test-arcade/ @ellahathaway @dotnet/dnceng
