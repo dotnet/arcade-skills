@@ -56,7 +56,7 @@ Use Step 7's numbered format: failure category, frequency, root cause, affected 
 ## Prerequisites
 
 - AzDO MCP tools (ado-* prefix) for querying builds and timelines on public projects
-- Binlog MCP tools (mcp-binlog-tool-*) for analyzing MSBuild binary logs from build artifacts
+- Binlog MCP tools (mcp-binlog-tool-*) for analyzing MSBuild binary logs from build artifacts via `Microsoft.AITools.BinlogMcp`
 - `az account get-access-token` or `azureauth ado token` for authenticated REST API access to `dnceng/internal`
 - `curl` for downloading task logs and build artifacts
 - `gh` CLI for searching related issues and source code
@@ -200,11 +200,14 @@ curl -s -H "Authorization: Bearer $TOKEN" -o /tmp/logs.zip "{downloadUrl}"
 unzip -o /tmp/logs.zip "*/Build.binlog" -d /tmp/binlogs/
 ```
 
-Then use the binlog MCP tools:
-- `load_binlog` → `get_diagnostics` for errors/warnings
-- `search_binlog` to find specific patterns (e.g., `MacSignFailed`, `crossgen2`)
-- `get_task_info` to see exact command lines and parameters for failed tasks
-- `list_tasks_in_target` to see all tasks in a target (e.g., 126 Crossgen tasks, which one failed?)
+Then use the binlog MCP tools (`Microsoft.AITools.BinlogMcp`, wired as `mcp-binlog-tool`):
+- `binlog_overview` for build configuration and which target failed
+- `binlog_errors` / `binlog_warnings` for the structured diagnostics list (`{code, message, file, line, column, projectFile, targetName, taskName}` per row)
+- `binlog_search` to find specific patterns (e.g., `MacSignFailed`, `crossgen2`) — same StructuredLog Viewer query syntax as before
+- `binlog_task_details` to see exact command lines and parameters for failed tasks (Exec's `Command`, RAR's `Assemblies`/`AppConfigFile` etc.)
+- `binlog_tasks_in_target` to see all tasks in a target (e.g., 126 Crossgen tasks, which one failed?)
+- `binlog_diagnose` for an automated "what broke" report (new in `Microsoft.AITools.BinlogMcp` — no equivalent on the old server)
+- `binlog_explain_property` to trace where a property got its value across imports/targets/tasks (also new)
 
 > 💡 Binlogs capture the full MSBuild execution including command lines, environment variables, and interleaved output that task logs lose. Essential for signing, crossgen2, and SBRP failures.
 
