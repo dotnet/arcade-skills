@@ -24,7 +24,7 @@
         "lewing.helix.mcp"
       ]
     },
-    "mcp-binlog-tool-aitools": {
+    "binlog": {
       "command": "dotnet",
       "args": [
         "dnx",

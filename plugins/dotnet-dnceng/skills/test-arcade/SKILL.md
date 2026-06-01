@@ -38,7 +38,7 @@ Before running this skill, ensure the following are available:
 
 ### Optional: Binlog MCP Tool
 
-For investigating build failures, the `mcp-binlog-tool` MCP server can parse `.binlog` files produced during builds.
+For investigating build failures, the `binlog` MCP server can parse `.binlog` files produced during builds.
 
 ## Quick Start
 

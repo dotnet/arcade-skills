@@ -56,7 +56,7 @@ Use Step 7's numbered format: failure category, frequency, root cause, affected 
 ## Prerequisites
 
 - AzDO MCP tools (ado-* prefix) for querying builds and timelines on public projects
-- Binlog MCP tools (mcp-binlog-tool-*) for analyzing MSBuild binary logs from build artifacts via `Microsoft.AITools.BinlogMcp`
+- Binlog MCP server (`binlog` namespace) for analyzing MSBuild binary logs from build artifacts via `Microsoft.AITools.BinlogMcp`
 - `az account get-access-token` or `azureauth ado token` for authenticated REST API access to `dnceng/internal`
 - `curl` for downloading task logs and build artifacts
 - `gh` CLI for searching related issues and source code
@@ -200,7 +200,7 @@ curl -s -H "Authorization: Bearer $TOKEN" -o /tmp/logs.zip "{downloadUrl}"
 unzip -o /tmp/logs.zip "*/Build.binlog" -d /tmp/binlogs/
 ```
 
-Then use the binlog MCP tools (`Microsoft.AITools.BinlogMcp`, wired as `mcp-binlog-tool`):
+Then use the binlog MCP tools (`Microsoft.AITools.BinlogMcp`, wired under the `binlog` MCP namespace):
 - `binlog_overview` for build configuration and which target failed
 - `binlog_errors` / `binlog_warnings` for the structured diagnostics list (`{code, message, file, line, column, projectFile, targetName, taskName}` per row)
 - `binlog_search` to find specific patterns (e.g., `MacSignFailed`, `crossgen2`) — same StructuredLog Viewer query syntax as before
