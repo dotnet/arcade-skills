@@ -24,24 +24,14 @@
         "lewing.helix.mcp"
       ]
     },
-    "mcp-binlog-tool": {
-      "command": "dotnet",
-      "args": [
-        "dnx",
-        "--yes",
-        "--version",
-        "1.0.0-preview.26275.1",
-        "Microsoft.AITools.BinlogMcp"
-      ]
-    },
     "mcp-binlog-tool-aitools": {
       "command": "dotnet",
       "args": [
         "dnx",
         "--yes",
-        "--version",
-        "1.0.0-preview.26275.1",
-        "Microsoft.AITools.BinlogMcp"
+        "Microsoft.AITools.BinlogMcp@1.0.0-preview.26275.1",
+        "--add-source",
+        "https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3/index.json"
       ]
     },
     "mihubot": {
