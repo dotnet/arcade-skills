@@ -6,8 +6,9 @@ description: >
   a GitHub PR transitions to `failure` and you need a structured root-cause analysis
   posted back as a PR review. Downloads `PostBuildLogs_*` / `Logs_Build_*` from the
   AzDO build artifacts, invokes the `binlog` MCP server (Microsoft.AITools.BinlogMcp)
-  for overview/errors/warnings (with `binlog_diagnose` / `binlog_explain_property` as
-  deeper drill-downs when the basics aren't enough), groups symptoms by root cause,
+  for build overview / errors / warnings (with deeper diagnostic capabilities — root-cause
+  reports, property-value tracing — when the basics aren't enough), groups symptoms
+  by root cause,
   and emits a single summary comment. Optionally attaches inline `suggestion`
   blocks when an error maps to a one-line fix on a diffed line. Cuts per-PR
   analysis cost from ~5–8 min (rebuild + analyze) to ~2–3 min (download + analyze).
@@ -21,7 +22,7 @@ Analyze a failed AzDO PR build by reading the **binlog that build already produc
 
 > 🛑 **NEVER** use `gh pr review --approve` or `--request-changes`. Only `--comment` is allowed. Approval and blocking are human-only actions.
 
-**Workflow**: gate on `check_run: completed` → resolve PR + build id → download AzDO artifact → invoke the `binlog` MCP server (overview/errors/warnings first; `binlog_diagnose` / `binlog_explain_property` when the cause is non-obvious) → group symptoms by root cause → post a single summary comment → optionally attach ≤10 inline `suggestion` blocks. The agent drives the analysis; tools provide the data.
+**Workflow**: gate on `check_run: completed` → resolve PR + build id → download AzDO artifact → ask the `binlog` MCP server for the build overview, errors, and warnings (drilling into root-cause diagnostics or property-value tracing when the basics aren't enough) → group symptoms by root cause → post a single summary comment → optionally attach ≤10 inline `suggestion` blocks. The agent drives the analysis; tools provide the data.
 
 ## When to use
 
@@ -38,7 +39,7 @@ Analyze a failed AzDO PR build by reading the **binlog that build already produc
 
 ## Prerequisites
 
-- **Binlog MCP tools** (`binlog` MCP server) — `Microsoft.AITools.BinlogMcp` is wired in `plugins/dotnet-dnceng/plugin.json` under the namespace `binlog`. The same server is also published by `dotnet/skills/dotnet-msbuild` under the same `binlog` name, so installing both plugins resolves to a single MCP instance. The three tools this skill calls by default are `binlog_overview`, `binlog_errors`, `binlog_warnings`; deeper investigation uses `binlog_diagnose` and `binlog_explain_property`. The server exposes 29 tools total — see Step 3 for the drill-down surface (search, task details, target reasons, double-writes, imports, NuGet, compiler, etc.).
+- **Binlog MCP tools** (`binlog` MCP server) — `Microsoft.AITools.BinlogMcp` is wired in `plugins/dotnet-dnceng/plugin.json` under the namespace `binlog`. The same server is also published by `dotnet/skills/dotnet-msbuild` under the same `binlog` name, so installing both plugins resolves to a single MCP instance. This skill calls capabilities semantically (build overview, error list, warning list, root-cause diagnose, property-value trace, structured search, task details, tasks-in-target) — discover the exact tool names for your server version via `tools/list`. With `Microsoft.AITools.BinlogMcp`, typical names start with `binlog_` (e.g., `binlog_overview`, `binlog_errors`); the server exposes ~29 tools total.
 - **`curl`** for the AzDO REST artifact download.
 - **`jq`** for parsing the AzDO artifacts JSON and the GitHub check-runs payload (Step 2 + `references/azdo-artifact-fetch.md`).
 - **`unzip`** for extracting the artifact.
@@ -68,7 +69,7 @@ The skill executes seven sequential steps. Each step gates the next — stop ear
 
 1. **Sanity check** — verify the trigger is a real failure with a known build id.
 2. **Download the binlog** from AzDO build artifacts.
-3. **Dump the binlog as JSON** via the `binlog` MCP server (overview/errors/warnings; drill-down tools on demand).
+3. **Dump the binlog as JSON** via the `binlog` MCP server (build overview, errors, warnings; drill-down capabilities on demand).
 4. **Group errors by root cause** using common .NET / MSBuild failure patterns.
 5. **Post the summary comment** on the PR with grouped clusters and proposed fixes.
 6. **Post inline `suggestion` review comments** (≤10, **optional / best-effort**) only when an error has a clear one-line fix on a line touched by the PR diff. Skip if no error fits cleanly.
@@ -119,28 +120,31 @@ Full REST recipe (incl. dnceng/internal auth, fallback when no `PostBuildLogs_*`
 
 ### Step 3 — Dump the binlog as JSON
 
-Use the `binlog` MCP server (`Microsoft.AITools.BinlogMcp`). Every tool takes a `binlog_file` argument (no separate `load_binlog` call needed).
-**Always call these three first** — they're cheap and feed Step 4's clustering:
+Use the `binlog` MCP server (`Microsoft.AITools.BinlogMcp`). Every tool takes a `binlog_file` argument (no separate load step needed).
 
-| Tool              | Purpose                       | Output file |
-| ----------------- | ----------------------------- | ----------- |
-| `binlog_overview` | Build status + project totals | `/tmp/binlog-data/binlog-overview.json` |
-| `binlog_errors`   | Per-error structured rows     | `/tmp/binlog-data/binlog-errors.json` |
-| `binlog_warnings` | Top-N warnings (`top: 10`)    | `/tmp/binlog-data/binlog-warnings.json` |
+> **Discover the tool surface first.** Tool names below are the typical ones exposed by `Microsoft.AITools.BinlogMcp` and are listed as hints — if names differ on your server version, call `tools/list` on the `binlog` MCP namespace and use the equivalent capability. The capability you need is what matters; the exact name is incidental.
+
+**Always gather the basics first** — they're cheap and feed Step 4's clustering:
+
+| Information you need | Typical tool | Output file |
+| -------------------- | ------------ | ----------- |
+| Build status + project totals + which target failed | `binlog_overview` | `/tmp/binlog-data/binlog-overview.json` |
+| Per-error structured rows | `binlog_errors` | `/tmp/binlog-data/binlog-errors.json` |
+| Top-N warnings (pass `top: 10`) | `binlog_warnings` | `/tmp/binlog-data/binlog-warnings.json` |
 
 Each error row contains: `severity`, `code`, `message`, `file`, `line`, `column`, `projectFile`, `targetName`, `taskName`.
 
-**Call these on-demand when the basics aren't enough** — e.g., the build is FAILED but `binlog_errors` is empty, or two clusters look like they share a hidden cause:
+**Drill down on-demand when the basics aren't enough** — e.g., overview says FAILED but the errors list is empty, or two clusters look like they share a hidden cause:
 
-| Tool                     | When to call | Output file |
-| ------------------------ | ------------ | ----------- |
-| `binlog_diagnose`        | `binlog_overview` says FAILED but `binlog_errors` is empty/uninformative — automated root-cause report covering task failures, OnError targets, and process exits. | `/tmp/binlog-data/binlog-diagnose.json` |
-| `binlog_explain_property`| An error blames a property value (`$(TargetFramework)`, `$(OutputPath)`, etc.) and you need to know which import/file set it. | `/tmp/binlog-data/binlog-explain-<name>.json` |
-| `binlog_search`          | You need every occurrence of a string/path/regex across the whole build (StructuredLog-Viewer query syntax). | `/tmp/binlog-data/binlog-search-<slug>.json` |
-| `binlog_task_details`    | One task is responsible for the failure and you need its inputs, outputs, and timing. | `/tmp/binlog-data/binlog-task-<name>.json` |
-| `binlog_tasks_in_target` | You need to know which task inside a failing target actually failed. | `/tmp/binlog-data/binlog-tasks-in-<target>.json` |
+| Information you need | When to gather it | Typical tool | Output file |
+| -------------------- | ----------------- | ------------ | ----------- |
+| Automated root-cause report (task failures, OnError targets, process exits) | Overview says FAILED but the errors list is empty or uninformative | `binlog_diagnose` | `/tmp/binlog-data/binlog-diagnose.json` |
+| Where a property value came from (which import/file set `$(TargetFramework)`, `$(OutputPath)`, etc.) | An error blames a property value | `binlog_explain_property` | `/tmp/binlog-data/binlog-explain-<name>.json` |
+| Every occurrence of a string/path/regex across the build (StructuredLog-Viewer query syntax) | You need to locate every mention of a token | `binlog_search` | `/tmp/binlog-data/binlog-search-<slug>.json` |
+| One task's inputs, outputs, and timing | A specific task is responsible for the failure | `binlog_task_details` | `/tmp/binlog-data/binlog-task-<name>.json` |
+| Which task inside a target actually failed | A failing target has many tasks; you need to find the culprit | `binlog_tasks_in_target` | `/tmp/binlog-data/binlog-tasks-in-<target>.json` |
 
-If `binlog_overview` says the build FAILED but every error/diagnose tool returns empty, the failure was non-MSBuild (process crash, signing, network). Fall back to grepping the raw artifact for `error` / `failed` lines.
+If the overview says the build FAILED but every error/diagnose tool returns empty, the failure was non-MSBuild (process crash, signing, network). Fall back to grepping the raw artifact for `error` / `failed` lines.
 
 ### Step 4 — Group errors by root cause
 
@@ -189,7 +193,7 @@ Template (keep under 400 lines total):
 
 ---
 <details><summary><b>Build overview</b></summary>
-<paste the binlog_overview output: configuration, TFM, target that failed.>
+<paste the build-overview output: configuration, TFM, target that failed.>
 </details>
 
 <details><summary><b>All MSBuild errors (N)</b></summary>
@@ -246,7 +250,7 @@ A successful run leaves:
 
 ## Defensive behaviour
 
-- If `binlog_overview` returns "SUCCEEDED" but the AzDO check is `failure`, the failure was downstream of MSBuild (test runner, Helix work item, ESRP signing). Post a one-line comment noting this and link to the AzDO build URL — don't fabricate root causes.
+- If the build-overview output returns "SUCCEEDED" but the AzDO check is `failure`, the failure was downstream of MSBuild (test runner, Helix work item, ESRP signing). Post a one-line comment noting this and link to the AzDO build URL — don't fabricate root causes.
 - If the AzDO REST call returns 401/403, the project isn't anonymously readable. Caller must wire an `azure/login@v2` or `azureauth ado token` step before this skill runs.
 - If the artifact doesn't contain a `*.binlog`, the pipeline isn't binlog-producing. Note that and stop; this skill cannot help.
 - Never propose a fix that disables an analyzer (`#pragma warning disable`, adding to `<NoWarn>`) without explicit justification — analyzers exist for a reason.
