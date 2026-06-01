@@ -36,7 +36,7 @@ Before running this skill, ensure the following are available:
 - **Network access**: Azure DevOps package feeds (dev.azure.com/dnceng) must be reachable for NuGet restore
 - **Local clones**: both the `dotnet/arcade` repo and a test repo (e.g., `arcade-validation`, `runtime`, `sdk`) must be cloned locally.
 
-### Optional: Binlog MCP Tool
+### Optional: Binlog MCP Server
 
 For investigating build failures, the `binlog` MCP server can parse `.binlog` files produced during builds.
 
