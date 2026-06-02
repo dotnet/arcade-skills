@@ -129,7 +129,7 @@ Heuristics, in order of preference:
 
 3. **`Build.binlog`** — most arcade-onboarded repos publish a canonical `Build.binlog` at the root of the `PostBuildLogs/<Stage>/<Job>/` directory.
 
-If none of those produce an MSBuild-failed binlog (i.e., `binlog_overview` reports SUCCEEDED), the failure was downstream of MSBuild (tests, Helix, signing). Report that and stop.
+If none of those produce an MSBuild-failed binlog (i.e., the build-overview tool reports SUCCEEDED), the failure was downstream of MSBuild (tests, Helix, signing). Report that and stop.
 
 ## 5. Common failure modes
 

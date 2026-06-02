@@ -124,13 +124,13 @@ $OfficialBuildId = "{0}.1" -f (Get-Date).AddYears(5).ToString('yyyyMMdd')
 
 ## Investigating Build Logs
 
-For detailed build diagnostics, use the MSBuild binary log (`.binlog`). The `mcp-binlog-tool` MCP server can parse these files directly:
+For detailed build diagnostics, use the MSBuild binary log (`.binlog`). The `binlog` MCP server can parse these files directly:
 
 ```powershell
 # Find binlog files
 Get-ChildItem /path/to/repo/artifacts/log -Recurse -Filter '*.binlog'
 
-# The mcp-binlog-tool (baronfel.binlog.mcp) can open and query these files
+# The binlog MCP server (Microsoft.AITools.BinlogMcp) can open and query these files
 # See the Prerequisites section in SKILL.md for setup
 ```
 
