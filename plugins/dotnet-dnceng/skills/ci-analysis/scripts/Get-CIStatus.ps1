@@ -170,10 +170,10 @@ function Get-TempDirectory {
     if (-not $tempPath -and $IsMacOS) { $tempPath = "/tmp" }
     if (-not $tempPath) {
         # Fallback: use .cache in user's home directory
-        $home = $env:HOME
-        if (-not $home) { $home = $env:USERPROFILE }
-        if ($home) {
-            $tempPath = Join-Path $home ".cache"
+        $userHome = $env:HOME
+        if (-not $userHome) { $userHome = $env:USERPROFILE }
+        if ($userHome) {
+            $tempPath = Join-Path $userHome ".cache"
             if (-not (Test-Path $tempPath)) {
                 New-Item -ItemType Directory -Path $tempPath -Force | Out-Null
             }
@@ -504,9 +504,9 @@ function Get-BuildAnalysisKnownIssues {
         # Format: <a href="https://github.com/dotnet/runtime/issues/117164">Issue Title</a>
         $knownIssues = @()
         $issuePattern = '<a href="(https://github\.com/[^/]+/[^/]+/issues/(\d+))">([^<]+)</a>'
-        $matches = [regex]::Matches($output.text, $issuePattern)
+        $issueMatches = [regex]::Matches($output.text, $issuePattern)
 
-        foreach ($match in $matches) {
+        foreach ($match in $issueMatches) {
             $issueUrl = $match.Groups[1].Value
             $issueNumber = $match.Groups[2].Value
             $issueTitle = $match.Groups[3].Value
@@ -1419,9 +1419,9 @@ function Extract-TestRunUrls {
     # Match Azure DevOps Test Run URLs
     # Pattern: Published Test Run : https://dev.azure.com/dnceng-public/public/_TestManagement/Runs?runId=35626550&_a=runCharts
     $pattern = 'Published Test Run\s*:\s*(https://dev\.azure\.com/[^/]+/[^/]+/_TestManagement/Runs\?runId=(\d+)[^\s]*)'
-    $matches = [regex]::Matches($LogContent, $pattern)
+    $testRunMatches = [regex]::Matches($LogContent, $pattern)
 
-    foreach ($match in $matches) {
+    foreach ($match in $testRunMatches) {
         $testRuns += @{
             Url = $match.Groups[1].Value
             RunId = $match.Groups[2].Value
