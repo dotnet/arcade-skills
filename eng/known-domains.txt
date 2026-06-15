@@ -25,6 +25,7 @@ live.msbuildlog.com
 
 # Platforms
 dev.azure.com
+kusto.windows.net
 
 # Repos
 github.com/dotnet/arcade
