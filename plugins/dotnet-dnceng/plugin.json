@@ -29,10 +29,7 @@
       "args": [
         "dnx",
         "--yes",
-        "--prerelease",
-        "Microsoft.AITools.BinlogMcp",
-        "--add-source",
-        "https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-tools/nuget/v3/index.json"
+        "Microsoft.AITools.BinlogMcp"
       ]
     },
     "mihubot": {
