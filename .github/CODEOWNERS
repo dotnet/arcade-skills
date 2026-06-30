@@ -12,6 +12,7 @@
 /plugins/dotnet-dnceng/skills/flow-analysis/ @lewing @steveisok
 /plugins/dotnet-dnceng/skills/flow-tracing/ @lewing @steveisok
 /plugins/dotnet-dnceng/skills/maestro-cli/ @lewing @steveisok
+/plugins/dotnet-dnceng/skills/subscription-history/ @lewing @dkurepa
 /plugins/dotnet-compliance/skills/binskim-scan/ @lewing @steveisok
 /plugins/dotnet-compliance/skills/binskim-analysis/ @lewing @steveisok
 /plugins/dotnet-dnceng/skills/helix-investigation/ @lewing @steveisok
