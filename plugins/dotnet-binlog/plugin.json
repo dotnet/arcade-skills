@@ -1,0 +1,27 @@
+{
+  "name": "dotnet-binlog",
+  "version": "0.1.0",
+  "description": "Analyze failed .NET MSBuild binary logs from Azure DevOps builds using the binlog MCP server, without rebuilding locally",
+  "author": {
+    "name": "dotnet"
+  },
+  "license": "MIT",
+  "keywords": [
+    "dotnet",
+    "binlog",
+    "msbuild",
+    "build-analysis",
+    "azure-devops"
+  ],
+  "skills": "./skills",
+  "mcpServers": {
+    "binlog": {
+      "command": "dotnet",
+      "args": [
+        "dnx",
+        "--yes",
+        "Microsoft.AITools.BinlogMcp"
+      ]
+    }
+  }
+}

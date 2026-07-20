@@ -7,7 +7,19 @@
     {
       "name": "dotnet-dnceng",
       "source": "./plugins/dotnet-dnceng",
-      "description": "Skills for .NET engineering infrastructure: CI/CD analysis, build pipeline workflows",
+      "description": "Lightweight .NET CI entry point: hlx CLI investigation, known-issue history, and the ci-investigator agent. No MCP servers by default.",
+      "version": "0.1.0"
+    },
+    {
+      "name": "dotnet-helix",
+      "source": "./plugins/dotnet-helix",
+      "description": "Deep CI failure investigation for .NET repos using the Helix/Azure DevOps MCP server: build/test triage, Helix logs, pipeline and crash-dump analysis",
+      "version": "0.1.0"
+    },
+    {
+      "name": "dotnet-binlog",
+      "source": "./plugins/dotnet-binlog",
+      "description": "Analyze failed .NET MSBuild binary logs from Azure DevOps builds using the binlog MCP server, without rebuilding locally",
       "version": "0.1.0"
     },
     {

@@ -13,7 +13,9 @@ For information about the Agent Skills standard, see [agentskills.io](http://age
 
 | Plugin | Description |
 |--------|-------------|
-| `dotnet-dnceng` | CI/CD failure investigation for .NET engineering infrastructure: build/test triage, Helix logs, pipeline and crash-dump analysis. |
+| `dotnet-dnceng` | Lightweight CI entry point: `hlx` CLI investigation (`helix-cli`), known-issue history, and the `ci-investigator` agent. No MCP servers loaded by default. |
+| `dotnet-helix` | Deep CI failure investigation via the Helix/Azure DevOps MCP server: build/test triage, Helix logs, pipeline and crash-dump analysis. |
+| `dotnet-binlog` | Analyze failed MSBuild binary logs from Azure DevOps builds via the binlog MCP server, without rebuilding locally. |
 | `dotnet-codeflow` | Dependency flow across .NET repos: Maestro/BAR subscriptions, VMR codeflow health, and cross-repo dependency tracing. |
 | `dotnet-arcade` | Build and validate the .NET Arcade SDK locally against consuming repositories. |
 | `dotnet-compliance` | Compliance and security: BinSkim binary scanning and SDL finding analysis. |

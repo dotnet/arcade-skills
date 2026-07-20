@@ -1,0 +1,31 @@
+{
+  "name": "dotnet-helix",
+  "version": "0.1.0",
+  "description": "Deep CI failure investigation for .NET repos using the Helix/Azure DevOps MCP server: build/test triage, Helix logs, pipeline and crash-dump analysis",
+  "author": {
+    "name": "dotnet"
+  },
+  "license": "MIT",
+  "keywords": [
+    "dotnet",
+    "helix",
+    "azure-devops",
+    "ci",
+    "test-failures"
+  ],
+  "skills": "./skills",
+  "mcpServers": {
+    "hlx": {
+      "command": "dotnet",
+      "args": [
+        "dnx",
+        "--yes",
+        "lewing.helix.mcp"
+      ]
+    },
+    "mihubot": {
+      "type": "http",
+      "url": "https://mihubot.xyz/mcp"
+    }
+  }
+}

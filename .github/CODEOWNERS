@@ -6,17 +6,18 @@
 /eng/ @viktorhofer @lewing
 
 # Skills
-/plugins/dotnet-dnceng/skills/ci-analysis/ @lewing @steveisok
+/plugins/dotnet-dnceng/skills/helix-cli/ @lewing @steveisok
 /plugins/dotnet-dnceng/skills/known-issue-history/ @lewing @steveisok
-/plugins/dotnet-dnceng/skills/ci-crash-dump/ @lewing @steveisok
+/plugins/dotnet-dnceng/agents/ @lewing @steveisok
+/plugins/dotnet-helix/skills/ci-analysis/ @lewing @steveisok
+/plugins/dotnet-helix/skills/ci-crash-dump/ @lewing @steveisok
+/plugins/dotnet-helix/skills/helix-investigation/ @lewing @steveisok
+/plugins/dotnet-helix/skills/pipeline-investigation/ @lewing @steveisok
+/plugins/dotnet-binlog/skills/binlog-failure-analysis/ @lewing @steveisok
 /plugins/dotnet-codeflow/skills/flow-analysis/ @lewing @steveisok
 /plugins/dotnet-codeflow/skills/flow-tracing/ @lewing @steveisok
 /plugins/dotnet-codeflow/skills/maestro-cli/ @lewing @steveisok
 /plugins/dotnet-codeflow/skills/subscription-history/ @lewing @dkurepa
 /plugins/dotnet-compliance/skills/binskim-scan/ @lewing @steveisok
 /plugins/dotnet-compliance/skills/binskim-analysis/ @lewing @steveisok
-/plugins/dotnet-dnceng/skills/helix-investigation/ @lewing @steveisok
-/plugins/dotnet-dnceng/skills/pipeline-investigation/ @lewing @steveisok
-/plugins/dotnet-dnceng/skills/binlog-failure-analysis/ @lewing @steveisok
-/plugins/dotnet-dnceng/agents/ @lewing @steveisok
 /plugins/dotnet-arcade/skills/test-arcade/ @ellahathaway @dotnet/dnceng
