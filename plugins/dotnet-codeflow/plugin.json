@@ -1,0 +1,28 @@
+{
+  "name": "dotnet-codeflow",
+  "version": "0.1.0",
+  "description": "Skills for .NET dependency flow: Maestro/BAR subscriptions, VMR codeflow health, cross-repo dependency tracing",
+  "author": {
+    "name": "dotnet"
+  },
+  "license": "MIT",
+  "keywords": [
+    "dotnet",
+    "maestro",
+    "darc",
+    "vmr",
+    "codeflow",
+    "dependency-flow"
+  ],
+  "skills": "./skills",
+  "mcpServers": {
+    "maestro": {
+      "command": "dotnet",
+      "args": [
+        "dnx",
+        "--yes",
+        "lewing.maestro.mcp"
+      ]
+    }
+  }
+}

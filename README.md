@@ -13,7 +13,10 @@ For information about the Agent Skills standard, see [agentskills.io](http://age
 
 | Plugin | Description |
 |--------|-------------|
-| `dotnet-dnceng` | CI/CD analysis, build pipeline workflows for .NET engineering infrastructure. |
+| `dotnet-dnceng` | CI/CD failure investigation for .NET engineering infrastructure: build/test triage, Helix logs, pipeline and crash-dump analysis. |
+| `dotnet-codeflow` | Dependency flow across .NET repos: Maestro/BAR subscriptions, VMR codeflow health, and cross-repo dependency tracing. |
+| `dotnet-arcade` | Build and validate the .NET Arcade SDK locally against consuming repositories. |
+| `dotnet-compliance` | Compliance and security: BinSkim binary scanning and SDL finding analysis. |
 | *(more coming soon)* | Contribute one! See [CONTRIBUTING.md](CONTRIBUTING.md). |
 
 ## Installation

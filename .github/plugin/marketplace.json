@@ -9,6 +9,24 @@
       "source": "./plugins/dotnet-dnceng",
       "description": "Skills for .NET engineering infrastructure: CI/CD analysis, build pipeline workflows",
       "version": "0.1.0"
+    },
+    {
+      "name": "dotnet-codeflow",
+      "source": "./plugins/dotnet-codeflow",
+      "description": "Skills for .NET dependency flow: Maestro/BAR subscriptions, VMR codeflow health, cross-repo dependency tracing",
+      "version": "0.1.0"
+    },
+    {
+      "name": "dotnet-arcade",
+      "source": "./plugins/dotnet-arcade",
+      "description": "Skills for building and validating the .NET Arcade SDK locally against consuming repositories",
+      "version": "0.1.0"
+    },
+    {
+      "name": "dotnet-compliance",
+      "source": "./plugins/dotnet-compliance",
+      "description": "Skills for .NET compliance and security: BinSkim scanning, SDL analysis",
+      "version": "0.1.0"
     }
   ]
 }

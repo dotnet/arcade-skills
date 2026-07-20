@@ -35,14 +35,6 @@
     "mihubot": {
       "type": "http",
       "url": "https://mihubot.xyz/mcp"
-    },
-    "maestro": {
-      "command": "dotnet",
-      "args": [
-        "dnx",
-        "--yes",
-        "lewing.maestro.mcp"
-      ]
     }
   }
 }
