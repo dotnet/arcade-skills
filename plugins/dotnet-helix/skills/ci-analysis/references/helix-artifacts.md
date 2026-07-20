@@ -78,7 +78,7 @@ curl -o build.binlog "https://helix.dot.net/api/jobs/{jobId}/workitems/{workItem
 ```
 
 **AI-assisted analysis:**
-Use the MSBuild MCP server to analyze binlogs for errors and warnings.
+Use the `binlog` MCP server (from the separate **`dotnet-binlog`** plugin) to analyze binlogs for errors and warnings. If that plugin isn't installed, use the manual viewer above.
 
 ## Core Dumps
 
