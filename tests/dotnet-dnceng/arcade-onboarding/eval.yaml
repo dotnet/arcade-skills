@@ -1,62 +1,95 @@
 scenarios:
-  - name: "Detect arcade onboarding need and analyze repository"
-    prompt: "Analyze this .NET repository and tell me what arcade infrastructure files are missing"
+  - name: "Preserve partial onboarding and central package management"
+    prompt: "This repo already imports Arcade and uses Directory.Packages.props, but eng/common and official CI are old. Plan the onboarding changes without replacing the parts that already work."
     assertions:
       - type: "output_contains"
-        value: "global.json"
+        value: "Directory.Packages.props"
       - type: "output_contains"
-        value: "Directory.Build"
+        value: "preserve"
       - type: "output_contains"
-        value: "eng"
-    timeout: 120
+        value: "eng/common"
+      - type: "output_not_contains"
+        value: "delete Directory.Packages.props"
+      - type: "output_not_contains"
+        value: "disable central package management"
+    timeout: 180
 
-  - name: "Generate arcade infrastructure files"
-    prompt: "Onboard this repository onto the dotnet/arcade build system"
+  - name: "Resolve volatile pipeline values from current sources"
+    prompt: "Generate an official Arcade pipeline for this repo. Pick the correct current pool image, template parameters, and service connections."
     assertions:
       - type: "output_contains"
-        value: "Versions.props"
+        value: "eng/common"
       - type: "output_contains"
-        value: "Version.Details.xml"
+        value: "current"
       - type: "output_contains"
-        value: "Publishing.props"
-    timeout: 300
+        value: "verify"
+      - type: "output_not_contains"
+        value: "source: {repo}-official"
+    timeout: 180
 
-  - name: "Identify arcade infrastructure gaps in partially onboarded repo"
-    prompt: "This repo already has a global.json with Arcade SDK but is missing eng/Publishing.props, eng/Signing.props, and es-metadata.yml. What files need to be created?"
+  - name: "Keep public-only onboarding minimal"
+    prompt: "Onboard a small open-source library to Arcade for public PR builds only. It will not sign or publish official artifacts."
     assertions:
       - type: "output_contains"
-        value: "Publishing.props"
+        value: "public CI"
       - type: "output_contains"
-        value: "Signing.props"
+        value: "preserve"
       - type: "output_contains"
-        value: "es-metadata"
-    timeout: 120
+        value: "build"
+      - type: "output_not_contains"
+        value: "DotNetSignType=Real"
+    timeout: 180
 
-  - name: "Generate NuGet.config without nuget.org"
-    prompt: "Create a NuGet.config for an arcade-onboarded repo. Should nuget.org be included?"
+  - name: "Handle CFS and NuGet.org publishing safely"
+    prompt: "This Microsoft repo needs signed official packages and later publishes them to NuGet.org. Explain the Arcade onboarding plan, including package sources and release pipeline concerns."
     assertions:
+      - type: "output_contains"
+        value: "CFS"
       - type: "output_contains"
         value: "dotnet-public"
-      - type: "output_not_contains"
-        value: "nuget.org"
-    timeout: 120
+      - type: "output_contains"
+        value: "separate"
+      - type: "output_contains"
+        value: "SBOM"
+    timeout: 180
 
-  - name: "Explain dependency flow setup with darc"
-    prompt: "How do I set up dependency flow for a repo that consumes packages from dotnet/runtime?"
+  - name: "Use current darc dependency flow"
+    prompt: "Set up dependency flow for a newly onboarded repo that consumes packages from dotnet/runtime. Give me the approach, but do not invent a channel or run-ready subscription until it is resolved."
     assertions:
       - type: "output_contains"
         value: "darc"
       - type: "output_contains"
-        value: "subscription"
+        value: "Version.Details.props"
       - type: "output_contains"
-        value: "Version.Details.xml"
-    timeout: 120
+        value: "current"
+      - type: "output_not_contains"
+        value: "--standard-automerge"
+      - type: "output_not_contains"
+        value: ".NET 9 Dev"
+    timeout: 180
 
-  - name: "Configure signing for official builds"
-    prompt: "How do I configure code signing for an arcade-onboarded repo's official build pipeline?"
+  - name: "Require authoritative inventory metadata"
+    prompt: "Create es-metadata.yml for this shipping repo. I do not know the Service Tree ID or whether the component is classified as production."
     assertions:
       - type: "output_contains"
-        value: "Signing.props"
+        value: "Service Tree"
       - type: "output_contains"
-        value: "enableMicrobuild"
-    timeout: 120
+        value: "isProduction"
+      - type: "output_contains"
+        value: "authoritative"
+      - type: "output_not_contains"
+        value: "onboarding is complete"
+    timeout: 180
+
+  - name: "Apply WiX workaround only when affected"
+    prompt: "Add the Arcade WiX workaround to every repo we onboard so signing cannot fail later."
+    assertions:
+      - type: "output_contains"
+        value: "16611"
+      - type: "output_contains"
+        value: "verify"
+      - type: "output_contains"
+        value: "affected"
+      - type: "output_not_contains"
+        value: "add it to every repository"
+    timeout: 180
