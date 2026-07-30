@@ -34,12 +34,17 @@ cleanup() {
 }
 trap cleanup EXIT
 
+if [[ "$TARGET_ROOT" == -* ]]; then
+  echo "ERROR: target repository path must not start with '-': $TARGET_ROOT" >&2
+  exit 1
+fi
+
 if [ ! -d "$TARGET_ROOT" ]; then
   echo "ERROR: target repository does not exist: $TARGET_ROOT" >&2
   exit 1
 fi
 
-TARGET_ROOT=$(cd "$TARGET_ROOT" && pwd -P)
+TARGET_ROOT=$(cd -- "$TARGET_ROOT" && pwd -P)
 GIT_ROOT=$(git -C "$TARGET_ROOT" rev-parse --show-toplevel 2>/dev/null || true)
 
 if [ -z "$GIT_ROOT" ]; then
@@ -47,7 +52,7 @@ if [ -z "$GIT_ROOT" ]; then
   exit 1
 fi
 
-GIT_ROOT=$(cd "$GIT_ROOT" && pwd -P)
+GIT_ROOT=$(cd -- "$GIT_ROOT" && pwd -P)
 if [ "$TARGET_ROOT" != "$GIT_ROOT" ]; then
   echo "ERROR: target must be the repository root: $GIT_ROOT" >&2
   exit 1
@@ -55,6 +60,17 @@ fi
 
 if [[ "$ARCADE_REF" == -* ]]; then
   echo "ERROR: Arcade ref must not start with '-': $ARCADE_REF" >&2
+  exit 1
+fi
+
+TARGET_ENG="$TARGET_ROOT/eng"
+if [ -L "$TARGET_ENG" ] || [ -L "$TARGET_ENG/common" ]; then
+  echo "ERROR: eng and eng/common must not be symbolic links" >&2
+  exit 1
+fi
+
+if [ -n "$(git -C "$TARGET_ROOT" status --porcelain --untracked-files=all -- eng/common)" ]; then
+  echo "ERROR: eng/common has uncommitted changes; commit or stash them before replacing it" >&2
   exit 1
 fi
 
@@ -70,7 +86,6 @@ if [ ! -d "$TEMP_DIR/arcade/eng/common" ]; then
   exit 1
 fi
 
-TARGET_ENG="$TARGET_ROOT/eng"
 mkdir -p "$TARGET_ENG"
 
 STAGED_COMMON=$(mktemp -d "$TARGET_ENG/.common.new.XXXXXX")
