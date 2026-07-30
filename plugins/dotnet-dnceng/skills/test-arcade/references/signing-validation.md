@@ -193,7 +193,7 @@ pwsh ./scripts/Test-Arcade.ps1 -SignCheck -SignCheckDir /path/to/files
 **Diagnosis**:
 1. Check `artifacts/log/Debug/signcheck.errors.log` for specific file names
 2. Check `artifacts/log/Debug/signcheck.log` for the full scan report
-3. Open `SigningValidation.binlog` with the `mcp-binlog-tool` MCP server for detailed task execution analysis
+3. Open `SigningValidation.binlog` with the `binlog` MCP server for detailed task execution analysis
 
 **Common causes**:
 - Files not listed in `eng/Signing.props`

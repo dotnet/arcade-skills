@@ -33,9 +33,11 @@ github.com/dotnet/diagnostics
 github.com/dotnet/dnceng
 github.com/dotnet/dotnet
 github.com/dotnet/runtime
+github.com/dotnet/xharness
 github.com/jaredpar/runfo
 github.com/lewing/maestro.mcp
 github.com/microsoft/binskim
+github.com/microsoft/perfview
 github.com/orgs/dotnet
 
 # MCP ecosystem

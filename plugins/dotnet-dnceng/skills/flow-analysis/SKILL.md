@@ -12,6 +12,7 @@ description: >
   tracing whether a specific commit/PR has reached another repo (use
   flow-tracing skill).
   INVOKES: maestro and GitHub MCP tools, flow-health.cs script.
+allowed-tools: shell
 ---
 
 # Flow Analysis

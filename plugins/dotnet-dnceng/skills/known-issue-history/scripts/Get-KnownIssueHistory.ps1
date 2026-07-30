@@ -16,7 +16,8 @@
     The GitHub issue number of a Known Build Error to analyze.
 
 .PARAMETER Repository
-    The GitHub repository (owner/repo format). Default: dotnet/runtime
+    The GitHub repository (owner/repo format). When omitted, auto-detected from the
+    current directory's git remote via `gh repo view`. Falls back to dotnet/runtime.
 
 .PARAMETER ListActive
     Scan all open "Known Build Error" issues and rank by recent failure activity.
@@ -52,7 +53,7 @@ param(
     [int]$IssueNumber,
 
     [Parameter()]
-    [string]$Repository = "dotnet/runtime",
+    [string]$Repository,
 
     [Parameter(Mandatory, ParameterSetName = 'ListActive')]
     [switch]$ListActive,
@@ -69,6 +70,28 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# Auto-detect repository from current working directory's git remote when not
+# explicitly supplied, so the script works naturally inside any dotnet repo
+# checkout. Falls back to dotnet/runtime to preserve historical behavior.
+function Resolve-DefaultRepository {
+    if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+        return 'dotnet/runtime'
+    }
+    $detected = & gh repo view --json nameWithOwner --jq '.nameWithOwner' 2>$null
+    if ($LASTEXITCODE -eq 0 -and $detected) {
+        $trimmed = $detected.Trim()
+        if ($trimmed) {
+            Write-Verbose "Auto-detected repository from current directory: $trimmed"
+            return $trimmed
+        }
+    }
+    return 'dotnet/runtime'
+}
+
+if (-not $Repository) {
+    $Repository = Resolve-DefaultRepository
+}
 
 function Split-Repository {
     param([string]$Repo)

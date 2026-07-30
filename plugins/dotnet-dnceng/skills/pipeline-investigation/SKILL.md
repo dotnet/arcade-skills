@@ -56,7 +56,7 @@ Use Step 7's numbered format: failure category, frequency, root cause, affected 
 ## Prerequisites
 
 - AzDO MCP tools (ado-* prefix) for querying builds and timelines on public projects
-- Binlog MCP tools (mcp-binlog-tool-*) for analyzing MSBuild binary logs from build artifacts
+- Binlog MCP server (`binlog` namespace) for analyzing MSBuild binary logs from build artifacts via `Microsoft.AITools.BinlogMcp`
 - `az account get-access-token` or `azureauth ado token` for authenticated REST API access to `dnceng/internal`
 - `curl` for downloading task logs and build artifacts
 - `gh` CLI for searching related issues and source code
@@ -200,11 +200,15 @@ curl -s -H "Authorization: Bearer $TOKEN" -o /tmp/logs.zip "{downloadUrl}"
 unzip -o /tmp/logs.zip "*/Build.binlog" -d /tmp/binlogs/
 ```
 
-Then use the binlog MCP tools:
-- `load_binlog` → `get_diagnostics` for errors/warnings
-- `search_binlog` to find specific patterns (e.g., `MacSignFailed`, `crossgen2`)
-- `get_task_info` to see exact command lines and parameters for failed tasks
-- `list_tasks_in_target` to see all tasks in a target (e.g., 126 Crossgen tasks, which one failed?)
+Then use the binlog MCP tools (`Microsoft.AITools.BinlogMcp`, wired under the `binlog` MCP namespace). Call `tools/list` on the `binlog` namespace first if you're unsure which capabilities your server version exposes — names below are typical for `Microsoft.AITools.BinlogMcp`:
+
+- **Build configuration + which target failed** (typically `binlog_overview`)
+- **Structured diagnostics list** with `{code, message, file, line, column, projectFile, targetName, taskName}` per row (typically `binlog_errors` / `binlog_warnings`)
+- **Find specific patterns** like `MacSignFailed` or `crossgen2` (typically `binlog_search`, same StructuredLog-Viewer query syntax)
+- **Exact command lines + parameters for failed tasks** — Exec's `Command`, RAR's `Assemblies`/`AppConfigFile`, etc. (typically `binlog_task_details`)
+- **All tasks in a target** — useful when one target invokes a task 126 times and only one failed (typically `binlog_tasks_in_target`)
+- **Automated "what broke" report** — newer servers include a root-cause diagnostic (typically `binlog_diagnose`; not present on older servers)
+- **Trace where a property got its value** across imports/targets/tasks (typically `binlog_explain_property`; newer servers only)
 
 > 💡 Binlogs capture the full MSBuild execution including command lines, environment variables, and interleaved output that task logs lose. Essential for signing, crossgen2, and SBRP failures.
 

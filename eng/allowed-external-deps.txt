@@ -28,7 +28,7 @@ script:known-issue-history:scripts/Get-KnownIssueHistory.ps1
 
 # dotnet-dnceng plugin: MCP servers
 mcp-server:dotnet-dnceng:hlx
-mcp-server:dotnet-dnceng:mcp-binlog-tool
+mcp-server:dotnet-dnceng:binlog
 mcp-server:dotnet-dnceng:mihubot
 mcp-server:dotnet-dnceng:maestro
 

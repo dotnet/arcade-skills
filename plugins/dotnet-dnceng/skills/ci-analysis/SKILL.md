@@ -127,6 +127,6 @@ Lead with a 1-2 sentence verdict, then the summary table, then detail bullets (o
 
 1. Get repo-specific CI guidance first — it gives you the investigation order, search patterns, and gotchas
 2. Check if same test fails on target branch before assuming transient
-3. Look for `[ActiveIssue]` attributes for known skipped tests
+3. Look for skip/quarantine attributes on known-flaky tests — common ones across dotnet repos include `[ActiveIssue]`, `[SkipOnHelix]`, `[QuarantinedTest]`, and `[ConditionalFact]`/`[ConditionalTheory]` with skip conditions
 4. Search for related issues across dotnet repos when failures don't match known patterns
 5. "Canceled" ≠ "Failed" — canceled jobs may have recoverable Helix results. Helix data may persist even when AzDO builds have expired.
