@@ -1,7 +1,7 @@
 {
   "name": "dotnet-dnceng",
   "version": "0.1.0",
-  "description": "Skills for .NET engineering infrastructure: CI/CD analysis, build pipeline workflows",
+  "description": "Skills for .NET engineering infrastructure: CI/CD analysis, Arcade SDK onboarding, and build pipeline workflows",
   "author": {
     "name": "dotnet"
   },
