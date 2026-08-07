@@ -1,0 +1,95 @@
+scenarios:
+  - name: "Preserve partial onboarding and central package management"
+    prompt: "This repo already imports Arcade and uses Directory.Packages.props, but eng/common and official CI are old. Plan the onboarding changes without replacing the parts that already work."
+    assertions:
+      - type: "output_matches"
+        pattern: '(?is)(?<!not )(?<!never )(preserve|keep|retain).{0,160}Directory\.Packages\.props|Directory\.Packages\.props.{0,160}(?<!not )(?<!never )(preserve|keep|retain)'
+      - type: "output_matches"
+        pattern: '(?is)(update|refresh|align|replace).{0,160}eng/common|eng/common.{0,160}(update|refresh|align|replace)'
+      - type: "output_not_matches"
+        pattern: '(?is)(?<!not )(?<!never )(delete|remove|regenerate).{0,80}Directory\.Packages\.props'
+      - type: "output_not_matches"
+        pattern: '(?is)(?<!not )(?<!never )(disable|remove).{0,80}(central package management|ManagePackageVersionsCentrally)'
+    timeout: 180
+
+  - name: "Resolve volatile pipeline values from current sources"
+    prompt: "Generate an official Arcade pipeline for this repo. Pick the correct current pool image, template parameters, and service connections."
+    assertions:
+      - type: "output_matches"
+        pattern: '(?is)(inspect|check|resolve|verify).{0,160}eng/common|eng/common.{0,160}(inspect|check|resolve|verify)'
+      - type: "output_matches"
+        pattern: '(?is)(inspect|fetch|check|resolve|verify).{0,160}(1ES.{0,40}pool|pool.{0,40}(source|inventory|list)|current pool)'
+      - type: "output_matches"
+        pattern: '(?is)(service connection|template parameter).{0,160}(confirm|current|resolve|verify)|(?:confirm|resolve|verify).{0,160}(service connection|template parameter)'
+      - type: "output_not_contains"
+        value: "source: {repo}-official"
+    timeout: 180
+
+  - name: "Keep public-only onboarding minimal"
+    prompt: "Onboard a small open-source library to Arcade for public PR builds only. It will not sign or publish official artifacts."
+    assertions:
+      - type: "output_matches"
+        pattern: '(?is)(public CI|public PR|pull request).{0,160}(pipeline|build|validation)'
+      - type: "output_matches"
+        pattern: '(?is)(skip|omit|do not add|not configure).{0,160}(official|sign|publish)'
+      - type: "output_matches"
+        pattern: '(?is)(inspect|preserve|keep|retain).{0,160}(existing|repository|repo)'
+      - type: "output_not_contains"
+        value: "DotNetSignType=Real"
+    timeout: 180
+
+  - name: "Handle CFS and NuGet.org publishing safely"
+    prompt: "This Microsoft repo needs signed official packages and later publishes them to NuGet.org. Explain the Arcade onboarding plan, including package sources and release pipeline concerns."
+    assertions:
+      - type: "output_contains"
+        value: "CFS"
+      - type: "output_contains"
+        value: "dotnet-public"
+      - type: "output_matches"
+        pattern: '(?is)(CFS|dotnet-public).{0,160}(NuGet\.config|package source|restore)'
+      - type: "output_matches"
+        pattern: '(?is)(separate|dedicated).{0,160}(release|NuGet\.org)|(release|NuGet\.org).{0,160}(separate|dedicated)'
+      - type: "output_contains"
+        value: "SBOM"
+    timeout: 180
+
+  - name: "Use current darc dependency flow"
+    prompt: "Set up dependency flow for a newly onboarded repo that consumes packages from dotnet/runtime. Give me the approach, but do not invent a channel or run-ready subscription until it is resolved."
+    assertions:
+      - type: "output_contains"
+        value: "darc"
+      - type: "output_contains"
+        value: "Version.Details.props"
+      - type: "output_matches"
+        pattern: '(?is)(resolve|inspect|query|verify).{0,160}(channel|build|subscription)'
+      - type: "output_not_contains"
+        value: "--standard-automerge"
+      - type: "output_not_contains"
+        value: ".NET 9 Dev"
+    timeout: 180
+
+  - name: "Require authoritative inventory metadata"
+    prompt: "Create es-metadata.yml for this shipping repo. I do not know the Service Tree ID or whether the component is classified as production."
+    assertions:
+      - type: "output_matches"
+        pattern: '(?is)(ask|obtain|look up|resolve|require).{0,160}Service Tree'
+      - type: "output_matches"
+        pattern: '(?is)isProduction.{0,160}(authoritative|owner|inventory)|(?:authoritative|owner|inventory).{0,160}isProduction'
+      - type: "output_matches"
+        pattern: '(?is)(block|incomplete|placeholder|unresolved).{0,160}(Service Tree|isProduction)|(Service Tree|isProduction).{0,160}(block|incomplete|placeholder|unresolved)'
+      - type: "output_not_contains"
+        value: "onboarding is complete"
+    timeout: 180
+
+  - name: "Apply WiX workaround only when affected"
+    prompt: "Add the Arcade WiX workaround to every repo we onboard so signing cannot fail later."
+    assertions:
+      - type: "output_contains"
+        value: "16611"
+      - type: "output_matches"
+        pattern: '(?is)(verify|confirm|check).{0,160}(affected|WiX|16611)'
+      - type: "output_matches"
+        pattern: '(?is)(only|conditional).{0,160}(affected|WiX|16611)|(affected|WiX|16611).{0,160}(only|conditional)'
+      - type: "output_not_contains"
+        value: "add it to every repository"
+    timeout: 180

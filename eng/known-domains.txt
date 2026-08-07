@@ -28,6 +28,7 @@ dev.azure.com
 
 # Repos
 github.com/dotnet/arcade
+github.com/dotnet/arcade-services
 github.com/dotnet/arcade-skills
 github.com/dotnet/diagnostics
 github.com/dotnet/dnceng
@@ -44,7 +45,6 @@ github.com/orgs/dotnet
 code.visualstudio.com
 github.com/modelcontextprotocol
 github.com/open-telemetry/semantic-conventions
-
 
 
 

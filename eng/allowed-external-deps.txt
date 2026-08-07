@@ -31,3 +31,6 @@ mcp-server:dotnet-dnceng:hlx
 mcp-server:dotnet-dnceng:binlog
 mcp-server:dotnet-dnceng:mihubot
 mcp-server:dotnet-dnceng:maestro
+
+# dotnet-dnceng plugin: arcade-onboarding skill
+script:arcade-onboarding:scripts/copy_eng_common.sh

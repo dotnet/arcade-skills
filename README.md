@@ -13,7 +13,7 @@ For information about the Agent Skills standard, see [agentskills.io](http://age
 
 | Plugin | Description |
 |--------|-------------|
-| `dotnet-dnceng` | CI/CD analysis, build pipeline workflows for .NET engineering infrastructure. |
+| `dotnet-dnceng` | CI/CD analysis, Arcade SDK onboarding, and build pipeline workflows for .NET engineering infrastructure. |
 | *(more coming soon)* | Contribute one! See [CONTRIBUTING.md](CONTRIBUTING.md). |
 
 ## Installation
