@@ -1,0 +1,17 @@
+{
+  "name": "dotnet-arcade",
+  "version": "0.1.0",
+  "description": "Skills for building and validating the .NET Arcade SDK locally against consuming repositories",
+  "author": {
+    "name": "dotnet"
+  },
+  "license": "MIT",
+  "keywords": [
+    "dotnet",
+    "arcade",
+    "sdk",
+    "build",
+    "nuget"
+  ],
+  "skills": "./skills"
+}

@@ -96,7 +96,7 @@ Prefer `PostBuildLogs_*` first; fall back to `Logs_*`; final fallback is "any ar
 
 ### Download
 
-Use the AzDO artifacts endpoint with `artifactName` + `$format=zip` to download the artifact as a zip — this is the canonical pattern used elsewhere in this repo (see `plugins/dotnet-dnceng/skills/ci-analysis/references/helix-artifacts.md`). The `downloadUrl` returned in the artifacts list is also usable when the underlying storage type is `Container` (it points at a pre-formatted zip stream), but the endpoint form is portable across both `Container` and modern `PipelineArtifact` storage:
+Use the AzDO artifacts endpoint with `artifactName` + `$format=zip` to download the artifact as a zip — this is the canonical pattern used elsewhere in this repo (see `plugins/dotnet-helix/skills/ci-analysis/references/helix-artifacts.md`). The `downloadUrl` returned in the artifacts list is also usable when the underlying storage type is `Container` (it points at a pre-formatted zip stream), but the endpoint form is portable across both `Container` and modern `PipelineArtifact` storage:
 
 ```bash
 ZIP_URL="https://dev.azure.com/$AZDO_ORG/$AZDO_PROJECT/_apis/build/builds/$AZDO_BUILD_ID/artifacts?artifactName=$ARTIFACT_NAME&api-version=7.1&\$format=zip"
