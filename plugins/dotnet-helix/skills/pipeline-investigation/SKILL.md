@@ -55,8 +55,8 @@ Use Step 7's numbered format: failure category, frequency, root cause, affected 
 
 ## Prerequisites
 
-- AzDO MCP tools (ado-* prefix) for querying builds and timelines on public projects
-- Binlog MCP server (`binlog` namespace) for analyzing MSBuild binary logs from build artifacts via `Microsoft.AITools.BinlogMcp`
+- AzDO MCP tools (ado-* prefix) for querying builds and timelines on public projects — provided by the `hlx` server in this `dotnet-helix` plugin
+- Binlog MCP server (`binlog` namespace) for analyzing MSBuild binary logs from build artifacts via `Microsoft.AITools.BinlogMcp`. This server ships in the separate **`dotnet-binlog`** plugin — install it alongside `dotnet-helix` when a build failure needs binlog drill-down. Without it, the AzDO timeline/log steps still work; only the binary-log analysis in the binlog section is unavailable.
 - `az account get-access-token` or `azureauth ado token` for authenticated REST API access to `dnceng/internal`
 - `curl` for downloading task logs and build artifacts
 - `gh` CLI for searching related issues and source code

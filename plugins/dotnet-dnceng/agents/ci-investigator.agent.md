@@ -16,6 +16,8 @@ Orchestrate CI failure investigations across dotnet repositories. You are the ro
 
 **Your job is routing and synthesis, not failure classification.** The skills own domain expertise. You decide which skills to invoke, in what order, and how to combine their results.
 
+> **Plugin layout:** `known-issue-history` and the `helix-cli` fallback ship in this `dotnet-dnceng` plugin. The MCP-backed deep-dive skills (`ci-analysis`, `helix-investigation`, `pipeline-investigation`, `ci-crash-dump`) live in the **`dotnet-helix`** plugin; `binlog-failure-analysis` lives in **`dotnet-binlog`**. If a target skill isn't available, fall back to `helix-cli` (CLI-based, always present here) or tell the user which plugin to install.
+
 ## Entry Point Routing
 
 Assess what the user has and route to the first skill:

@@ -1,7 +1,7 @@
 {
   "name": "dotnet-dnceng",
   "version": "0.1.0",
-  "description": "Skills for .NET engineering infrastructure: CI/CD analysis, build pipeline workflows",
+  "description": "Lightweight .NET CI entry point: hlx CLI investigation, known-issue history, and the ci-investigator agent. No MCP servers loaded by default — install dotnet-helix / dotnet-binlog for the richer MCP toolset.",
   "author": {
     "name": "dotnet"
   },
@@ -14,37 +14,5 @@
     "azure-devops"
   ],
   "skills": "./skills",
-  "agents": ["./agents/ci-investigator.agent.md"],
-  "mcpServers": {
-    "hlx": {
-      "command": "dotnet",
-      "args": [
-        "dnx",
-        "--yes",
-        "lewing.helix.mcp"
-      ]
-    },
-    "binlog": {
-      "command": "dotnet",
-      "args": [
-        "dnx",
-        "--yes",
-        "--source",
-        "https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-public/nuget/v3/index.json",
-        "Microsoft.AITools.BinlogMcp"
-      ]
-    },
-    "mihubot": {
-      "type": "http",
-      "url": "https://mihubot.xyz/mcp"
-    },
-    "maestro": {
-      "command": "dotnet",
-      "args": [
-        "dnx",
-        "--yes",
-        "lewing.maestro.mcp"
-      ]
-    }
-  }
+  "agents": ["./agents/ci-investigator.agent.md"]
 }

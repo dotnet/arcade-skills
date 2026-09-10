@@ -39,7 +39,7 @@ Analyze a failed AzDO PR build by reading the **binlog that build already produc
 
 ## Prerequisites
 
-- **`binlog` MCP server** — `Microsoft.AITools.BinlogMcp` is wired in `plugins/dotnet-dnceng/plugin.json` under the namespace `binlog`. The same server is also published by `dotnet/skills/dotnet-msbuild` under the same `binlog` name, so installing both plugins resolves to a single MCP instance. This skill invokes the server's capabilities semantically (build overview, error list, warning list, root-cause diagnose, property-value trace, structured search, task details, tasks-in-target) — discover the exact tool names for your server version via `tools/list`. With `Microsoft.AITools.BinlogMcp`, typical names start with `binlog_` (e.g., `binlog_overview`, `binlog_errors`); the server exposes ~29 tools total.
+- **`binlog` MCP server** — `Microsoft.AITools.BinlogMcp` is wired in `plugins/dotnet-binlog/plugin.json` under the namespace `binlog`. The same server is also published by `dotnet/skills/dotnet-msbuild` under the same `binlog` name, so installing both plugins resolves to a single MCP instance. This skill invokes the server's capabilities semantically (build overview, error list, warning list, root-cause diagnose, property-value trace, structured search, task details, tasks-in-target) — discover the exact tool names for your server version via `tools/list`. With `Microsoft.AITools.BinlogMcp`, typical names start with `binlog_` (e.g., `binlog_overview`, `binlog_errors`); the server exposes ~29 tools total.
 - **`curl`** for the AzDO REST artifact download.
 - **`jq`** for parsing the AzDO artifacts JSON and the GitHub check-runs payload (Step 2 + `references/azdo-artifact-fetch.md`).
 - **`unzip`** for extracting the artifact.

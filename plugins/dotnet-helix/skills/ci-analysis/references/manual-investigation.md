@@ -88,6 +88,8 @@ Binlogs contain detailed MSBuild execution traces for diagnosing:
 
 **Using MSBuild binlog MCP tools:**
 
+> Requires the **`dotnet-binlog`** plugin (it provides the `binlog` MCP server; not bundled with `dotnet-helix`). If it isn't installed, fall back to the manual analysis below or hand off to the `binlog-failure-analysis` skill.
+
 Load the binlog, then search for errors/diagnostics or specific queries. The binlog MCP tools handle loading, searching, and extracting task details.
 
 **Manual Analysis:**
