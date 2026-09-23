@@ -12,8 +12,10 @@ CREATE TABLE IF NOT EXISTS failed_jobs (
   job_name TEXT,
   error_category TEXT,   -- from failedJobDetails: test-failure, build-error, crash, etc.
   error_snippet TEXT,
-  known_issue_url TEXT,  -- NULL if unmatched
+  known_issue_url TEXT,  -- NULL for unknown coverage or verified unmatched
   known_issue_title TEXT,
+  ba_match_status TEXT NOT NULL DEFAULT 'unknown'
+    CHECK (ba_match_status IN ('unknown', 'matched', 'unmatched')),
   is_pr_correlated BOOLEAN DEFAULT FALSE,
   recovery_status TEXT DEFAULT 'not-checked',  -- effectively-passed, real-failure, no-results
   notes TEXT,
@@ -24,14 +26,18 @@ CREATE TABLE IF NOT EXISTS failed_jobs (
 ### Key queries
 
 ```sql
--- Failures without a verified match (check report coverage separately)
-SELECT job_name, error_category, error_snippet FROM failed_jobs
-WHERE known_issue_url IS NULL;
+-- Failures with no Build Analysis verdict yet (pending or unavailable coverage)
+SELECT build_id, job_name, error_category FROM failed_jobs
+WHERE ba_match_status = 'unknown';
 
--- Are ALL failures accounted for?
-SELECT COUNT(*) as total,
-       SUM(CASE WHEN known_issue_url IS NOT NULL THEN 1 ELSE 0 END) as matched
-FROM failed_jobs;
+-- Verified unmatched failures in a report covering the build
+SELECT build_id, job_name, error_category, error_snippet FROM failed_jobs
+WHERE ba_match_status = 'unmatched';
+
+-- Counts by match status; unknown is not a verified unmatched failure
+SELECT ba_match_status, COUNT(*) AS jobs
+FROM failed_jobs
+GROUP BY ba_match_status;
 
 -- Which crash/canceled jobs need recovery verification?
 SELECT job_name, build_id FROM failed_jobs
@@ -44,9 +50,10 @@ SELECT job_name, error_snippet FROM failed_jobs WHERE is_pr_correlated = TRUE;
 ### Workflow
 
 1. After the script runs, insert one row per failed job from `failedJobDetails` (each entry includes `buildId`)
-2. Read the relevant GitHub Build Analysis report (see [analysis-workflow.md](analysis-workflow.md#reading-the-build-analysis-check-report)); for each verified per-build KBE match, including those already available in an in-progress report, UPDATE the matching rows with the issue URL
-3. Query for unmatched failures — these need investigation
-4. For crash/canceled jobs, update `recovery_status` after checking Helix results
+2. Read the relevant GitHub Build Analysis report (see [analysis-workflow.md](analysis-workflow.md#reading-the-build-analysis-check-report)); for each verified per-build KBE match, including those already available in an in-progress report, set `ba_match_status = 'matched'` and store the issue URL on the corresponding job
+3. Set `ba_match_status = 'unmatched'` only after the completed report covers that build and confirms its failure is unmatched. Leave jobs in pending, unavailable, or uncovered builds as `unknown`; a NULL `known_issue_url` alone is not evidence of an unmatched failure
+4. Query unknown and verified unmatched failures separately; investigate the latter and report incomplete coverage for the former
+5. For crash/canceled jobs, update `recovery_status` after checking Helix results
 
 ## Build Progression
 

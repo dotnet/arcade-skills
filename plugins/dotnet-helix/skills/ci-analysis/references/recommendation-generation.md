@@ -8,7 +8,7 @@ Read `recommendationHint` as a starting point, then layer in context:
 
 | Hint | Action |
 |------|--------|
-| `BUILD_SUCCESSFUL` | No failures. Confirm CI is green. |
+| `BUILD_SUCCESSFUL` | No failures observed by the script. If `lastBuildJobSummary.pending > 0` or any relevant build/check is still running, say CI is **pending**, not green; inspect available monitor evidence and wait for completion before confirming success. |
 | `KNOWN_ISSUES_DETECTED` | Known tracked issues found — but this does NOT mean all failures are covered. Read the relevant Build Analysis check report, including in-progress reports with linked matches for completed builds; mark other builds pending rather than unmatched. Check status alone can be overridden. |
 | `LIKELY_PR_RELATED` | Failures correlate with PR changes. Lead with "fix these before retrying" and list `correlatedFiles`. |
 | `POSSIBLY_TRANSIENT` | Failures could not be automatically classified — does NOT mean they are transient. Use `failedJobDetails` to investigate each failure individually. |
@@ -23,7 +23,7 @@ Refine the recommendation with context the heuristic can't capture:
 - **Unmatched novel failures**: A completed Build Analysis report covers the build but leaves failures unmatched, and they don't match any existing issue or PR correlation → suggest the user consider filing a Known Build Error issue. If the report is unavailable/incomplete, report any explicit matches for completed pipelines, but investigate the rest rather than claiming a BA mismatch from absent entries. **Before drafting any issue, you MUST first**: (1) download/extract the actual failure log, (2) run `scripts/Test-KnownIssuePattern.ps1 -ErrorMessage "<pattern>" -LogFile <log>` (or `-ErrorPattern` for regex), (3) confirm the script outputs `RESULT: PASS`. Only then draft a `gh issue create` command. Do NOT skip validation — patterns that look correct often don't match due to invisible characters, line breaks, or log formatting. See [kbe-issue-creation.md](kbe-issue-creation.md).
 - **Mixed signals**: Some failures match known issues AND some correlate with PR changes → separate them. Known issues = safe to retry; correlated = fix first.
 - **Canceled jobs with recoverable results**: If `canceledJobNames` is non-empty, mention that canceled jobs may have passing Helix results (see [failure-interpretation.md](failure-interpretation.md) — Recovering Results).
-- **Build still in progress**: If `lastBuildJobSummary.pending > 0`, note that more failures may appear.
+- **Build still in progress**: If `lastBuildJobSummary.pending > 0` or another relevant build/check is still running, report CI as pending even when `recommendationHint` is `BUILD_SUCCESSFUL`; check incremental monitor evidence and note that more failures may appear.
 - **Multiple builds**: If `builds` has >1 entry, `lastBuildJobSummary` reflects only the last build — use `totalFailedJobs` for the aggregate count.
 - **BuildId mode**: `knownIssues` and `prCorrelation` won't be populated by the script. If you have the PR, read its relevant GitHub Build Analysis check report separately; otherwise say "Build Analysis and PR correlation not available in BuildId mode."
 
