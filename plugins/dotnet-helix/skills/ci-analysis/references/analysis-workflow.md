@@ -10,9 +10,24 @@ Run with `-ShowLogs` for detailed failure info. See [script-modes.md](script-mod
 
 When the script output is insufficient (e.g., build timeline fetch fails), use AzDO MCP tools to query builds directly. **Match the org from the build URL to the correct AzDO tools** — see [azdo-helix-reference.md](azdo-helix-reference.md#azure-devops-organizations). PR builds are in `dnceng-public`; internal builds are in `dnceng`.
 
+## Reading the Build Analysis Check Report
+
+Use AzDO/Helix tools for build and failure details, but use the **GitHub Build Analysis check report** for KBE matches. `azdo_build_analysis` `knownIssues` is derived from AzDO tags/timeline; its empty array and timeline `unmatchedFailures` do not tell you what Build Analysis matched. The script's `[CI_ANALYSIS_SUMMARY]` `knownIssues` can also be empty when it cannot read the report; do not treat an empty array as a negative finding.
+
+1. Identify the PR/repo and the AzDO build ID(s) under investigation. Find the PR's head SHA (for example, `gh pr view PR --repo OWNER/REPO --json headRefOid --jq .headRefOid`) and inspect its check runs:
+
+   ```bash
+   gh api --paginate "repos/OWNER/REPO/commits/SHA/check-runs?per_page=100" \
+     --jq '.check_runs[] | select(.name == "Build Analysis") | {id, html_url, status, conclusion, completed_at, output: .output}'
+   ```
+
+   Use the check's `html_url` to read it on GitHub, or read its `output.summary` and `output.text` from this response (the report may contain HTML markup). `gh pr checks` can help locate the check, but its `link` may point to Build Analysis documentation rather than the report. Paginate: busy PRs can have more check runs than one page.
+2. Confirm `status` is `completed` and the report links the **specific AzDO build ID**. Match its known-error entries (linked KBE issue plus build/job/test) and unmatched-error entries to the AzDO timeline and Helix failures. A PR can have several pipelines, builds, or commits; a check on the latest head may not cover an older build. For historical builds, locate the corresponding check on the relevant PR head commit/checks view instead of attributing current-head matches to them. AzDO's `sourceVersion` can be a PR merge commit, not the PR head SHA; use report build links to verify the association.
+3. If the check is absent, unfinished, unreadable, or its report still lists the relevant pipeline as pending, say **Build Analysis unavailable/incomplete for that build** and continue investigating without a BA verdict. If a completed report **covers that build** and shows no KBE matches, say **zero Build Analysis matches for that build**. An overridden green check is not proof every failure matched; read the report and its override note, and verify coverage before recommending a retry.
+
 ## Step 2: Analyze Results
 
-1. **Check Build Analysis** — If the Build Analysis GitHub check is **green**, all failures matched known issues and it's safe to retry. If it's **red**, some failures are unaccounted for — you must identify which failing jobs are covered by known issues and which are not. For 3+ failures, use SQL tracking to avoid missed matches (see [sql-tracking.md](sql-tracking.md)).
+1. **Check Build Analysis** — Use the completed check report for the relevant build to determine which failures matched KBEs and which remain unmatched. Do not infer coverage from check color alone (it may be overridden), AzDO `knownIssues`, or an empty script summary. For 3+ failures, use SQL tracking to avoid missed matches (see [sql-tracking.md](sql-tracking.md)).
 2. **Correlate with PR changes** — Same files failing = likely PR-related
 3. **Compare with baseline** — If a test passes on the target branch but fails on the PR, compare Helix binlogs. See [binlog-comparison.md](binlog-comparison.md) — **delegate binlog download/extraction to subagents** to avoid burning context on mechanical work.
 4. **Check build progression** — If the PR has multiple builds (multiple pushes), check whether earlier builds passed. A failure that appeared after a specific push narrows the investigation to those commits. See [build-progression-analysis.md](build-progression-analysis.md). Present findings as facts, not fix recommendations.
@@ -35,5 +50,5 @@ Before stating a failure's cause, verify your claim:
 - **"Infrastructure failure"** → Did Build Analysis flag it? Does the same test pass on the target branch? If neither, don't call it infrastructure.
 - **"Transient/flaky"** → Has it failed before? Is there a known issue? A single non-reproducing failure isn't enough to call it flaky.
 - **"PR-related"** → Do the changed files actually relate to the failing test? Correlation in the script output is heuristic, not proof.
-- **"Safe to retry"** → Are ALL failures accounted for (known issues or infrastructure), or are you ignoring some? Check the Build Analysis check status — if it's red, not all failures are matched. Map each failing job to a specific known issue before concluding "safe to retry."
+- **"Safe to retry"** → Are ALL failures accounted for (known issues or verified infrastructure), or are you ignoring some? Check the relevant Build Analysis report's entries and coverage, not just the status. Map each failing job to a specific issue or other evidence before concluding "safe to retry."
 - **"Not related to this PR"** → Have you checked if the test passes on the target branch? Don't assume — verify.

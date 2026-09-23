@@ -1,6 +1,6 @@
 # Creating Known Build Error Issues
 
-When Build Analysis shows **unmatched failures** (check is red) and investigation confirms the failure is not PR-specific, file a Known Build Error (KBE) issue so Build Analysis can track it across all affected builds.
+When the relevant completed Build Analysis report shows **unmatched failures** and investigation confirms the failure is not PR-specific, consider filing a Known Build Error (KBE) issue so Build Analysis can track it across all affected builds.
 
 ## When to File
 
@@ -9,7 +9,7 @@ File a KBE issue when **all** of these are true:
 1. The failure is **not caused by the PR's changes** (verified via target-branch comparison or PR correlation)
 2. The failure is **not already tracked** — search first (see [Duplicate Check](#duplicate-check))
 3. The failure **affects or could affect multiple builds** (not a one-off environment glitch)
-4. Build Analysis check is **red** (at least one failure is unmatched)
+4. The completed Build Analysis report covers the build and shows the specific failure is **unmatched** (do not rely on check color; it may be overridden)
 
 Do **not** file a KBE issue when:
 - The failure is clearly caused by the PR's code changes (`LIKELY_PR_RELATED`)
@@ -42,7 +42,7 @@ gh issue list --repo dotnet/dnceng --label "Known Build Error" --state open --se
 # https://github.com/orgs/dotnet/projects/111
 ```
 
-Also check the `knownIssues` array from the `[CI_ANALYSIS_SUMMARY]` JSON — Build Analysis may have already matched the failure to an existing issue.
+Also read the relevant completed GitHub Build Analysis check report for KBE matches (see [analysis-workflow.md](analysis-workflow.md#reading-the-build-analysis-check-report)). An empty `knownIssues` array in the `[CI_ANALYSIS_SUMMARY]` JSON, or from `azdo_build_analysis`, does not establish that no issue matched.
 
 ## Issue Template
 
