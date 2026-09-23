@@ -42,7 +42,7 @@ gh issue list --repo dotnet/dnceng --label "Known Build Error" --state open --se
 # https://github.com/orgs/dotnet/projects/111
 ```
 
-Also read the relevant completed GitHub Build Analysis check report for KBE matches (see [analysis-workflow.md](analysis-workflow.md#reading-the-build-analysis-check-report)). An empty `knownIssues` array in the `[CI_ANALYSIS_SUMMARY]` JSON, or from `azdo_build_analysis`, does not establish that no issue matched.
+Also read the relevant GitHub Build Analysis check report for KBE matches, including matches already linked to completed builds in an in-progress report (see [analysis-workflow.md](analysis-workflow.md#reading-the-build-analysis-check-report)). An empty `knownIssues` array in the `[CI_ANALYSIS_SUMMARY]` JSON, or from `azdo_build_analysis`, does not establish that no issue matched.
 
 ## Issue Template
 

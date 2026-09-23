@@ -44,7 +44,7 @@ SELECT job_name, error_snippet FROM failed_jobs WHERE is_pr_correlated = TRUE;
 ### Workflow
 
 1. After the script runs, insert one row per failed job from `failedJobDetails` (each entry includes `buildId`)
-2. Read the relevant completed GitHub Build Analysis report (see [analysis-workflow.md](analysis-workflow.md#reading-the-build-analysis-check-report)); for each verified per-build KBE match, UPDATE the matching rows with the issue URL
+2. Read the relevant GitHub Build Analysis report (see [analysis-workflow.md](analysis-workflow.md#reading-the-build-analysis-check-report)); for each verified per-build KBE match, including those already available in an in-progress report, UPDATE the matching rows with the issue URL
 3. Query for unmatched failures — these need investigation
 4. For crash/canceled jobs, update `recovery_status` after checking Helix results
 

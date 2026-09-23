@@ -4,7 +4,7 @@
 
 **Known Issues section**: Potential matches from the script; verify per-build KBE matches in the relevant GitHub Build Analysis check report.
 
-**Build Analysis check status**: Read the completed report's matched and unmatched entries for the relevant build. Green can be manually overridden or leave pipelines pending; status alone does not prove every failure matched. If no relevant completed report is available, do not infer zero matches.
+**Build Analysis check status**: Read the report's matched and unmatched entries by build ID, even if the overall check is in progress: completed pipelines can already have KBE matches. Green can be manually overridden or leave pipelines pending; status alone does not prove every failure matched. Do not infer zero matches from an absent match in a partial report.
 
 **Canceled/timed-out jobs**: Jobs canceled due to earlier stage failures or AzDO timeouts. Dependency-canceled jobs don't need investigation. **Timeout-canceled jobs may have all-passing Helix results** — the "failure" is just the AzDO job wrapper timing out, not actual test failures. To verify: get the Helix job pass/fail summary for each job in the timed-out build (include passed work items). If all work items passed, the build effectively passed.
 

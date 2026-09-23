@@ -50,7 +50,7 @@ The script operates in three distinct modes depending on what information you ha
 
 ### PR Analysis Mode (`-PRNumber`)
 1. Discovers AzDO builds associated with the PR (from GitHub check status; for full build history, query AzDO builds on `refs/pull/{PR}/merge` branch)
-2. Attempts to fetch the GitHub Build Analysis check output for known issues; an empty `knownIssues` result does not establish that the relevant build had zero matches. Read the completed report for that build separately (see [analysis-workflow.md](analysis-workflow.md#reading-the-build-analysis-check-report)).
+2. Attempts to fetch the GitHub Build Analysis check output for known issues; an empty `knownIssues` result does not establish that the relevant build had zero matches. Read the report separately, including matches already present for finished pipelines in an in-progress check (see [analysis-workflow.md](analysis-workflow.md#reading-the-build-analysis-check-report)).
 3. Gets failed jobs from Azure DevOps timeline
 4. **Separates canceled jobs from failed jobs** (canceled may be dependency-canceled or timeout-canceled)
 5. Extracts Helix work item failures from each failed job
