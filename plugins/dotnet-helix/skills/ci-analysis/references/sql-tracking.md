@@ -2,14 +2,15 @@
 
 Use the SQL tool to track structured data during complex investigations. This avoids losing context across tool calls and enables queries that catch mistakes (like claiming "all failures known" when some are unmatched).
 
-## Failed Job Tracking
+## Failure Tracking
 
-Track each failure from the script output and map it to known issues as you verify them:
+Track each distinct failure from the script output and map it to known issues as you verify them. This is a new table rather than an in-place change to the older `failed_jobs` example: a reused SQL session may already have that job-level table without a match-status column. Create this table once per session; if it already exists, reuse it instead of rerunning the `CREATE TABLE` statement.
 
 ```sql
-CREATE TABLE IF NOT EXISTS failed_jobs (
+CREATE TABLE ci_failures (
   build_id INT,
   job_name TEXT,
+  failure_id TEXT,        -- unique within the job: test/work-item ID or distinct error
   error_category TEXT,   -- from failedJobDetails: test-failure, build-error, crash, etc.
   error_snippet TEXT,
   known_issue_url TEXT,  -- NULL for unknown coverage or verified unmatched
@@ -19,48 +20,50 @@ CREATE TABLE IF NOT EXISTS failed_jobs (
   is_pr_correlated BOOLEAN DEFAULT FALSE,
   recovery_status TEXT DEFAULT 'not-checked',  -- effectively-passed, real-failure, no-results
   notes TEXT,
-  PRIMARY KEY (build_id, job_name)
+  PRIMARY KEY (build_id, job_name, failure_id)
 );
 ```
+
+Do not collapse multiple failing tests/work items in one job into a single match verdict. If the script gives only job-level details, inspect the Helix work items or failure logs to identify distinct failures before assigning `ba_match_status`; otherwise leave coverage `unknown` for failures you cannot distinguish.
 
 ### Key queries
 
 ```sql
 -- Failures with no Build Analysis verdict yet (pending or unavailable coverage)
-SELECT build_id, job_name, error_category FROM failed_jobs
+SELECT build_id, job_name, failure_id, error_category FROM ci_failures
 WHERE ba_match_status = 'unknown';
 
 -- Verified unmatched failures in a report covering the build
-SELECT build_id, job_name, error_category, error_snippet FROM failed_jobs
+SELECT build_id, job_name, failure_id, error_category, error_snippet FROM ci_failures
 WHERE ba_match_status = 'unmatched';
 
 -- Counts by match status; unknown is not a verified unmatched failure
-SELECT ba_match_status, COUNT(*) AS jobs
-FROM failed_jobs
+SELECT ba_match_status, COUNT(*) AS failures
+FROM ci_failures
 GROUP BY ba_match_status;
 
 -- Which crash/canceled jobs need recovery verification?
-SELECT job_name, build_id FROM failed_jobs
+SELECT build_id, job_name, failure_id FROM ci_failures
 WHERE error_category IN ('crash', 'unclassified') AND recovery_status = 'not-checked';
 
 -- PR-correlated failures (fix before retrying)
-SELECT job_name, error_snippet FROM failed_jobs WHERE is_pr_correlated = TRUE;
+SELECT build_id, job_name, failure_id, error_snippet FROM ci_failures WHERE is_pr_correlated = TRUE;
 ```
 
 ### Workflow
 
-1. After the script runs, insert one row per failed job from `failedJobDetails` (each entry includes `buildId`)
-2. Read the relevant GitHub Build Analysis report (see [analysis-workflow.md](analysis-workflow.md#reading-the-build-analysis-check-report)); for each verified per-build KBE match, including those already available in an in-progress report, set `ba_match_status = 'matched'` and store the issue URL on the corresponding job
-3. Set `ba_match_status = 'unmatched'` only after the completed report covers that build and confirms its failure is unmatched. Leave jobs in pending, unavailable, or uncovered builds as `unknown`; a NULL `known_issue_url` alone is not evidence of an unmatched failure
+1. After the script runs, expand each `failedJobDetails` entry (with its `buildId`) into one row per distinct failing test, work item, or build error; identify each using a stable `failure_id` within its job
+2. Read the relevant GitHub Build Analysis report (see [analysis-workflow.md](analysis-workflow.md#reading-the-build-analysis-check-report)); for each verified per-build, per-failure KBE match, including those already available in an in-progress report, set `ba_match_status = 'matched'` and store the issue URL on that failure
+3. Set `ba_match_status = 'unmatched'` only after the completed report covers that build and confirms that specific failure is unmatched. Leave failures in pending, unavailable, or uncovered builds as `unknown`; a NULL `known_issue_url` alone is not evidence of an unmatched failure
 4. Query unknown and verified unmatched failures separately; investigate the latter and report incomplete coverage for the former
-5. For crash/canceled jobs, update `recovery_status` after checking Helix results
+5. For crash/canceled work items, update `recovery_status` after checking Helix results
 
 ## Build Progression
 
 See [build-progression-analysis.md](build-progression-analysis.md) for the `build_progression` and `build_failures` tables that track pass/fail across multiple builds.
 
-> **`failed_jobs` vs `build_failures` — when to use each:**
-> - `failed_jobs` (above): **Job-level** — maps each failed AzDO job to a known issue. Use for single-build triage ("are all failures accounted for?").
+> **`ci_failures` vs `build_failures` — when to use each:**
+> - `ci_failures` (above): **Failure-level** — maps each error/test/work item within an AzDO job to its own known-issue verdict. Use for single-build triage ("are all failures accounted for?").
 > - `build_failures` (build-progression-analysis.md): **Test-level** — tracks individual test names across builds. Use for progression analysis ("which tests started failing after commit X?").
 
 ## PR Comment Tracking

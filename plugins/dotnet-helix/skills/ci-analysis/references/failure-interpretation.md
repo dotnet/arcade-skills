@@ -16,7 +16,7 @@
 
 **Local test failures**: Some repos (e.g., dotnet/sdk) run tests directly on build agents. These can also match known issues — search for the test name with the "Known Build Error" label.
 
-**Unmatched failures**: If a failure has no known issue match and is not PR-related, it may be a candidate for a new Known Build Error issue. See [kbe-issue-creation.md](kbe-issue-creation.md) for when and how to file one.
+**Unmatched failures**: Only if the completed Build Analysis report covers the build and shows that specific failure unmatched, and the failure is not PR-related, may it be a candidate for a new Known Build Error issue. When the report is absent, partial, or does not cover that build, its match status is **unknown**, not unmatched. See [kbe-issue-creation.md](kbe-issue-creation.md) for when and how to file one.
 
 ## Per-Failure Details
 
