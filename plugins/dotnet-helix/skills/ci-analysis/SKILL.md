@@ -18,7 +18,7 @@ Analyze CI build status and test failures in Azure DevOps and Helix for dotnet r
 
 **Workflow**: Gather PR context (Step 0) → collect failure data → synthesize recommendations. The agent drives the investigation; tools provide the data.
 
-**Accessing services**: Start with MCP tools if available. Get repo-specific CI guidance early — it provides the investigation workflow, tool selection, failure patterns, and classification algorithm for that repo. The guidance evolves with the toolset, so it always reflects current capabilities.
+**Accessing services**: Start with MCP tools if available. Get repo-specific CI guidance early — it provides the investigation workflow, tool selection, failure patterns, and classification algorithm for that repo. The guidance evolves with the toolset, so it always reflects current capabilities. For **Build Analysis KBE matches**, read the GitHub Build Analysis check report itself; AzDO/Helix tools provide failure evidence, not the check's matches.
 
 If MCP tools aren't loaded, the Helix CLI tool provides the same capabilities via bash with progressive discovery.
 
@@ -69,7 +69,11 @@ For full parameter reference and mode details, see [references/script-modes.md](
 
 **Classify each failure.** Determine whether it's a build error, test failure, crash, timeout, or infrastructure issue. Exit codes, log patterns, and Helix work item state all contribute — the repo-specific CI guidance includes a classification algorithm with the patterns and recommended next steps for each category. Crashes (exit code -4, 139, 134) don't always mean tests failed — check for recoverable test results before concluding.
 
-**Cross-reference with known issues.** Check which failures are already matched by Build Analysis — green means all failures are accounted for, red means some are unmatched. For each unmatched failure, search for related known issues by error message, test name, or job type. The user needs a per-failure verdict, not two separate lists.
+**Check running lanes for monitor evidence.** When the AzDO/Helix queue monitor is enabled for a lane, inspect its already-emitted in-progress AzDO timeline issues and Helix work-item failure details **before calling a still-running build green**. The monitor streams failure evidence incrementally; a missing monitor failure does not prove the lane is passing, since test-result-only failures may not appear there. The monitor does **not** perform Build Analysis or Build Insights KBE matching. Treat monitor issues as failures to investigate, not as KBE matches or a complete failure inventory.
+
+**Cross-reference with known issues.** Read the relevant **GitHub Build Analysis check report** for the PR, then match its linked AzDO builds/jobs/tests and KBE issues to the failures you're investigating. Start with the PR's head SHA and the check's `html_url`/`output.text` (use `gh api --paginate "repos/OWNER/REPO/commits/SHA/check-runs?per_page=100"` and select the `Build Analysis` check). Build Analysis updates the check as pipelines finish: an **in-progress** report may already show KBE matches for completed pipelines. Report those matches now, with their build IDs, without claiming coverage of pending pipelines or an unfinished build. For an older build or a PR with multiple runs, verify the report actually links that build ID; locate the corresponding check/commit if it doesn't. Read the report's known and unmatched sections, not just its conclusion: checks can be manually overridden or still list pending pipelines. See [the check-report workflow](references/analysis-workflow.md#reading-the-build-analysis-check-report).
+
+`azdo_build_analysis` `knownIssues: []` and timeline `unmatchedFailures` reflect AzDO tags/timeline, **not** Build Analysis KBE matches or its unmatched verdict. An empty `knownIssues` in the CI script's summary is not proof of zero matches either. If a report is missing or partial, report available **positive matches** for linked completed builds and mark the rest **Build Analysis unavailable/incomplete**, not "no known issues." Do not infer zero matches from absence in an in-progress report; only report **zero Build Analysis matches** after a completed report covers the build and shows none. Search for related issues by error message, test name, or job type for failures the report leaves unmatched; provide a per-failure verdict, not two separate lists.
 
 **Correlate with PR changes.** If the same files appear in both the PR diff and the failure messages, the failure is likely PR-related. If not, check whether the same test fails on the target branch — that distinguishes pre-existing flakes from regressions.
 
@@ -91,7 +95,7 @@ Lead with a 1-2 sentence verdict, then the summary table, then detail bullets (o
 
 ## Anti-Patterns
 
-> 🚨 **Every failure verdict needs evidence — no "Likely flaky" without proof.** Each row in your summary table must cite a specific source: known issue number, Build Analysis match, or target-branch verification. If Build Analysis didn't match it and you haven't verified the target branch, the verdict is **"Unmatched — needs investigation"**, not "Likely flaky." A test that *looks* like it could be flaky is not the same as one you've *verified* is flaky.
+> 🚨 **Every failure verdict needs evidence — no "Likely flaky" without proof.** Each row in your summary table must cite a specific source: known issue number, Build Analysis match, or target-branch verification. If Build Analysis covers the build but didn't match a failure and you haven't verified the target branch, the verdict is **"Unmatched — needs investigation"**, not "Likely flaky." If the lane has not been analyzed yet, the BA match is **unknown**, not unmatched. A test that *looks* like it could be flaky is not the same as one you've *verified* is flaky.
 
 > ❌ **Don't label failures "infrastructure" without evidence.** Requires: Build Analysis match, identical failure on target branch, or confirmed outage. Exception: `tests-passed-reporter-failed` is genuinely infrastructure.
 
@@ -99,9 +103,9 @@ Lead with a 1-2 sentence verdict, then the summary table, then detail bullets (o
 
 > ❌ **Missing packages on flow PRs ≠ infrastructure.** Flow PRs request *different* packages. Check *which* package and *why* before assuming feed delay.
 
-> ❌ **Don't present failures and known issues as separate lists.** Cross-reference them: for each `failedJobDetails` entry, state whether it matches a `knownIssues` entry or is unmatched. An `unclassified` failure can still match a known issue by error pattern.
+> ❌ **Don't present failures and known issues as separate lists.** Cross-reference each `failedJobDetails` entry with the relevant GitHub Build Analysis report: identify its KBE match, an unmatched report entry, or unavailable/incomplete coverage. An `unclassified` failure can still match a known issue by error pattern.
 
-> ❌ **Don't say "safe to retry" with Build Analysis red.** Map each failing job to a specific known issue first.
+> ❌ **Don't say "safe to retry" when the report has unmatched failures or incomplete coverage.** Map each failing job to a specific KBE or other verified explanation first; a green override doesn't resolve unmatched failures.
 
 > ❌ **Don't execute `gh issue create` without explicit user approval.** Always present the draft command as text and ask the user to confirm before running it. This applies to KBE issues and any other GitHub issue creation.
 

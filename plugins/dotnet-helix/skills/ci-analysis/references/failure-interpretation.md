@@ -2,9 +2,9 @@
 
 ## Result Categories
 
-**Known Issues section**: Failures matching existing GitHub issues.
+**Known Issues section**: Potential matches from the script; verify per-build KBE matches in the relevant GitHub Build Analysis check report.
 
-**Build Analysis check status**: Green = *every* failure matched a known issue. Red = at least one unmatched. Verify each failing job is covered before calling it safe to retry.
+**Build Analysis check status**: Read the report's matched and unmatched entries by build ID, even if the overall check is in progress: completed pipelines can already have KBE matches. Green can be manually overridden or leave pipelines pending; status alone does not prove every failure matched. Do not infer zero matches from an absent match in a partial report.
 
 **Canceled/timed-out jobs**: Jobs canceled due to earlier stage failures or AzDO timeouts. Dependency-canceled jobs don't need investigation. **Timeout-canceled jobs may have all-passing Helix results** — the "failure" is just the AzDO job wrapper timing out, not actual test failures. To verify: get the Helix job pass/fail summary for each job in the timed-out build (include passed work items). If all work items passed, the build effectively passed.
 
@@ -16,7 +16,7 @@
 
 **Local test failures**: Some repos (e.g., dotnet/sdk) run tests directly on build agents. These can also match known issues — search for the test name with the "Known Build Error" label.
 
-**Unmatched failures**: If a failure has no known issue match and is not PR-related, it may be a candidate for a new Known Build Error issue. See [kbe-issue-creation.md](kbe-issue-creation.md) for when and how to file one.
+**Unmatched failures**: Only if the completed Build Analysis report covers the build and shows that specific failure unmatched, and the failure is not PR-related, may it be a candidate for a new Known Build Error issue. When the report is absent, partial, or does not cover that build, its match status is **unknown**, not unmatched. See [kbe-issue-creation.md](kbe-issue-creation.md) for when and how to file one.
 
 ## Per-Failure Details
 
