@@ -22,9 +22,23 @@ To classify PR builds, extract the PR number from `sourceBranch` (`refs/pull/{nu
 gh pr view {number} --repo dotnet/dotnet --json title -q '.title'
 ```
 
+## Fatal vs Non-Fatal Issues
+
+The report's job is to tell the QB what is **breaking builds**. Before placing any issue in a table, decide whether it is fatal:
+
+| Impact | Timeline evidence | Where it goes |
+|--------|-------------------|---------------|
+| **Fatal** | Task `result == "failed"` **and** parent Job `result == "failed"` (the task caused the leg to fail) | Failed Builds Table, Failure Trends Table |
+| **Non-fatal** | Task `result == "succeededWithIssues"`; task `failed` but parent Job `succeeded`/`succeededWithIssues` (`continueOnError`); warning-type `issues`; builds whose overall result is `partiallySucceeded` | Non-Fatal Issues section only |
+
+Rules:
+- A non-fatal issue that happens to appear in a failed build is **still non-fatal**. Do not list it as that build's Failure Detail and do not count it toward fatal Hits.
+- Common non-fatal noise includes SBOM generation warnings, 1ES/container tooling warnings (for example locale or runner setup messages), Component Governance alerts, and post-build steps marked `continueOnError`. Verify the job result every time; don't classify by name alone.
+- If a tooling problem *does* fail the job, it is fatal. Report it as a normal failure.
+
 ## Failed Builds Table
 
-List only failed builds in chronological order:
+List only builds with overall result `failed`, in chronological order. `partiallySucceeded` builds are not failed builds. The Failure Detail must describe the **fatal** cause:
 
 ```
 | Build | Type | Source | Failure Detail |
@@ -51,11 +65,13 @@ Follow the build list with a breakdown by type:
 | **Total** | **47** | **29** | **18** | **62%** |
 ```
 
+Count `partiallySucceeded` builds as ✅ Pass. Their issues are non-fatal by definition.
+
 Note any temporal patterns (failure clusters, recent green streaks, etc.).
 
 ## Failure Trends Table
 
-When 3+ builds are in scope and at least one failure pattern recurs across builds, add a trends table after the summary. Cap at top 5 patterns — one-offs don't get rows.
+When 3+ builds are in scope and at least one **fatal** failure pattern recurs across builds, add a trends table after the summary. Cap at top 5 patterns — one-offs don't get rows. Only fatal patterns belong here (see [Fatal vs Non-Fatal Issues](#fatal-vs-non-fatal-issues)). Give each distinct root cause its own row. Don't merge unrelated issues into one pattern.
 
 ```
 | Pattern | Hits | Window | Status |
@@ -75,6 +91,23 @@ When 3+ builds are in scope and at least one failure pattern recurs across build
   - ⏳ Fix in progress (link PR) — someone is working on it
 
 This table transforms the report from "what's broken" to "what needs action." The Failed Builds Table is a per-build log; this is per-pattern triage.
+
+## Non-Fatal Issues (Informational)
+
+Optional. Put this section last, after all fatal content, under a heading that includes "Non-Fatal". Include only recurring non-fatal patterns (2+ builds). Cap at top 5, or omit the section entirely if there is nothing worth tracking.
+
+```
+### ℹ️ Non-Fatal Issues (did not fail any build)
+
+| Pattern | Occurrences | Window | Notes |
+|---------|-------------|--------|-------|
+| ℹ️ Alpine SBOM generation warning | 18 internal builds | 24 hours | `succeededWithIssues`, all jobs passed |
+| ℹ️ AlmaLinux Python locale warning | 18 internal builds | 24 hours | Container init warning, non-blocking |
+```
+
+- Prefix every Pattern with `ℹ️` so rows are unambiguous when copied elsewhere.
+- Use **Occurrences**, not Hits, so these rows aren't mistaken for build failures.
+- Never use ❌ or "needs action" language here. If a non-fatal issue is worth filing (for example, it's getting worse or could become fatal), say so in Notes.
 
 ## Branch Filtering
 
