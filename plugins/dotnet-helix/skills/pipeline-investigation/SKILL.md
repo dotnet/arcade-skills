@@ -41,9 +41,11 @@ Follow [references/health-assessment-format.md](references/health-assessment-for
 2. **Summary Table** — pass/fail breakdown by build type:
    | Type | Completed | ✅ Pass | ❌ Fail | Pass Rate |
 
-3. **Failure Trends Table** (conditional — include when 3+ builds in scope and at least one pattern recurs; cap at top 5):
+3. **Failure Trends Table** (conditional — include when 3+ builds in scope and at least one **fatal** pattern recurs; cap at top 5):
    | Pattern | Hits | Window | Status |
    - **Status**: ❌ No issue filed, ✅ Fix merged, 🔄 Known issue (link), ⏳ Fix in progress
+
+4. **Non-Fatal Issues** (conditional, placed last): recurring warnings and `continueOnError` failures that did **not** fail any build, each marked `ℹ️ Non-fatal`. Never mix these into tables 1–3 or count them in pass/fail rates.
 
 See the reference for build classification rules, branch filtering, and codeflow analysis methodology.
 
@@ -89,7 +91,9 @@ Given a build ID or URL, query the timeline to find all failed records:
 https://dev.azure.com/{org}/{project}/_apis/build/builds/{buildId}/timeline?api-version=7.1
 ```
 
-Filter records by `result == "failed"` or `result == "succeededWithIssues"`, with `type == "Task"`. Don't skip `succeededWithIssues` — these contain real failures (signing validation errors, Component Governance warnings) that didn't block the overall job. For health assessments, also include builds with overall result `partiallySucceeded`.
+Filter records by `result == "failed"` or `result == "succeededWithIssues"`, with `type == "Task"`. Don't skip `succeededWithIssues` — these contain real problems (signing validation errors, Component Governance warnings) that didn't block the overall job. For health assessments, also include builds with overall result `partiallySucceeded`.
+
+**Classify every issue as fatal or non-fatal before reporting it.** An issue is **fatal** only if it caused its job to fail: the task `result == "failed"` **and** its parent Job record `result == "failed"` (follow `parentId`). Everything else is **non-fatal**: `succeededWithIssues` tasks, `failed` tasks whose job still succeeded (`continueOnError: true`), and warning-level `issues`. A non-fatal issue that appears in a failed build is still non-fatal. It is not that build's root cause. See [Fatal vs Non-Fatal](references/health-assessment-format.md#fatal-vs-non-fatal-issues).
 
 Each failed or warning task has:
 - **name** — the task that failed
