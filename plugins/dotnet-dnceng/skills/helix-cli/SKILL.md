@@ -42,6 +42,8 @@ dotnet run --project src/HelixTool -- <command>
 
 Examples in this skill use `hlx`; replace it with the local `dotnet run` form if needed.
 
+The list examples below use `hlx` v0.11.0 envelopes. Older versions use different JSON shapes; check `hlx --version` and update with `dotnet tool update -g lewing.helix.mcp` if needed. Check the command's `--schema` when using another version.
+
 ## Authentication
 
 `hlx` supports anonymous access for public data and explicit auth for private Helix/AzDO.
@@ -118,9 +120,11 @@ Use this when the failure signal lives in Helix work items rather than AzDO orch
 ### 6. Pull structured test results before scraping logs
 
 ```bash
-hlx azdo test-runs 12345678 --json
-hlx azdo test-results 12345678 987654 --json
+hlx azdo test-runs 12345678 --all --json
+hlx azdo test-results 12345678 987654 --all --outcomes Failed --json
 ```
+
+These commands return list envelopes, not arrays. Check the producer exit status and completeness before consuming `.results` (see below). `test-results` defaults to failed outcomes; `--outcomes Failed` makes that selection explicit. A complete empty selection means no failed results in that run, not that the whole build passed.
 
 If the work item uploaded test results to Helix instead, use:
 
@@ -158,12 +162,33 @@ hlx azdo timeline "$BUILD" --filter failed --json \
 hlx azdo search-log "$BUILD" --pattern error --max-matches 20 --json \
   | jq -r '.steps[] | [.logId, .stepName, .stepResult, (.matchCount | tostring)] | @tsv'
 
-# Failed tests (.[] .id, .testCaseTitle, .outcome, .automatedTestName)
-hlx azdo test-results "$BUILD" "$RUN" --json \
-  | jq -r '.[] | [.id, .testCaseTitle, .outcome, .automatedTestName] | @tsv'
+# Failed tests (.results[].id, .testCaseTitle, .outcome, .automatedTestName)
+# Run in Bash; capture the producer status before invoking jq.
+(
+  if results=$(hlx azdo test-results "$BUILD" "$RUN" --all --outcomes Failed --json); then
+    printf '%s\n' "$results" | jq -r '
+      if .ok == true and .complete == true and .truncated == false
+         and (.results | type) == "array"
+      then .results[] | [.id, .testCaseTitle, .outcome, .automatedTestName] | @tsv
+      else error("Test-result acquisition failed or is incomplete")
+      end'
+  else
+    status=$?
+    printf '%s\n' "$results" >&2
+    exit "$status"
+  fi
+)
 ```
 
 `hlx azdo builds --json` returns a bare array. `hlx search-log` (Helix) is text output only in the CLI; use MCP `helix_search` for structured matches.
+
+### List envelopes and completeness
+
+In v0.11.0, `hlx azdo changes`, `test-runs`, `test-results`, `artifacts`, and `test-attachments` with `--json` return `{ok, results, returned, total, offset, limit, complete, truncated, next, cache, note}` (`note` may be omitted). Read rows from `.results[]`, not `.[]`. This does not change the `builds` bare array, `timeline`'s `.records[]`, or `search-log`'s `.steps[]`.
+
+Treat a collection as usable and complete only when the producer exits 0, `.ok == true`, `.complete == true`, and `.truncated == false`. Use the capture-and-guard pattern above for these list commands, adapting the row projection. Do not turn an error, missing `.results`, or an incomplete empty page into "no failures". Acquisition failures return `{ok:false, error:{...}}` and exit 1. A successful acquisition containing failed tests is not an acquisition failure.
+
+Prefer `--all` for the complete requested list. It cannot be combined with `--offset`, `--limit`, or the compatibility alias `--top`. For intentional bounded inspection, use e.g. `hlx azdo artifacts "$BUILD" --limit 1 --json`: truncated output exits 2. `--allow-truncated` changes that exit to 0 but the collection is still partial and must fail the completeness guard. `.next` contains `{offset, limit}` for the next page, not a URL; keep the same command, resource, and filters when continuing. A final page does not by itself prove earlier pages were collected. Do not use `returned == total` as a substitute for the completeness checks.
 
 ## Cache
 
