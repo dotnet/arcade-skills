@@ -1,201 +1,165 @@
 ---
 name: cross-repo-validation
-description: "Coordinate product and test owners across repositories with recorded permissions, exact build and test identities, concise handoffs and linked evidence. Use for local build handoffs to another repo's tests, candidate changes, complete-first-pass collection, and counting physical executions versus unique cases and overlapping coverage groups. Not for CI triage, codeflow, publishing or implementing test harnesses."
+description: "Coordinate product/test owners across repositories: build handoffs, candidate changes, launch authorization, complete-first-pass collection, and physical executions versus unique cases and overlapping coverage groups. Not for CI triage, codeflow, publishing or implementing test harnesses."
 ---
 
 # Cross-Repository Validation
 
-Record what was permitted, what actually ran, and what the evidence proves.
-Both owners use this protocol, even if one agent holds both roles. Build and test
-implementation stays in its own repository; no particular tool or plugin is required.
-
-For a question, answer the requested decision first and explain only the relevant
-controls. Include the records needed for that request, not every record below.
-For example, a build handoff checklist needs provenance and matching files, not
-the full scheduling lifecycle. For actual execution, all applicable launch,
-evidence and cleanup checks below remain mandatory.
+Record permission, exact inputs, actual execution and supported conclusions.
+Build/test implementation stays in its own repository; no tool or plugin is
+required. Answer questions directly with only relevant controls, not the whole
+workflow. Actual execution still requires every applicable check below.
 
 ## Terms used in records
 
 | Term | Meaning |
 |------|---------|
-| Candidate | The exact product build being tested |
-| Harness | The test scripts, data, tools and executable used to run the tests |
-| Manifest | An inventory identifying those files, their sources and content hashes; link detailed logs rather than copying them into messages |
-| Operation | The overall validation task, with one ID across its revisions |
-| Generation / plan revision | A numbered version of the task's inputs / its instructions and selected tests |
-| Authorization | Permission from the user for specific actions and inputs; `HOLD` means do not launch, regardless of readiness or cleanup approval |
+| Candidate / harness | Exact product build / test scripts, data, tools and executable |
+| Manifest | Inventory of files, source identity and content hashes |
+| Operation | Overall validation task, with one ID across revisions |
+| Generation / plan revision | Version of task inputs / instructions and selected tests |
+| Authorization | User permission for specific actions and inputs; `HOLD` means do not launch |
 
-An **immutable** record is a saved version that is never overwritten. Changes get
-a new version and reference. A manifest is not permission to execute its contents.
+**Immutable** records are never overwritten; changes get new versions/references.
+A manifest, available resources or cleanup approval is not test authorization.
 
 ## Roles and inputs
 
-| Role | Owns | Must not assume |
-|------|------|-----------------|
-| Product owner | Source, build, matching product files, saved candidate and manifest | Handoff authorizes tests or selects harness cases |
-| Test owner | Harness, test selection, launch checks, execution, evidence, restoring configuration and cleaning up owned processes | Availability, cleanup or agent suggestions grant launch permission |
+The **product owner** owns source, builds and a coherent frozen candidate.
+The **test owner** owns harness preparation, exact case/data/mode selection,
+launch checks, execution, evidence, restoration and owned-process cleanup.
+One agent may hold both roles; a handoff does not transfer these responsibilities.
 
-Every shared handoff identifies the owners and links the candidate and harness
-manifests, authorization, and supporting evidence. Repository-owned scripts
-remain with those owners; the protocol records their inputs and results.
+Identify both owners. Quote the user's scope, permissions and stop conditions;
+separate decisions from agent suggestions. Link operation/generation, versioned
+plan, both manifests, authorization and evidence. Obtain repository-owned
+build/launch, runtime-selection and safe-stop procedures, required access and
+evidence locations. Missing inputs block launch; do not invent them.
 
-Before execution, identify both owners and obtain:
-
-- The user's actual request: permitted actions, repositories, cases, candidate,
-  resources, cleanup and stop conditions. Quote it; separate decisions from suggestions.
-- Operation ID, generation, saved plan version, candidate manifest and
-  harness manifest references accessible to both owners.
-- Repository-owned procedures: build/launch commands, runtime selection mechanism,
-  evidence locations, required access, and safe stop/restoration procedures.
-  Resolve missing inputs before launch; do not invent commands or permissions.
-
-Use [record templates and examples](references/records.md) in repository/session
-artifact storage, not message bodies. Never publish private records or widen access.
+Read [record templates and examples](references/records.md) when preparing a
+handoff or result: they specify inventories, record fields and overlap examples.
+Keep private records in repository/session artifacts, not this public plugin.
 
 ## Workflow
 
 ### 1. Establish identity and authorization
 
-Record the task and input versions, owners, permitted tests and manifests. Agree
-whether to stop after a failure and how to handle running work when plans change.
-Distinguish *proposed*, *queued*, *running* and *finished* work.
+Distinguish *proposed*, *queued*, *running* and *finished* work. Keep one authoritative
+current-state record pointing to the plan, candidate, harness and permission/HOLD.
+Increase its revision number on every update.
 
-Keep one agreed current-state record pointing to the latest plan, candidate and
-harness, with the current permission or HOLD. Increase its revision number on
-every update so launch checks can identify exactly what they read.
+1. Bind authorization, its source and scope to the exact operation, generation,
+   plan, candidate and harness. A generic "GO" or cleanup approval is insufficient.
+2. Input, scope or policy changes get new records and a generation/plan revision.
+   A proposal alone changes neither current state nor authorization. When an
+   authorized replacement is adopted, supersede old queued work; never silently
+   retarget it. New inputs need their own authorization. Unclear replacement
+   status blocks launch.
+3. Before **each physical launch**, re-read current state: the full combination
+   must remain current and authorized, with no later HOLD/stop/replacement.
+   Recheck actual executable and runtime identity. Unreadable state or mismatched
+   inputs means do not launch. Record checked revision and launch time.
+4. Checking state then starting a process is **not atomic**: a HOLD can arrive
+   between them (a race). Preventing this needs a real launch gate coordinating
+   permission changes and process creation as one protected action. A document
+   cannot enforce that; disclose the gap and obey later stops.
 
-1. Bind authorization to the exact operation, generation, plan, candidate, and
-   harness references. Record its source and scope. A generic "GO", resource
-   availability, or approval to clean up is not authorization to launch.
-2. Proposed changes get new records and a generation or plan revision, but a
-   proposal alone changes neither the current plan nor its authorization.
-   Never silently run queued work with different inputs. When an authorized
-   replacement is adopted, update current state and mark old queued work
-   **superseded** (replaced). The new operation/generation/plan/candidate/harness
-   combination needs its own authorization. If replacement status is unclear,
-   hold launches until it is resolved.
-3. Immediately before **each physical launch**, re-read authoritative current state
-   and check that this full combination remains current and authorized, with no
-   later HOLD, stop or replacement. Recheck the actual test executable and chosen
-   runtime. If state cannot be read or identities differ, do not launch.
-4. Record checked revision and launch time. Reading state and starting a process
-   are separate actions: permission can change between them (a **race**).
-   Preventing this requires an actual launch gate that coordinates authorization
-   changes with process creation as one protected action (**atomic**). A document
-   check alone cannot provide that guarantee; disclose the gap and obey later stops.
-
-Preserve tool-provided assignment IDs only for real assignments; never invent them
-for peers. These tool identifiers are separate from session IDs and the operation
-ID used to link the task's records.
+Preserve tool-provided assignment IDs only for real assignments; never invent
+them from peer-session IDs. Operation IDs correlate records, not tool assignments.
 
 ### 2. Save the exact build and test setup
 
-The product owner records the commit **plus** any uncommitted tracked edits and
-untracked build inputs, preserving a patch or source snapshot. Record build
-commands and logs, operating system, architecture, each component's configuration,
-and hashes of binaries, libraries, symbols and supporting files. Explain
-inapplicable items; a commit stamp alone does not cover uncommitted source.
+The product manifest captures commit **plus** tracked patches/untracked build
+inputs, build commands/logs, OS/architecture, per-component configurations and
+hashes of binaries, libraries, symbols and supporting files. Explain missing or
+inapplicable items. A commit stamp alone does not cover uncommitted source.
 
-Save an immutable copy or a bundle identified by its content hash, with a fixed
-manifest. A build output folder that later builds overwrite is not a frozen
-handoff. For an **overlay** (replacing only some files in an existing build),
-identify the base, replaced and retained files, matching symbols and evidence
-that all components form the intended build. Copying new binaries alone does
-not establish coherence.
+Save an immutable copy or content-hashed bundle, not mutable build output.
+An **overlay** replaces some files in an existing build: identify its base,
+replaced/retained files, matching symbols and evidence of one coherent build.
+Copying new binaries alone proves no coherence.
 
-The test owner saves the test source and edits, tools, settings, exact selected
-cases, input data and test modes, and **actual test host/executable identity**.
-A selector is a name or filter used to choose tests. Record both it and the files
-it resolves to: an unchanged selector can choose a different executable later.
-Such a change invalidates setup until reconciled.
+The harness manifest captures test source/edits, tools, settings, resolved cases,
+data/modes and actual host/executable identity. A **selector** is a test name or
+filter: save both selector and resolved files. The same selector choosing a
+different host invalidates setup until reconciled.
 
-Specify exact runtime and dependency versions, architecture, component settings,
-environment overrides and whether automatic version substitution (roll-forward)
-is allowed. Verify the loaded libraries/packages, runtime and test executable
-from execution evidence, not just requested settings or PATH.
-Exchange manifest references, not repeated inventories/hashes. Reuse a verified
-candidate while it remains applicable.
+Pin exact runtime/dependency versions, architecture, component settings,
+environment overrides and **roll-forward** (automatic version substitution).
+Verify actually loaded modules/packages, runtime and host from execution evidence,
+not requested settings or PATH. Exchange manifest references, not inventories.
+Reuse a verified candidate while applicable.
 
 ### 3. Choose when to stop; keep diagnosis separate
 
-A **collection policy** says whether the initial test pass stops after a failure:
+A **collection policy** determines whether the first pass stops after failure:
 
 | Policy | Required behavior |
 |--------|-------------------|
-| `complete-first-pass` | Collect every authorized case/data/mode once, including independent cases after failures. Mark unreachable cases individually; safety and user stops still take precedence. |
-| `fail-fast` | Stop at the agreed failure boundary and report the remainder as not reached/not run, never passed. |
+| `complete-first-pass` | Run every authorized case/data/mode once, continuing independent cases after failures; mark unreachable cases individually. Safety/user stops still win. |
+| `fail-fast` | Stop at the agreed failure boundary; report the remainder as not reached/not run, never passed. |
 
-Never silently change policy or add tests to fill gaps. Keep assertions, original
-logs and historical runs. Distinguish the planned validation pass (**acceptance**)
-from extra runs investigating a failure (`diagnostic`) or fixing invalid setup
-(`setup-correction`). Link each extra run to its original and obtain any additional
-authorization. Corrections do not erase invalid runs; retries for green do not
-establish first-pass success.
+Never silently change policy or add scope. Preserve assertions, logs and historical
+runs. Label the planned pass **acceptance**, investigations `diagnostic`, and
+invalid-setup corrections `setup-correction`. Link extra runs to originals and
+obtain any additional authorization. Corrections do not erase invalid runs;
+retries for green do not establish first-pass success.
 
 ### 4. Execute, stop, and restore
 
-For each actual launch, capture commands, working directory, environment,
-start/end times, exit status, raw logs and selected tests. Record **reached
-subchecks**: the individual steps confirmed to have run, such as load, roundtrip
-and compare. Tool success alone proves neither target execution nor outcome.
+Record exact commands, working directory/environment, start/end times, exit status,
+raw logs and selected tests. **Reached subchecks** are steps confirmed to have
+executed, such as load/roundtrip/compare. Tool success proves neither target
+execution nor outcome.
 
-A HOLD/stop revokes queued launches immediately. For already-running work, follow
-the agreed replacement policy within the user's authorization: either stop
-safely or finish only explicitly permitted in-flight collection. A user stop or
-safety boundary takes precedence over collection completeness. If the policy is
-missing, stop safely and block further launches rather than assuming permission
-to finish. Preserve partial evidence.
+HOLD/stop revokes queued launches immediately. Apply the agreed running-work
+policy: stop safely or finish only explicitly permitted in-flight collection.
+User/safety stops override completeness. Without a policy, stop safely and block
+new launches. Preserve partial evidence.
 
 Track owned process IDs/children; never kill unrelated processes. Snapshot
-configuration before mutation, restore owned changes without overwriting
-concurrent edits, and verify restoration. Report cleanup/restoration failures as
-blockers. Cleanup does not release a HOLD or authorize a new generation.
+configuration, restore owned changes without overwriting concurrent edits, and
+verify restoration and cleanup. Failures are blockers. Cleanup releases no HOLD
+and authorizes no new generation.
 
 ### 5. Classify outcomes and coverage
 
-Keep execution state separate from the requested verdict:
+Separate execution state from the requested verdict:
 
 | Outcome | Meaning |
 |---------|---------|
-| `setup-invalid` | Wrong/missing candidate, runtime, host, harness, pinning or prerequisites; no valid product conclusion |
-| `product-failure-before-operation` | Verified setup, but product fails before the requested operation; requested symptom remains not reached |
-| `symptom-reproduced` | Requested operation reached and evidence satisfies the defined symptom criterion |
-| `symptom-not-reproduced` | Requested operation and required subchecks reached under verified setup; symptom criterion absent within this scope |
-| `not-reached` / `not-run` | A subcheck was unreachable / no physical execution started; neither is a pass |
-| `blocked` / `interrupted` | Permission, infrastructure, stop, or supersession prevented completion; retain any already observed outcomes |
+| `setup-invalid` | Wrong/missing candidate, runtime, host, harness or prerequisites; no product conclusion |
+| `product-failure-before-operation` | Verified setup; product fails before the requested operation, so its symptom remains not reached |
+| `symptom-reproduced` | Requested operation reached; evidence meets the symptom criterion |
+| `symptom-not-reproduced` | Valid setup and required subchecks reached; symptom absent within this scope |
+| `not-reached` / `not-run` | Step unreachable / no launch; neither is a pass |
+| `blocked` / `interrupted` | Permission, infrastructure, stop or replacement prevents completion; retain observed outcomes |
 
-For compatibility tests, define what counts as success as well as the failure
-symptom; `symptom-not-reproduced` is not automatically a pass.
-Report separately: tool return, actual target execution, observed configuration,
-reached subchecks, and verified outcome. Unknown evidence stays unknown.
+Define success as well as the failure symptom; absence of a symptom alone is not
+a pass. Report tool return, actual target execution, observed configuration,
+reached subchecks and verified outcome separately. Unknown stays unknown.
 
-Count actual launches (**physical executions**) separately from distinct test
-cases and distinct combinations of case, data, mode and configuration. Records
-call such a combination a **tuple**. A coverage group is a named set of those
-combinations; one combination may belong to several groups without being run
-several times.
+Count **physical executions** (launches) separately from unique cases and
+**tuples** (case/data/mode/configuration combinations). Coverage groups are named
+sets of tuples; membership in several groups does not imply several executions.
+Explicitly report every requested total:
 
-| Count | What to state explicitly |
-|-------|--------------------------|
-| Physical executions | Total launches and separate acceptance, diagnostic and setup-correction counts |
-| Unique coverage | Number of distinct case IDs and distinct case/data/mode/configuration combinations |
-| Coverage groups | Total memberships (sum of group sizes), intersections, and the deduplicated union |
+- Physical launches: total and acceptance/diagnostic/setup-correction breakdown.
+- Unique coverage: distinct case IDs and distinct tuples.
+- Groups: total memberships (sum of sizes), intersections and deduplicated union.
 
-State every requested total; do not leave readers to calculate it from the
-breakdown. Group memberships are not unique coverage, and repeating a diagnostic
-launch does not add a new test combination.
+Do not leave totals to reader arithmetic. Diagnostic reruns add executions, not
+unique coverage. Use the overlap example in the records reference when needed.
 
 ### 6. Publish once; message only to change an action
 
-Write one final report (**terminal summary**) linking the plan, manifests, results,
-raw logs, coverage, gaps and cleanup evidence. State what decision or action, if
-any, remains. Send its reference once; revise only when evidence or the required
-next action changes. Never resend unchanged final reports or hashes.
+Write one final report (**terminal summary**) linking plan, manifests, results,
+commands/raw logs, coverage/gaps and restoration/cleanup evidence. State any
+remaining decision. Send its reference once; revise only for changed evidence or
+next action. Never resend unchanged final reports/hashes.
 
-Message only when the recipient's next action changes: permission, replacement or
-stop, an actionable blocker, requested evidence, an important correction or
-completion. State the event, task/version, evidence reference and next action:
+Message only to change the recipient's next action: permission, replacement/stop,
+actionable blocker, requested evidence, material correction or completion.
 
 ```text
 event: completion
@@ -207,16 +171,7 @@ next-action: product owner reviews the recorded failure before proposing changes
 ```
 
 Avoid acknowledgement loops, repeated HOLD/readiness and duplicate progress.
-Reference durable records. Report inaccessible artifacts as blockers rather than
-copying private inventories into messages.
-
-## Validation checklist
-
-- Executions match authorized inputs and recorded pre-launch checks; superseded
-  queued work did not start.
-- Actual host/runtime/configuration and reached subchecks support the verdict.
-- Every requested test combination has an outcome or an explicit coverage gap; totals
-  reconcile overlaps and distinguish physical execution from unique coverage.
-- Original assertions/evidence survive; diagnostics are labeled.
-- Restoration and owned-process cleanup are verified or blocked.
-- One terminal summary is discoverable without replaying conversations.
+Reference durable records; inaccessible artifacts are blockers, not permission
+to copy private inventories or widen access. Before reporting, verify each
+requested tuple has evidence or an explicit gap, counts reconcile, and cleanup
+is verified or blocked.
