@@ -1,0 +1,32 @@
+scenarios:
+  - name: "Reuse requires a verified feed and consumer pins"
+    prompt: "We already have a verified local Arcade build for a coordinated product/test handoff. Does SkipArcadeBuild recreate the feed or update the consumer global.json? Does CleanFeed work with it? Explain the prerequisites without executing anything or rebuilding a valid baseline."
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)(skip|not|doesn't)[^\\n]*(feed|global.json|pin)"
+      - type: "output_matches"
+        pattern: "(?i)CleanFeed[^\\n]*(no effect|ignored|not|skip)|(?:no effect|ignored)[^\\n]*CleanFeed"
+      - type: "output_matches"
+        pattern: "(?i)(verif|check|confirm)[^\\n]*(feed|pin|manifest|package|restor)"
+    timeout: 120
+
+  - name: "Shared handoff preserves evidence and identifies side effects"
+    prompt: "Before running the local Arcade SDK validation script for a product owner and a test owner, identify its destructive/shared-state and configuration side effects, restoration responsibilities, and where to get the shared cross-repository handoff protocol. The source has intentional tracked and untracked changes. Can a successful consumer build prove a requested runtime case ran? Do not run anything."
+    assertions:
+      - type: "output_contains"
+        value: "cross-repo-validation"
+      - type: "output_contains"
+        value: "dotnet-validation"
+      - type: "output_contains"
+        value: "NuGet.config"
+      - type: "output_contains"
+        value: "global.json"
+      - type: "output_matches"
+        pattern: "(?i)(delet|remov|reset)[^\\n]*(artifacts|\\.packages)"
+      - type: "output_matches"
+        pattern: "(?i)(restor|snapshot)"
+      - type: "output_contains"
+        value: "untracked"
+      - type: "output_matches"
+        pattern: "(?i)(does not|doesn't|cannot|not)[^\\n]*(prove|runtime|execut)"
+    timeout: 120
