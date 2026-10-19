@@ -35,6 +35,12 @@
       "version": "0.1.0"
     },
     {
+      "name": "dotnet-validation",
+      "source": "./plugins/dotnet-validation",
+      "description": "Cross-repository validation protocol for product and test owners: immutable handoffs, scoped authorization, collection policy, and evidence",
+      "version": "0.1.0"
+    },
+    {
       "name": "dotnet-compliance",
       "source": "./plugins/dotnet-compliance",
       "description": "Skills for .NET compliance and security: BinSkim scanning, SDL analysis",

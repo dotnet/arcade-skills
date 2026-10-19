@@ -18,6 +18,7 @@ For information about the Agent Skills standard, see [agentskills.io](http://age
 | `dotnet-binlog` | Analyze failed MSBuild binary logs from Azure DevOps builds via the binlog MCP server, without rebuilding locally. |
 | `dotnet-codeflow` | Dependency flow across .NET repos: Maestro/BAR subscriptions, VMR codeflow health, and cross-repo dependency tracing. |
 | `dotnet-arcade` | Build and validate the .NET Arcade SDK locally against consuming repositories. |
+| `dotnet-validation` | Coordinate cross-repository product/test owners with immutable handoffs, scoped launch authorization, explicit collection policy, and linked evidence. |
 | `dotnet-compliance` | Compliance and security: BinSkim binary scanning and SDL finding analysis. |
 | *(more coming soon)* | Contribute one! See [CONTRIBUTING.md](CONTRIBUTING.md). |
 

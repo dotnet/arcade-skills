@@ -21,3 +21,6 @@
 /plugins/dotnet-compliance/skills/binskim-scan/ @lewing @steveisok
 /plugins/dotnet-compliance/skills/binskim-analysis/ @lewing @steveisok
 /plugins/dotnet-arcade/skills/test-arcade/ @ellahathaway @dotnet/dnceng
+/tests/dotnet-arcade/test-arcade/ @ellahathaway @dotnet/dnceng
+/plugins/dotnet-validation/ @dotnet/dnceng
+/tests/dotnet-validation/ @dotnet/dnceng
