@@ -1,0 +1,155 @@
+scenarios:
+  - name: "Cleanup approval does not release a hold"
+    prompt: "A product owner and test owner are validating a frozen build across repositories. The current operation is on HOLD. The user said GO only to restore configuration and clean up the previous run. The machine is now available. State the launch decision and next action; do not execute commands."
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)(do not|don't|must not|cannot|not authorized to) (launch|start|run)|no (new )?(launch|test execution)"
+      - type: "output_matches"
+        pattern: "(?i)(authoriz|permission)"
+      - type: "output_contains"
+        value: "HOLD"
+    timeout: 120
+
+  - name: "Product owner freezes dirty inputs rather than claiming commit identity"
+    prompt: "I am handing an x64 product build to another repository's test owner. Native components are Release, managed components are Debug, and the build used uncommitted tracked edits and an untracked generated input. Write a compact handoff checklist, not commands. A commit stamp and a folder containing newly copied binaries are all I have recorded so far."
+    assertions:
+      - type: "output_contains"
+        value: "untracked"
+      - type: "output_matches"
+        pattern: "(?i)(patch|snapshot|preserv[^\\n]*tracked edits)"
+      - type: "output_matches"
+        pattern: "(?i)(coheren|retained|base manifest)"
+      - type: "output_contains"
+        value: "symbols"
+      - type: "output_matches"
+        pattern: "(?i)(immutable|frozen|content.address)"
+      - type: "output_matches"
+        pattern: "(?i)(hash|digest)"
+    timeout: 120
+
+  - name: "Superseded queued work is not retargeted"
+    prompt: "Generation 1 of a cross-repository validation operation is queued and authorized for plan-v1, candidate-v1 and harness-v1. The product owner supplies candidate-v2 and proposes generation 2 but has no new test authorization. Explain what happens to queued work and what the test owner must check immediately before any physical launch. Does a document check prevent a race with a later HOLD?"
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)supersed"
+      - type: "output_contains"
+        value: "authorization"
+      - type: "output_contains"
+        value: "harness"
+      - type: "output_matches"
+        pattern: "(?i)(re.read|reread|current state|authoritative)"
+      - type: "output_matches"
+        pattern: "(?i)(not atomic|not an atomic|cannot.*(race|atomic)|does not.*(prevent.*race|atomic)|no.*atomic)"
+    timeout: 120
+
+  - name: "Stop wins over an in-flight complete collection"
+    prompt: "An authorized cross-repository complete-first-pass collection is running. A later user HOLD arrives just after the launch check. The plan says stop-safely for running work on supersession. Explain the handling of the running process, queued tests, partial evidence and configuration restoration. Do not run or kill anything."
+    assertions:
+      - type: "output_contains"
+        value: "queued"
+      - type: "output_matches"
+        pattern: "(?i)(owned|ownership|process ID|PID)"
+      - type: "output_matches"
+        pattern: "(?i)restor"
+      - type: "output_matches"
+        pattern: "(?i)(partial|evidence (collected|captured|gathered|available) so far)"
+      - type: "output_matches"
+        pattern: "(?i)(stop|interrupt)"
+    timeout: 120
+
+  - name: "Complete first pass is not fail-fast or retry for green"
+    prompt: "The authorized plan for testing another repository's product build specifies complete-first-pass for independent cases alpha, beta and gamma. Alpha reaches its compare assertion and fails. There is no safety or infrastructure blocker. Should we stop, disable the assertion, retry alpha until green, or continue? Explain how any later diagnostic execution is reported without overwriting the original."
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)continu"
+      - type: "output_contains"
+        value: "beta"
+      - type: "output_contains"
+        value: "gamma"
+      - type: "output_contains"
+        value: "diagnostic"
+      - type: "output_matches"
+        pattern: "(?i)(preserv|retain|keep).*original|original.*(preserv|retain|keep)"
+    timeout: 120
+
+  - name: "Outcome distinctions require target and subcheck evidence"
+    prompt: "Classify these executions of a candidate from a different repo, using precise outcome labels. A: a launcher tool returned success but the wrong runtime was loaded. B: verified setup, product crashed before the requested roundtrip. C: verified setup, roundtrip and compare reached and payload mismatch observed. D: verified setup, all required subchecks reached and no mismatch. E: never launched after fail-fast. F: user stopped it mid-run. Do not equate a successful tool call with a passing test."
+    assertions:
+      - type: "output_contains"
+        value: "setup-invalid"
+      - type: "output_contains"
+        value: "product-failure-before-operation"
+      - type: "output_contains"
+        value: "symptom-reproduced"
+      - type: "output_contains"
+        value: "symptom-not-reproduced"
+      - type: "output_contains"
+        value: "not-run"
+      - type: "output_contains"
+        value: "interrupted"
+    timeout: 120
+
+  - name: "Overlapping coverage counts physical launches separately"
+    prompt: "Summarize this cross-repository validation coverage in prose. Group A selects tuples x and y; group B selects y and z. Acceptance ran x, y and z once each. One separately authorized diagnostic reran y. Each tuple uses a distinct case ID. Report numeric counts for physical executions by purpose, unique tuples, unique cases, group memberships and group intersection, without adding group sizes as unique coverage."
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)(4|four)[\\s*]+(total[\\s*]+)?physical\\s+(executions|launches)|(total\\s+)?physical\\s+(executions|launches)(\\s+total)?[\\s*:=|]*(4|four)\\b"
+      - type: "output_matches"
+        pattern: "(?i)(3|three) acceptance|acceptance[^\\n]*(3|three)"
+      - type: "output_matches"
+        pattern: "(?i)(1|one) (separately authorized )?diagnostic|diagnostic[^\\n]*(1|one)"
+      - type: "output_matches"
+        pattern: "(?i)(3|three) unique|unique[^\\n]*(3|three)"
+      - type: "output_matches"
+        pattern: "(?i)(4|four)[\\s*]+((total|group)[\\s*]+)?memberships|memberships[\\s*:=|]*(4|four)\\b"
+    timeout: 120
+
+  - name: "Stable selector with host drift invalidates setup"
+    prompt: "A test owner used the same friendly selector for two validations of another repo's frozen product. It now resolves to a different test-host binary than the authorized harness manifest. The command returned zero and requested settings look correct, but loaded-module evidence was not captured. Can we count this as symptom not reproduced? Explain the correction and required runtime evidence."
+    assertions:
+      - type: "output_contains"
+        value: "setup-invalid"
+      - type: "output_contains"
+        value: "harness"
+      - type: "output_contains"
+        value: "authorization"
+      - type: "output_matches"
+        pattern: "(?i)(loaded|observed|actual).*runtime|runtime.*(loaded|observed|actual)"
+    timeout: 120
+
+  - name: "Unchanged terminal reports do not trigger message loops"
+    prompt: "A test owner has already sent the authoritative terminal result reference for a cross-repository validation generation, including manifests, raw logs and cleanup evidence. The product owner acknowledges it. No evidence, hashes, decision or next action has changed. Should the test owner resend the full report or acknowledge again? State the messaging decision and where durable state belongs."
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)(do\\s+\\**not\\**|don't|no need|neither|should\\s+\\**not\\**)[^\\n]*(resend|reply|acknowledg)|no (new |further )?message"
+      - type: "output_matches"
+        pattern: "(?i)(artifact|authoritative|durable|record)"
+    timeout: 120
+
+  - name: "Peer session identifiers are not assignment identifiers"
+    prompt: "Two peer sessions own product and tests for an operation. Their messaging tool has not provided an assignment ID, but their session IDs are known. Should we synthesize an assignment ID from those IDs to report the cross-repository validation result? Explain which identifiers correlate the plan and which tool identifier is optional."
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)(do not|don't|must not|never|should not|no)[^\\n]*(invent|synthesi|fabricat|derive|assignment)"
+      - type: "output_contains"
+        value: "operation"
+      - type: "output_contains"
+        value: "generation"
+      - type: "output_matches"
+        pattern: "(?i)(tool.provided|provided by.*tool|tool.*suppl|real assignment)"
+    timeout: 120
+
+  - name: "Protocol stays independent of repository implementations"
+    prompt: "Product and test owners in two repositories use unrelated build systems and already maintain their own build and launch scripts. What does a shared handoff protocol need from each owner, and should it choose or implement their scripts? Describe responsibilities and required records without recommending concrete tools, plugins or adapters. Do not execute anything."
+    assertions:
+      - type: "output_contains"
+        value: "manifest"
+      - type: "output_contains"
+        value: "authorization"
+      - type: "output_contains"
+        value: "evidence"
+      - type: "output_matches"
+        pattern: "(?i)(remain|stay|belong|outside|keeps?|retain|repository.owned|repository.specific)"
+      - type: "output_matches"
+        pattern: "(?i)(not|never|no)[^\\n]*(choose|implement|select)|(?:choose|implement|select)[^\\n]*(outside|own|repositor)"
+    timeout: 120

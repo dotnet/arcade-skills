@@ -27,6 +27,28 @@ Build the Arcade SDK from a local checkout, publish the artifacts to a local NuG
 
 **Not for**: CI/CD pipeline analysis, Helix test failures, publishing Arcade packages to official feeds, or dependency flow troubleshooting.
 
+## Shared Cross-Repository Handoffs
+
+For coordinated product/test owners, use `cross-repo-validation` from the
+independently installed `dotnet-validation` plugin for authorization, versioned
+plans, immutable candidate/harness manifests, collection policy, and terminal
+evidence. This skill remains the Arcade-specific build/feed/pinning adapter; do
+not copy its script into a second validation workflow. Neither plugin requires
+the other for standalone use.
+
+Before invoking the script, confirm permission for its concrete side effects:
+it deletes `.packages` and `artifacts` in the affected repos, may clean a shared
+feed, clears user-wide NuGet caches, and changes the test repo's `NuGet.config`
+and `global.json`. Preserve existing evidence and snapshot configuration first.
+The script does not restore those files automatically; restore owned changes
+without overwriting concurrent edits and verify cleanup after failures or stops.
+
+For a handoff, freeze and hash the packages from one coherent Arcade build and
+record source/patch identity, build configuration, logs, and exact package pins.
+The shared temp feed is mutable, not an immutable candidate. Verify the packages
+actually resolved by the consumer from restore/build evidence, not just the
+requested version. Do not clear a feed or cache used by another active run.
+
 ## Prerequisites
 
 Before running this skill, ensure the following are available:
@@ -87,7 +109,12 @@ Run `scripts/Test-Arcade.ps1` with the required `-Arcade` and `-TestRepo` argume
 | `-CleanFeed` | ❌ | Delete and recreate the local feed directory before running. Use when switching branches or testing a different Arcade change |
 | `-SignCheck` | ❌ | Run Signing Validation (SignCheck) after building the test repo. Checks files in `artifacts/packages/<config>/NonShipping` by default |
 | `-SignCheckDir <path>` | ❌ | Directory to validate with SignCheck. Implies `-SignCheck`. Use to check a custom directory instead of the default |
-| `-SkipArcadeBuild` | ❌ | Skip the Arcade build step and reuse existing artifacts. Only resets the test repo |
+| `-SkipArcadeBuild` | ❌ | Reuse an already verified build, feed and test repo SDK pins. Skips Arcade build, feed setup and `global.json` updates; only resets the test repo |
+
+`-SkipArcadeBuild` does not prepare a new candidate handoff: verify the existing
+feed contents and consumer pins against the candidate manifest first.
+`-CleanFeed` has no effect with `-SkipArcadeBuild`. Do not rerun a valid product
+build merely to obtain a fresh baseline when the recorded candidate still applies.
 
 ## Step 2: Interpret Results
 
@@ -148,6 +175,15 @@ Possible `Outcome` values in the XML: `Signed`, `Unsigned` (error), `Skipped`, `
 
 If any phase fails, include the error details and remediation guidance from the table above.
 
+For coordinated validation, use one terminal summary under the shared protocol
+instead of sending this phase table as a second final report. Link the exact
+command, candidate/harness manifests, restore/build logs and SignCheck evidence.
+Distinguish setup-invalid failures from product failures and tests that were not
+reached: the script stops at the first failure and does not collect every requested
+case. A successful build does not prove a requested runtime test executed. If a
+complete first pass is required, the test owner must explicitly collect the
+authorized independent cases with the repository's harness after valid setup.
+
 ## Anti-Patterns
 
 > ❌ **Don't reuse a stale feed directory.** The script only resets the feed when run with `-CleanFeed`. If you're re-running without that flag or running steps manually, always clear the feed and NuGet caches before re-testing with new Arcade changes.
@@ -156,7 +192,7 @@ If any phase fails, include the error details and remediation guidance from the 
 
 > ❌ **Don't manually modify NuGet.config or global.json** when the script handles it. Manual edits risk inconsistency and are harder to reproduce.
 
-> ❌ **Don't test against a dirty repo.** Ensure both the Arcade and test repos have committed or stashed changes before running. Uncommitted changes in build infrastructure files can cause misleading results.
+> ❌ **Don't test unrecorded source.** Prefer a clean source state. When intentionally validating uncommitted changes, capture tracked patches and relevant untracked inputs in the source identity before building; a commit stamp alone is insufficient. Do not stash or discard the user's changes just to run validation.
 
 > ❌ **Don't install a .NET SDK manually.** The build process installs its own SDK via `eng/common/dotnet.sh`. Manual SDK installations can cause version conflicts.
 
