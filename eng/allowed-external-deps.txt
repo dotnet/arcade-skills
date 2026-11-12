@@ -26,8 +26,15 @@ invokes:flow-tracing
 # dotnet-dnceng plugin: known-issue-history skill
 script:known-issue-history:scripts/Get-KnownIssueHistory.ps1
 
-# dotnet-dnceng plugin: MCP servers
-mcp-server:dotnet-dnceng:hlx
-mcp-server:dotnet-dnceng:binlog
-mcp-server:dotnet-dnceng:mihubot
-mcp-server:dotnet-dnceng:maestro
+# Tool-backed MCP servers use exact package versions in plugin.json.
+# Update the package version here and in the manifest together in a reviewed PR.
+
+# dotnet-helix plugin: lewing.helix.mcp@0.12.0 and the mihubot HTTP server
+mcp-server:dotnet-helix:hlx
+mcp-server:dotnet-helix:mihubot
+
+# dotnet-codeflow plugin: lewing.maestro.mcp@0.18.0
+mcp-server:dotnet-codeflow:maestro
+
+# dotnet-binlog plugin: Microsoft.AITools.BinlogMcp@3.0.4 from dotnet-public
+mcp-server:dotnet-binlog:binlog

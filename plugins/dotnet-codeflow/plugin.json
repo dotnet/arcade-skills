@@ -21,7 +21,7 @@
       "args": [
         "dnx",
         "--yes",
-        "lewing.maestro.mcp"
+        "lewing.maestro.mcp@0.18.0"
       ]
     }
   }
