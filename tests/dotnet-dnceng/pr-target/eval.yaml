@@ -1,0 +1,436 @@
+scenarios:
+  - name: "Preview before servicing - public next preview"
+    prompt: "Where should I open a VMR PR for a non-security 11.0 fix targeting the next preview to ship? Use state.md as verified evidence for this offline task, without querying services or changing files. Give the PR base link, restrictions, and ports."
+    setup: &before
+      files:
+        - path: "state.md"
+          source: "fixtures/preview-before.md"
+    assertions:
+      - type: "output_contains"
+        value: "https://github.com/dotnet/dotnet/tree/release/11.0.0-rc.1"
+      - type: "output_matches"
+        pattern: "(?i)port[^\\n]*main|main[^\\n]*port"
+    timeout: 180
+
+  - name: "Preview before servicing - security next preview"
+    prompt: "Where should I open a VMR PR for a security 11.0 fix targeting the next preview to ship? Use state.md as verified offline evidence; do not query services or change files. Give the branch link and port timing without discussing vulnerability details."
+    setup: *before
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)[?&]version=GBinternal(?:/|%2F)release(?:/|%2F)11\\.0\\.0-rc\\.1"
+      - type: "output_matches"
+        pattern: "(?i)after[^\\n]*(public release|publicly released|disclosure)"
+    timeout: 180
+
+  - name: "Preview before servicing - public later preview"
+    prompt: "My non-security VMR change targets 11.0 RC2, not the next preview to ship. Where do I open the PR? Use state.md as verified offline evidence; do not query services or change files. Give the exact base link."
+    setup: *before
+    assertions:
+      - type: "output_contains"
+        value: "https://github.com/dotnet/dotnet/tree/main"
+    rubric:
+      - "Selects public main despite an existing next-preview branch, because the change does not target that preview."
+    timeout: 180
+
+  - name: "Preview before servicing - security later preview"
+    prompt: "My security VMR change targets 11.0 RC2, not the next preview. Where do I open a PR now? Use state.md as verified offline evidence; do not query services or change files."
+    setup: *before
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)(wait|not yet|not available)"
+    rubric:
+      - "Waits for the intended internal preview; does not substitute the existing RC1 branch or a public target."
+    timeout: 180
+
+  - name: "Preview after servicing - public next preview"
+    prompt: "Where should I open a non-security VMR PR for the next 11.0 preview to ship? Use state.md as verified offline evidence; do not query services or change files. Include the branch link and required port."
+    setup: &after
+      files:
+        - path: "state.md"
+          source: "fixtures/preview-after.md"
+    assertions:
+      - type: "output_contains"
+        value: "https://github.com/dotnet/dotnet/tree/release/11.0.1xx-rc1"
+      - type: "output_contains"
+        value: "release/11.0.1xx"
+    rubric:
+      - "Ports to the vNext servicing development branch, not main."
+    timeout: 180
+
+  - name: "Preview after servicing - security next preview"
+    prompt: "Where should I open a security VMR PR targeting the next 11.0 preview? Use state.md as verified offline evidence; do not query services or change files. Include the branch link and port timing."
+    setup: *after
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)[?&]version=GBinternal(?:/|%2F)release(?:/|%2F)11\\.0\\.1xx-rc1"
+      - type: "output_matches"
+        pattern: "(?i)after[^\\n]*(public release|publicly released|disclosure)"
+    rubric:
+      - "Identifies the public 11.0 servicing development branch as the eventual port, not an immediate security destination."
+    timeout: 180
+
+  - name: "Preview after servicing - public later preview"
+    prompt: "My non-security VMR change is for 11.0 RC2 rather than the next preview. Where should its PR go? Use state.md as verified offline evidence; do not query services or change files."
+    setup: *after
+    assertions:
+      - type: "output_contains"
+        value: "https://github.com/dotnet/dotnet/tree/release/11.0.1xx"
+    rubric:
+      - "Chooses the actual public development ref rather than main, the RC1 preview, or the literal placeholder release/vNext."
+    timeout: 180
+
+  - name: "Preview after servicing - security later preview"
+    prompt: "My security VMR change is for 11.0 RC2, not the next preview. Which branch can I create a PR against now? Use state.md as verified offline evidence; do not query services or change files."
+    setup: *after
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)(wait|not yet|not available)"
+    rubric:
+      - "Does not substitute public development or the existing internal RC1 preview for the missing intended preview."
+    timeout: 180
+
+  - name: "Unbranched preview - public change"
+    prompt: "My non-security 11.0 VMR change targets Preview 1. Where should I open a PR? Use state.md as verified offline evidence; do not query services or change files."
+    setup: &unbranched
+      files:
+        - path: "state.md"
+          source: "fixtures/preview-unbranched.md"
+    assertions:
+      - type: "output_contains"
+        value: "https://github.com/dotnet/dotnet/tree/main"
+    timeout: 180
+
+  - name: "Unbranched preview - security change"
+    prompt: "My security 11.0 VMR change targets Preview 1. Where should I open a PR now? Use state.md as verified offline evidence; do not query services or change files."
+    setup: *unbranched
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)(wait|not yet|not available)"
+    rubric:
+      - "Waits for an internal preview branch without inventing a ref or recommending public main."
+    timeout: 180
+
+  - name: "General Servicing - public shared fix"
+    prompt: "Where should my non-security runtime/shared-component VMR fix go? Tactics approved 2027/1B for .NET 10.0; it also benefits SDK 2xx users. Use state.md as verified offline evidence; do not query services or change files. Give exact PR base links and ports."
+    setup: &servicing
+      files:
+        - path: "state.md"
+          source: "fixtures/servicing.md"
+    assertions:
+      - type: "output_contains"
+        value: "https://github.com/dotnet/dotnet/tree/release/10.0.1xx"
+      - type: "output_not_contains"
+        value: "https://github.com/dotnet/dotnet/tree/release/10.0.2xx"
+    rubric:
+      - "Targets only the shared-component source band; benefiting 2xx consumers is not a request for a 2xx source PR."
+    timeout: 180
+
+  - name: "General Servicing - security shared fix"
+    prompt: "Where should my security runtime/shared-component VMR fix go? Tactics approved .NET 10.0 window 2027/1B. Use state.md as verified offline evidence; do not query services or change files. Give the exact branch link and port timing."
+    setup: *servicing
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)[?&]version=GBinternal(?:/|%2F)release(?:/|%2F)10\\.0\\.1xx"
+      - type: "output_contains"
+        value: "disclosure"
+    timeout: 180
+
+  - name: "General Servicing - public SDK both bands"
+    prompt: "Where should a non-security SDK-source fix approved for .NET 10.0 2027/1B go? The affected bands are 1xx and 2xx. Use state.md as verified offline evidence; do not query services or change files. Give both PR base links."
+    setup: *servicing
+    assertions:
+      - type: "output_contains"
+        value: "https://github.com/dotnet/dotnet/tree/release/10.0.1xx"
+      - type: "output_contains"
+        value: "https://github.com/dotnet/dotnet/tree/release/10.0.2xx"
+    timeout: 180
+
+  - name: "General Servicing - security SDK both bands"
+    prompt: "Where should a security SDK-source fix approved for .NET 10.0 2027/1B go? It affects 1xx and 2xx. Use state.md as verified offline evidence; do not query services or change files. Give both branch links and port timing."
+    setup: *servicing
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)[?&]version=GBinternal(?:/|%2F)release(?:/|%2F)10\\.0\\.1xx"
+      - type: "output_matches"
+        pattern: "(?i)[?&]version=GBinternal(?:/|%2F)release(?:/|%2F)10\\.0\\.2xx"
+      - type: "output_contains"
+        value: "disclosure"
+    timeout: 180
+
+  - name: "Later approved release - public fix waits"
+    prompt: "Where should my non-security runtime/shared VMR fix approved for .NET 10.0 2027/2B go? Use state.md as verified offline evidence; do not query services or change files. Tell me whether I can merge it now."
+    setup: *servicing
+    assertions:
+      - type: "output_contains"
+        value: "https://github.com/dotnet/dotnet/tree/release/10.0.1xx"
+      - type: "output_matches"
+        pattern: "(?i)(unmerged|do not merge|must not merge|wait[^\\n]*merg|merg[^\\n]*wait)"
+    rubric:
+      - "Keeps the public PR unmerged until its approved window; does not send a non-security fix to parking."
+    timeout: 180
+
+  - name: "Later approved release - security shared fix parks"
+    prompt: "Where should my security runtime/shared VMR fix approved for .NET 10.0 2027/2B go? It benefits 2xx as well. Use state.md as verified offline evidence; do not query services or change files. Include the exact link, later integration responsibility, and port timing."
+    setup: *servicing
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)[?&]version=GBinternal(?:/|%2F)parking(?:/|%2F)10\\.0\\.1xx(?:/|%2F)2027(?:/|%2F)2B"
+      - type: "output_contains"
+        value: "NETMechanic"
+      - type: "output_contains"
+        value: "disclosure"
+    rubric:
+      - "Uses only 1xx parking; NETMechanic integrates the fix without developer resubmission."
+    timeout: 180
+
+  - name: "Later approved release - SDK only 2xx"
+    prompt: "Where should my security SDK-source fix approved for .NET 10.0 2027/2B go? Only band 2xx is affected. Use state.md as verified offline evidence; do not query services or change files. Give its branch link."
+    setup: *servicing
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)[?&]version=GBinternal(?:/|%2F)parking(?:/|%2F)10\\.0\\.2xx(?:/|%2F)2027(?:/|%2F)2B"
+      - type: "output_not_matches"
+        pattern: "(?i)[?&]version=GBinternal(?:/|%2F)parking(?:/|%2F)10\\.0\\.1xx"
+    timeout: 180
+
+  - name: "Missing approved parking branch"
+    prompt: "Where should my security runtime/shared VMR fix approved for .NET 10.0 2027/3B go? Use state.md as verified offline evidence; do not query services or change files. Can I create its PR now?"
+    setup: *servicing
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)(QB|quarterback)"
+      - type: "output_matches"
+        pattern: "(?i)(prepar|creat)[^\\n]*(window|parking|branch)|(window|parking|branch)[^\\n]*(prepar|creat)"
+    rubric:
+      - "Waits for the QB to prepare the missing window; does not claim an absent branch link is ready or substitute General Servicing or 2B."
+    timeout: 180
+
+  - name: "Release Specific - public shared fix is internal"
+    prompt: "My non-security runtime/shared VMR fix is approved for .NET 10.0.3 (2026/12B). Where should I open the PR? Use state.md as verified offline evidence; do not query services or change files."
+    setup: *servicing
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)[?&]version=GBinternal(?:/|%2F)release(?:/|%2F)10\\.0\\.103"
+    rubric:
+      - "Uses the internal VMR Release Specific branch even though the fix itself is non-security."
+    timeout: 180
+
+  - name: "Release Specific - security SDK both bands"
+    prompt: "My security SDK-source fix is approved for .NET 10.0.3 (2026/12B) and affects bands 1xx and 2xx. Where should I open PRs? Use state.md as verified offline evidence; do not query services or change files. Include links and port timing."
+    setup: *servicing
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)[?&]version=GBinternal(?:/|%2F)release(?:/|%2F)10\\.0\\.103"
+      - type: "output_matches"
+        pattern: "(?i)[?&]version=GBinternal(?:/|%2F)release(?:/|%2F)10\\.0\\.200"
+      - type: "output_contains"
+        value: "disclosure"
+      - type: "output_contains"
+        value: "main"
+    rubric:
+      - "Uses the provided per-band mapping rather than deriving SDK branch numbers from the runtime product patch."
+    timeout: 180
+
+  - name: "Release Specific wins while branding matches"
+    prompt: "My non-security runtime/shared VMR fix is approved for .NET 10.0 2027/1B. General Servicing branding still matches that window. Where should I open its PR? Use state.md as verified offline evidence; do not query services or change files."
+    setup: &cut
+      files:
+        - path: "state.md"
+          source: "fixtures/cut.md"
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)[?&]version=GBinternal(?:/|%2F)release(?:/|%2F)10\\.0\\.104"
+    rubric:
+      - "Checks Release Specific existence before relying on General Servicing branding."
+    timeout: 180
+
+  - name: "Bands can be at different branch states"
+    prompt: "My non-security SDK-source fix approved for .NET 10.0 2027/1B affects bands 1xx and 2xx. Give each PR base link. Use state.md as verified offline evidence; do not query services or change files."
+    setup: *cut
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)[?&]version=GBinternal(?:/|%2F)release(?:/|%2F)10\\.0\\.104"
+      - type: "output_contains"
+        value: "https://github.com/dotnet/dotnet/tree/release/10.0.2xx"
+    rubric:
+      - "Evaluates the bands independently instead of assuming both bands have or lack a Release Specific branch."
+    timeout: 180
+
+  - name: "Published parking handoff overrides lagging branding"
+    prompt: "Where should my security runtime/shared VMR fix approved for .NET 10.0 2027/2B go during integration? Use state.md as verified offline evidence; do not query services or change files."
+    setup: &transition
+      files:
+        - path: "state.md"
+          source: "fixtures/transition.md"
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)[?&]version=GBinternal(?:/|%2F)release(?:/|%2F)10\\.0\\.1xx"
+    rubric:
+      - "Follows the verified QB handoff despite lagging branding, and does not submit to the frozen parking ref."
+    timeout: 180
+
+  - name: "Frozen parking without a published handoff"
+    prompt: "Where should my security SDK-source fix approved for .NET 10.0 2027/2B go? Only 2xx is affected. Use state.md as verified offline evidence; do not query services or change files."
+    setup: *transition
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)(QB|quarterback)"
+      - type: "output_matches"
+        pattern: "(?i)(wait|blocked|unpublished|not published|missing)"
+    rubric:
+      - "Requests the QB-published replacement destination or its publication before proceeding; does not treat an existing frozen parking or General Servicing ref as authorized for this handoff."
+    timeout: 180
+
+  - name: "OOB explicitly approved destination"
+    prompt: "Tactics approved my security runtime/shared fix for an OOB and explicitly designated internal/release/10.0.104-oob.1 in the internal VMR. Where do I open the PR? Use state.md as verified offline evidence; do not query services or change files. Include link and port timing."
+    setup: *servicing
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)[?&]version=GBinternal(?:/|%2F)release(?:/|%2F)10\\.0\\.104-oob\\.1"
+      - type: "output_contains"
+        value: "disclosure"
+    rubric:
+      - "Uses the explicit OOB destination without consuming a parking branch or guessing from the ordinary servicing matrix."
+    timeout: 180
+
+  - name: "OOB destination is not implied by ref existence"
+    prompt: "Tactics approved my security runtime/shared fix for a .NET 10.0 OOB, but did not specify a destination. Where should the PR go? Use state.md as verified offline evidence; do not query services or change files."
+    setup: *servicing
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)(explicit|approved)[^\\n]*destination|destination[^\\n]*(approv|specif)"
+    rubric:
+      - "Requests the explicitly approved OOB destination rather than using the plausible existing OOB ref or a parking window."
+    timeout: 180
+
+  - name: "Missing servicing approval"
+    prompt: "I have a non-security .NET 10.0 runtime/shared fix but no Tactics approval or approved window yet. Which branch should I check it into? Use state.md as verified offline evidence; do not query services or change files."
+    setup: *servicing
+    assertions:
+      - type: "output_contains"
+        value: "Tactics"
+      - type: "output_matches"
+        pattern: "(?i)approv"
+    rubric:
+      - "Requires approval for a specific window before recommending a servicing check-in; does not default to the nearest release."
+    timeout: 180
+
+  - name: "Security classification is missing"
+    prompt: "My .NET 10.0 runtime/shared VMR fix is approved for 2027/1B. Which branch should I create its PR against? Use state.md as verified offline evidence; do not query services or change files."
+    setup: *servicing
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)security"
+    rubric:
+      - "Asks whether the change is security-related; does not infer non-security from the absence of a label or repeat known scope and approval questions."
+    timeout: 180
+
+  - name: "Window year is missing"
+    prompt: "My security .NET 10.0 runtime/shared VMR fix is approved for 2B, but I have not supplied the year. Where should the PR go? Use state.md as verified offline evidence; do not query services or change files."
+    setup: *servicing
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)year"
+    rubric:
+      - "Asks for the approved window year; does not silently choose 2027 from the inventory or the clock."
+    timeout: 180
+
+  - name: "Affected SDK bands are missing"
+    prompt: "My non-security .NET 10.0 SDK-source fix is approved for 2027/1B, but I have not identified the affected feature bands. Where should its PRs go? Use state.md as verified offline evidence; do not query services or change files."
+    setup: *servicing
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)(which|what|confirm|specify|need|affected)[^\\n]*bands|bands[^\\n]*\\?"
+    rubric:
+      - "Asks for affected bands before recommending targets; does not give a conditional menu of targets or treat every existing band as affected."
+    timeout: 180
+
+  - name: "Access failure is not internal branch absence"
+    prompt: "My security 11.0 VMR fix targets the next preview to ship. Give the PR base if it can be verified. Use state.md as offline discovery evidence; do not query services or change files."
+    setup: &denied
+      files:
+        - path: "state.md"
+          source: "fixtures/access-denied.md"
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)(auth|access|permission|unverified|cannot verify|could not verify)"
+    rubric:
+      - "Reports the internal-access blocker instead of interpreting failed discovery as absence, synthesizing a private URL, or falling back to the public preview."
+    timeout: 180
+
+  - name: "Bootstrap SDK is not shipping window evidence"
+    prompt: "My non-security runtime/shared VMR fix is approved for .NET 10.0 2027/1B. Does the available branch state establish where to open its PR? Use state.md as offline evidence; do not query services or change files."
+    setup: *denied
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)(unknown|missing|cannot|unverified|insufficient|lacks|not establish|no[^\\n]*establish)"
+    rubric:
+      - "Does not derive a shipping window from global.json or assume a missing Release Specific branch after the internal query failed."
+    timeout: 180
+
+  - name: "Component branch mapping differs from VMR"
+    prompt: "I am working in the canonical dotnet/runtime repository, not the VMR. My non-security shared-runtime fix is approved for .NET 10.0 2027/1B. Where should this component PR go? Use state.md as verified offline evidence; do not query services or change files."
+    setup: *servicing
+    assertions:
+      - type: "output_contains"
+        value: "https://github.com/dotnet/runtime/tree/release/10.0"
+    rubric:
+      - "Uses the verified component branch rather than inventing runtime release/10.0.1xx."
+    timeout: 180
+
+  - name: "Discover shared scope from the change"
+    prompt: "Where should this non-security VMR change go? Tactics approved .NET 10.0 2027/1B. Inspect change.patch and state.md for the change scope and verified offline branch state. Do not query services or change files."
+    setup:
+      files:
+        - path: "state.md"
+          source: "fixtures/servicing.md"
+        - path: "change.patch"
+          source: "fixtures/change.patch"
+    assertions:
+      - type: "output_contains"
+        value: "https://github.com/dotnet/dotnet/tree/release/10.0.1xx"
+    rubric:
+      - "Discovers runtime/shared scope from the patch without asking the user to repeat the component or treating 2xx as another source target."
+    timeout: 180
+
+  - name: "Mixed runtime and SDK changes need per-band subsets"
+    prompt: "My non-security VMR change edits runtime/shared source and SDK-source files. Tactics approved .NET 10.0 2027/1B. The SDK part affects 1xx and 2xx. Where do I open PRs and which edits belong in each? Use state.md as verified offline evidence; do not query services or change files."
+    setup: *servicing
+    assertions:
+      - type: "output_contains"
+        value: "https://github.com/dotnet/dotnet/tree/release/10.0.1xx"
+      - type: "output_contains"
+        value: "https://github.com/dotnet/dotnet/tree/release/10.0.2xx"
+    rubric:
+      - "Keeps shared runtime source changes in 1xx and limits the 2xx PR to SDK-source changes."
+    timeout: 180
+
+  - name: "Older release does not inherit VMR band rules"
+    prompt: "My non-security .NET 9 runtime fix is approved for a servicing release. Where should I check it in? Use state.md as the available verified offline evidence; do not query services or change files."
+    setup: *servicing
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)(policy|component|QB|quarterback)"
+    rubric:
+      - "Asks for the older component policy and approved destination rather than applying 10.0+ 1xx VMR rules or reusing a .NET 10 ref."
+    timeout: 180
+
+  - name: "General Servicing later than approval is not parking"
+    prompt: "My security runtime/shared VMR fix is approved for .NET 10.0 2026/11B. Where should I create the PR? Use state.md as verified offline evidence; do not query services or change files."
+    setup: *servicing
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)(QB|quarterback)"
+    rubric:
+      - "Recognizes that General Servicing is later than the approved release and no Release Specific exists; asks the QB instead of treating all nonmatching windows as future parking."
+    timeout: 180
+
+  - name: "Checkout and fork do not determine the base"
+    prompt: "I am on a feature branch based on main in my mmitche/dotnet fork. My non-security runtime/shared VMR fix is approved for .NET 10.0 2027/1B. Where should the PR go? Use state.md as verified offline evidence; do not query services or change files."
+    setup: *servicing
+    assertions:
+      - type: "output_contains"
+        value: "https://github.com/dotnet/dotnet/tree/release/10.0.1xx"
+      - type: "output_not_contains"
+        value: "https://github.com/mmitche/dotnet/tree"
+    timeout: 180

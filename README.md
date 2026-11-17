@@ -13,7 +13,7 @@ For information about the Agent Skills standard, see [agentskills.io](http://age
 
 | Plugin | Description |
 |--------|-------------|
-| `dotnet-dnceng` | Lightweight CI entry point: `hlx` CLI investigation (`helix-cli`), known-issue history, and the `ci-investigator` agent. No MCP servers loaded by default. |
+| `dotnet-dnceng` | Lightweight engineering entry point: [PR target selection](plugins/dotnet-dnceng/skills/pr-target/SKILL.md), `hlx` CLI investigation (`helix-cli`), known-issue history, and the `ci-investigator` agent. No MCP servers loaded by default. |
 | `dotnet-helix` | Deep CI failure investigation via the Helix/Azure DevOps MCP server: build/test triage, Helix logs, pipeline and crash-dump analysis. |
 | `dotnet-binlog` | Analyze failed MSBuild binary logs from Azure DevOps builds via the binlog MCP server, without rebuilding locally. |
 | `dotnet-codeflow` | Dependency flow across .NET repos: Maestro/BAR subscriptions, VMR codeflow health, and cross-repo dependency tracing. |

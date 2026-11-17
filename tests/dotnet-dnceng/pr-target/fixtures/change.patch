@@ -1,0 +1,6 @@
+diff --git a/src/runtime/src/libraries/Example/Fix.cs b/src/runtime/src/libraries/Example/Fix.cs
+--- a/src/runtime/src/libraries/Example/Fix.cs
++++ b/src/runtime/src/libraries/Example/Fix.cs
+@@ -1 +1 @@
+-return oldValue;
++return correctedValue;
