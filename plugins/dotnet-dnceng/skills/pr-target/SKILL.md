@@ -105,6 +105,12 @@ for security. Do not infer open parking intake from the branch merely existing.
 Matching verified branding and a complete ref inventory can establish the target
 without a separate QB mapping when the approval already identifies that release.
 Do not equate an SDK version with a runtime patch or calendar window by guesswork.
+If approval names only a calendar window and its SDK release remains unknown,
+withhold the target and branch link. Ask for the authoritative window-to-release
+mapping without listing candidate target branches or URLs. Explain that later
+SDK releases can share General Servicing; if the approved release is later than
+the current General Servicing branding, the PR must remain unmerged until its
+window opens.
 
 If offline advice is requested with supplied branch-state evidence, use that
 snapshot and label the result **snapshot-based**, not live-verified. Missing

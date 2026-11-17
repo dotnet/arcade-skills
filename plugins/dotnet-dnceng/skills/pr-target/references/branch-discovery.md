@@ -80,8 +80,11 @@ For each affected band:
    whether the approved release matches Release Specific or General Servicing
    and whether a later release must wait to merge until its window opens. Do not
    claim that every possible mapping yields a different branch. Until the
-   mapping is known, withhold the target instead of listing conditional base
-   branches.
+   mapping is known, withhold the target and branch link instead of listing
+   candidate target branches or URLs, even conditionally. Explain that later
+   SDK releases may share General Servicing; when the approved release is later
+   than current General Servicing branding, hold the PR unmerged until its
+   window opens.
 
 Take transition state and conflicting evidence into account:
 
