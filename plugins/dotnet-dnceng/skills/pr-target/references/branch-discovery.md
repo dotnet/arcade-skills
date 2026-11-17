@@ -85,6 +85,11 @@ metadata, not a token-bearing clone URL:
   branch. Slashes may be percent-encoded or left as slashes in this query value.
   Do not point to `refs/heads/` as part of the displayed branch name.
 
+For an offline snapshot exercise, use the supplied repository browser URL for
+the example link, even when its host or project name is synthetic. Do not call
+it unusable, request a real host, or invent a replacement URL. Label the link
+snapshot-based and do not imply live verification.
+
 For an SSH remote, obtain the HTTPS browser URL from host metadata or the user;
 do not guess an internal host/project mapping. Remove credential/userinfo
 components before displaying a URL.

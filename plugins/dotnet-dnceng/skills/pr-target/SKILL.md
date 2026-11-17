@@ -37,9 +37,11 @@ Collect only the facts relevant to the route:
 
 Ask the minimal unresolved questions together using the host's question tool,
 or ask them directly in the response if none is available. Merely stating
-that a fact is missing is not a question. For an unresolved route, stop before
-giving candidate target links or a conditional menu of branches. Ask for the
-decisive fact instead. Do not ask the user to repeat discoverable facts.
+that a fact is missing is not a question. For an unresolved route, stop before giving candidate target links or naming
+the possible destination branches/branch classes for each answer. Ask for the
+decisive fact instead. A high-level explanation that the answer changes the
+visibility or routing model is enough; do not describe the conditional routes.
+Do not ask the user to repeat discoverable facts.
 Do not guess security status, approval, or affected bands. If the year is
 omitted from an approved servicing window, use today's date to infer its
 nearest plausible occurrence when the normal planning horizon makes it clear.
@@ -50,10 +52,17 @@ For unknown SDK bands, ask "Which SDK feature bands does this fix affect?" and
 stop: do not enumerate potential targets for all existing bands.
 
 Distinguish unknown inputs from prerequisites known to be absent. If the user
-has no Tactics approval yet, report **wait** and request approval for a specific
-window before recommending a servicing check-in. If the QB has not published
-a frozen-intake replacement, report **wait** and request that publication.
-Do not repeatedly ask for a fact the user or evidence has already established.
+has no Tactics approval yet, report **wait** and tell them to obtain Tactics
+approval for a specific window before returning for a target recommendation.
+Do not ask which window was approved when the user has said none was approved.
+For this case, respond with only the wait action and approval prerequisite:
+"No target yet. Obtain Tactics approval for a specific servicing window,
+including the year, then return for target selection." Do not name, link, or
+describe any branch or conditional route while approval is absent; do not
+include band analysis, parking status, ports, or servicing-matrix examples.
+If the QB has not published a frozen-intake replacement, report **wait** and
+request that publication. Do not repeatedly ask for a fact the user or evidence
+has already established.
 Every decisive unknown that blocks routing must have an explicit question in
 the response; saying only that information is missing is insufficient. Use a
 sentence beginning `Question:` and ending with `?` for each unresolved blocker.
@@ -171,6 +180,11 @@ If the correct parking branch is absent, ask the QB to prepare it and return
 branch, a different year, or another window. NETMechanic integrates and deletes
 parking branches when their windows open; developers do not resubmit those fixes.
 Component validation PRs are not the final internal VMR check-in destination.
+When recommending security parking for a later approved window, explain all
+three decisive facts: no Release Specific branch exists for the approved
+release, General Servicing represents an earlier release, and the exact parking
+branch exists with intake open (or has a QB-published handoff). State the
+approved and General Servicing windows in the rationale, not just "earlier".
 
 **Ports:** non-security fixes port to `main` as necessary; security fixes port
 as necessary **on disclosure day**. Release-tag merges carry shipped fixes back
@@ -210,6 +224,11 @@ which release window General Servicing represents?" Add parking intake and its
 published handoff when that determines routing. For an older component
 release, ask for that repository's own internal branch and servicing-window
 mapping.
+
+For offline snapshot exercises, use the repository browser URL supplied in the
+snapshot for its example branch link, even when the host or project name is
+synthetic. Do not call it unusable or replace it with a guessed real URL. Label
+the link snapshot-based and do not imply live verification.
 
 ## Policy references
 

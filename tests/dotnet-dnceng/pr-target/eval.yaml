@@ -164,7 +164,7 @@ scenarios:
       - type: "output_contains"
         value: "https://github.com/dotnet/dotnet/tree/release/10.0.1xx"
       - type: "output_matches"
-        pattern: "(?i)(unmerged|do not merge|must not merge|wait[^\\n]*merg|merg[^\\n]*wait)"
+        pattern: "(?i)(unmerged|do not merge|don't merge|must not merge|wait[^\\n]*merg|merg[^\\n]*wait)"
     rubric:
       - "Keeps the public PR unmerged until its approved window; does not send a non-security fix to parking."
     timeout: 180
@@ -191,6 +191,8 @@ scenarios:
         pattern: "(?i)[?&]version=GBinternal(?:/|%2F)parking(?:/|%2F)10\\.0\\.2xx(?:/|%2F)2027(?:/|%2F)2B"
       - type: "output_not_matches"
         pattern: "(?i)[?&]version=GBinternal(?:/|%2F)parking(?:/|%2F)10\\.0\\.1xx"
+    rubric:
+      - "Explains that 2xx General Servicing is still at 2027/1B (10.0.4), earlier than the approved 2027/2B (10.0.5), and that no 2xx Release Specific branch exists; this is why the open 2xx parking branch is the target."
     timeout: 180
 
   - name: "Missing approved parking branch"
@@ -206,11 +208,13 @@ scenarios:
     timeout: 180
 
   - name: "Release Specific - public shared fix is internal"
-    prompt: "My non-security runtime/shared VMR fix is approved for .NET 10.0.3 (2026/12B). Where should I open the PR? Use state.md as verified offline evidence; do not query services or change files."
+    prompt: "My non-security runtime/shared VMR fix is approved for .NET 10.0.3 (2026/12B). Where should I open the PR? Use state.md as verified offline evidence, and use its supplied internal browser URL for a snapshot-based example link; do not query services or change files."
     setup: *servicing
     assertions:
       - type: "output_matches"
         pattern: "(?i)[?&]version=GBinternal(?:/|%2F)release(?:/|%2F)10\\.0\\.103"
+      - type: "output_matches"
+        pattern: "(?i)https://dev\\.azure\\.com/example/project/_git/vmr[?&]version=GBinternal(?:/|%2F)release(?:/|%2F)10\\.0\\.103"
     rubric:
       - "Uses the internal VMR Release Specific branch even though the fix itself is non-security."
     timeout: 180
@@ -311,8 +315,10 @@ scenarios:
         value: "Tactics"
       - type: "output_matches"
         pattern: "(?i)approv"
+      - type: "output_not_matches"
+        pattern: "(?i)(internal/parking|General Servicing|Release Specific|release/10\\.0)"
     rubric:
-      - "Requires approval for a specific window before recommending a servicing check-in; does not default to the nearest release."
+      - "Because the user says there is no approval, reports wait and tells them to obtain Tactics approval for a specific window before returning; does not ask which window was approved, give a conditional branch route, or default to the nearest release."
     timeout: 180
 
   - name: "Security classification is missing"
@@ -321,6 +327,8 @@ scenarios:
     assertions:
       - type: "output_matches"
         pattern: "(?i)(is this|whether)[^\\n]*security[^?\\n]*\\?"
+      - type: "output_not_matches"
+        pattern: "(?i)(public General Servicing|internal VMR General Servicing|https?://)"
     rubric:
       - "Asks whether the change is security-related; does not infer non-security from the absence of a label or repeat known scope and approval questions."
     timeout: 180
