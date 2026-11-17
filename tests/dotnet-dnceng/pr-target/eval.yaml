@@ -235,6 +235,70 @@ scenarios:
       - "Uses the provided per-band mapping rather than deriving SDK branch numbers from the runtime product patch."
     timeout: 180
 
+  - name: "Release Specific is identified from branch branding"
+    prompt: "My non-security, non-OOB VMR SDK-source fix affects only 1xx and Tactics approved it for 2027/1B, SDK 10.0.104. Where should its PR go? Use state.md and its referenced files as verified offline evidence; do not query services or change files."
+    setup: &branding
+      files:
+        - path: "state.md"
+          source: "fixtures/branding/state.md"
+        - path: "refs/general/eng/Versions.props"
+          source: "fixtures/branding/general-Versions.props"
+        - path: "refs/release-specific/eng/Versions.props"
+          source: "fixtures/branding/release-specific-Versions.props"
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)[?&]version=GBinternal(?:/|%2F)release(?:/|%2F)10\\.0\\.104"
+      - type: "output_matches"
+        pattern: "(?i)(Versions\\.props|branding|branded)"
+    rubric:
+      - "Reads the release-specific and General Servicing branding, identifies 10.0.104 as the approved Release Specific ref and 10.0.105 as General Servicing, and selects the verified internal Release Specific branch without requiring a separate QB mapping."
+    timeout: 180
+
+  - name: "General Servicing is identified from branch branding"
+    prompt: "My non-security, non-OOB VMR SDK-source fix affects only 1xx and Tactics approved it for 2027/2B, SDK 10.0.105. Where should its PR go? Use state.md and its referenced files as verified offline evidence; do not query services or change files."
+    setup: *branding
+    assertions:
+      - type: "output_contains"
+        value: "https://github.com/dotnet/dotnet/tree/release/10.0.1xx"
+      - type: "output_matches"
+        pattern: "(?i)(Versions\\.props|branding|branded)"
+    rubric:
+      - "Uses the observed General Servicing branding for SDK 10.0.105, identifies the existing 10.0.104 Release Specific branch as belonging to a different release, and targets public General Servicing without demanding a separate QB mapping."
+    timeout: 180
+
+  - name: "Release Specific name conflicts with its branding"
+    prompt: "My non-security, non-OOB VMR SDK-source fix affects only 1xx and Tactics approved it for 2027/1B, SDK 10.0.104. Where should its PR go? Use state.md and its referenced files as verified offline evidence; do not query services or change files."
+    setup:
+      files:
+        - path: "state.md"
+          source: "fixtures/branding/state.md"
+        - path: "refs/general/eng/Versions.props"
+          source: "fixtures/branding/general-Versions.props"
+        - path: "refs/release-specific/eng/Versions.props"
+          source: "fixtures/branding/general-Versions.props"
+    assertions:
+      - type: "output_matches"
+        pattern: "(?i)(conflict|disagree|mismatch|inconsisten|does not match|doesn't match|different|contradict)"
+      - type: "output_matches"
+        pattern: "\\?"
+      - type: "output_not_matches"
+        pattern: "(?i)[?&]version=GBinternal(?:/|%2F)release(?:/|%2F)10\\.0\\.104"
+    rubric:
+      - "Recognizes that the 10.0.104 Release Specific ref is branded for SDK 10.0.105, asks for the discrepancy to be resolved, and does not select a target based solely on the ref name. If it cites the snapshot observation date, it uses 2027-01-15 rather than the CLI's current date."
+    timeout: 180
+
+  - name: "Calendar window needs a release mapping"
+    prompt: "My non-security, non-OOB VMR SDK-source fix affects only 1xx and Tactics approved it for 2027/2B, without specifying an SDK version. Where should its PR go? Use state.md and its referenced files as verified offline evidence; do not query services or change files."
+    setup: *branding
+    assertions:
+      - type: "output_matches"
+        pattern: "\\?"
+      - type: "output_not_contains"
+        value: "https://github.com/dotnet/dotnet/tree/release/10.0.1xx"
+    rubric:
+      - "Does not guess which branded SDK version corresponds to 2027/2B from the calendar or branch suffix. Asks for the release/window mapping and withholds all candidate targets rather than listing conditional branches. Explains that the mapping determines whether the approved release matches Release Specific or General Servicing and that a release later than the current General Servicing branding must wait to merge until its window opens. Does not claim each possible mapping means a different branch, since 10.0.105 and later can share public General Servicing."
+    timeout: 180
+
   - name: "Release Specific wins while branding matches"
     prompt: "My non-security runtime/shared VMR fix is approved for .NET 10.0 2027/1B. General Servicing branding still matches that window. Where should I open its PR? Use state.md as verified offline evidence; do not query services or change files."
     setup: &cut

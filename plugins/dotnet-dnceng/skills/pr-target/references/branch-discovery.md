@@ -46,24 +46,59 @@ for its URL/access. Use the organization's authenticated git or Azure DevOps
 tools to list/read it. Never send internal ref names, private PR bodies, or
 security change contents to GitHub or another public endpoint.
 
-Internal General Servicing, Release Specific, and parking destinations are VMR
-branches. A component's internal validation branch can validate a change but
-does not replace that final VMR destination.
+For 10.0+ servicing, internal General Servicing, Release Specific, and parking
+destinations are VMR branches. A component's internal validation branch can
+validate a change but does not replace that final VMR destination.
 
-For each band, read current branding/version files at the observed ref SHA
-(file locations vary by release). Combine that with the release/QB's current
-window-to-branch mapping:
+For each affected band:
+
+1. List the relevant Release Specific refs, including their observed SHAs,
+   separately from General Servicing, validation, and OOB refs. A complete
+   inventory can establish that a specific release branch has or has not been
+   cut; an unrelated Release Specific ref does not represent every release.
+2. Read branding from both General Servicing and candidate Release Specific refs
+   at their observed SHAs. In the VMR, start with `eng/Versions.props`.
+   `VersionMajor`, `VersionMinor`, `VersionSDKMinor`, `VersionSDKMinorPatch`,
+   `VersionFeature`, and `VersionPrefix` describe the SDK branding; evaluate
+   property expressions rather than treating an unevaluated expression as a
+   version. If the required commit is available locally, for example:
+
+   ```text
+   git show <observed-sha>:eng/Versions.props
+   ```
+
+   Otherwise use the host's authenticated contents API at that SHA. Query
+   internal refs only through authorized internal tools. Component product
+   branding may be elsewhere; for runtime source present in a VMR branch,
+   `src/runtime/eng/Versions.props` contains its `ProductVersion`.
+3. Compare like-for-like branding with the release identified by the approval.
+   If approval already identifies the exact SDK release and verified branding
+   and refs settle the route, no separate QB mapping is needed. If approval
+   names only a calendar window, use an authoritative release schedule or
+   mapping to relate it to the observed version; ask the QB only if the
+   relationship remains unresolved. Explain that this mapping determines
+   whether the approved release matches Release Specific or General Servicing
+   and whether a later release must wait to merge until its window opens. Do not
+   claim that every possible mapping yields a different branch. Until the
+   mapping is known, withhold the target instead of listing conditional base
+   branches.
+
+Take transition state and conflicting evidence into account:
 
 - A `release/10.0.1xx` ref identifies a train/band, not the month it is servicing.
 - A bootstrap SDK in `global.json` does not identify the release being shipped.
 - Runtime product versions and SDK patch versions differ; use the mapping, not
   a guess that `10.0.4` means SDK branch `internal/release/10.0.104`.
 - Release Specific can already exist while General Servicing still has the same
-  branding. Check the Release Specific mapping first.
+  branding. Check for a Release Specific branch for the approved release first.
+- Branch name and branding that disagree, or stale/incomplete inventories, are
+  conflicting evidence. Resolve the discrepancy rather than selecting a ref
+  from its name alone.
 - Window identity includes **year**, such as `2027/2B`. OOB rebranding can change
   product patch numbers without changing that window's identity.
 - Intake can be frozen while a parking ref still exists. Obtain its current
   intake state and QB-published destination; a branch listing cannot prove this.
+- Do not infer the absence of a branch type unless its inventory is complete.
 - During integration, the QB can publish General Servicing as the destination
   before its branding change merges. Do not override that handoff from branding.
 

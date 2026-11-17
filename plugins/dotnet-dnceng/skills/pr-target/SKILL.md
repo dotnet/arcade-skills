@@ -85,8 +85,10 @@ For each relevant band, establish:
 
 - The canonical public repository and, when needed, the internal VMR repository.
 - Whether vNext servicing and next-preview branches exist.
-- Which release/window General Servicing represents, using version metadata
-  **and** the current release/QB mapping, not a branch suffix or date alone.
+- Which release each General Servicing and Release Specific branch represents:
+  inspect their existence and branding at the observed refs. For the VMR,
+  inspect `eng/Versions.props`. Relate branding to the approved release using
+  approval details or an authoritative release/window mapping when needed.
 - For an omitted year, the nearest plausible year for the approved window,
   using the current date (or snapshot observation date for offline evidence).
 - Whether a Release Specific branch exists for the approved release.
@@ -94,16 +96,25 @@ For each relevant band, establish:
   intake/integration state, and any QB-published replacement destination.
 
 A failed or unauthorized query is **unknown**, not proof a branch is absent.
+Only report a branch type as absent when the evidence covers a complete
+inventory of that branch type; lack of an integration handoff does not prove a
+parking ref is absent.
 If missing access or conflicting/stale evidence changes the answer, report the
 blocker and ask for the missing evidence. Do not fall back to a public target
 for security. Do not infer open parking intake from the branch merely existing.
+Matching verified branding and a complete ref inventory can establish the target
+without a separate QB mapping when the approval already identifies that release.
+Do not equate an SDK version with a runtime patch or calendar window by guesswork.
 
 If offline advice is requested with supplied branch-state evidence, use that
 snapshot and label the result **snapshot-based**, not live-verified. Missing
 evidence still blocks a definitive target. In an offline exercise, links refer
-to the supplied snapshot's repository URLs, not verified live endpoints.
-Do not assert future branch names, creation dates, or ancestry as verified
-facts. Distinguish intended downstream flow from verified inclusion.
+to the supplied snapshot's repository URLs, not verified live endpoints. Use
+the snapshot's observation time, not the CLI's current date, for date-based
+reasoning; if citing the observation date, reproduce it accurately. If the
+snapshot has no observation time, do not invent one. Do not assert future
+branch names, creation dates, or ancestry as verified facts. Distinguish
+intended downstream flow from verified inclusion.
 
 `global.json` selects the SDK used by the checkout's build tooling. It can help
 identify the bootstrap SDK, but it does not identify which product release is
@@ -218,12 +229,12 @@ For example, when security status is unknown, explicitly ask "Is this change
 security-related or non-security?" Saying classification is required is not
 enough. Explain why the answer affects the target; leave targets unresolved.
 For unavailable internal state, directly ask the user or QB: "Can you provide
-the authorized internal branch state or QB-confirmed mapping for the approved
-release, including whether a Release Specific branch exists and its ref, and
-which release window General Servicing represents?" Add parking intake and its
-published handoff when that determines routing. For an older component
-release, ask for that repository's own internal branch and servicing-window
-mapping.
+the missing authorized branch state, including Release Specific existence and
+branding and General Servicing branding for the approved release?" Ask for a
+release/window mapping only if the approval and branch branding do not already
+establish the relationship. Add parking intake and its published handoff when
+that determines routing. For an older component release, ask for that
+repository's own internal branch and servicing-window mapping.
 
 For offline snapshot exercises, use the repository browser URL supplied in the
 snapshot for its example branch link, even when the host or project name is
