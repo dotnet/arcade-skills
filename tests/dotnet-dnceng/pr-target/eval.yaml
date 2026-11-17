@@ -320,19 +320,21 @@ scenarios:
     setup: *servicing
     assertions:
       - type: "output_matches"
-        pattern: "(?i)security"
+        pattern: "(?i)(is this|whether)[^\\n]*security[^?\\n]*\\?"
     rubric:
       - "Asks whether the change is security-related; does not infer non-security from the absence of a label or repeat known scope and approval questions."
     timeout: 180
 
-  - name: "Window year is missing"
-    prompt: "My security .NET 10.0 runtime/shared VMR fix is approved for 2B, but I have not supplied the year. Where should the PR go? Use state.md as verified offline evidence; do not query services or change files."
+  - name: "Omitted window year is inferred from snapshot date"
+    prompt: "My security .NET 10.0 runtime/shared VMR fix is approved for 2B. Where should the PR go? Use state.md as verified offline evidence; do not query services or change files."
     setup: *servicing
     assertions:
       - type: "output_matches"
-        pattern: "(?i)year"
+        pattern: "(?i)2027[^\\n]*2B|2B[^\\n]*2027"
+      - type: "output_matches"
+        pattern: "(?i)internal(?:/|%2F)parking(?:/|%2F)10\\.0\\.1xx(?:/|%2F)2027(?:/|%2F)2B"
     rubric:
-      - "Asks for the approved window year; does not silently choose 2027 from the inventory or the clock."
+      - "Infers 2027/2B from the snapshot's 2027-01-15 observation date and near-term servicing horizon, states that basis, and routes the security shared-runtime fix only to the verified internal 1xx parking branch."
     timeout: 180
 
   - name: "Affected SDK bands are missing"
@@ -359,11 +361,13 @@ scenarios:
     timeout: 180
 
   - name: "Bootstrap SDK is not shipping window evidence"
-    prompt: "My non-security runtime/shared VMR fix is approved for .NET 10.0 2027/1B. Does the available branch state establish where to open its PR? Use state.md as offline evidence; do not query services or change files."
+    prompt: "My non-security, non-OOB runtime/shared VMR fix is approved for .NET 10.0 2027/1B. Does the available branch state establish where to open its PR? Use state.md as offline evidence; do not query services or change files."
     setup: *denied
     assertions:
       - type: "output_matches"
         pattern: "(?i)(unknown|missing|cannot|unverified|insufficient|lacks|not establish|no[^\\n]*establish)"
+      - type: "output_matches"
+        pattern: "(?i)(question|can you|could you|please provide|ask the QB)[^?]*\\?"
     rubric:
       - "Does not derive a shipping window from global.json or assume a missing Release Specific branch after the internal query failed."
     timeout: 180
@@ -405,14 +409,18 @@ scenarios:
       - "Keeps shared runtime source changes in 1xx and limits the 2xx PR to SDK-source changes."
     timeout: 180
 
-  - name: "Older release does not inherit VMR band rules"
-    prompt: "My non-security .NET 9 runtime fix is approved for a servicing release. Where should I check it in? Use state.md as the available verified offline evidence; do not query services or change files."
+  - name: ".NET 9 uses repository-specific internal servicing"
+    prompt: "My .NET 9 runtime fix is approved for 2027/1B. Where should I check it in? Use state.md as the available verified offline evidence; do not query services or change files."
     setup: *servicing
     assertions:
       - type: "output_matches"
         pattern: "(?i)(policy|component|QB|quarterback)"
+      - type: "output_matches"
+        pattern: "(?i)(internal|out of support|unsupported)"
+      - type: "output_matches"
+        pattern: "(?i)(wait|cannot verify|unknown|which .*branch|what .*branch)"
     rubric:
-      - "Asks for the older component policy and approved destination rather than applying 10.0+ 1xx VMR rules or reusing a .NET 10 ref."
+      - "Recognizes .NET 9 is out of support and therefore internal-only; asks the QB for this component repository's branch/window mapping because no .NET 9 state is in evidence, and waits rather than applying .NET 10+ VMR band rules or reusing a .NET 10 ref."
     timeout: 180
 
   - name: "General Servicing later than approval is not parking"

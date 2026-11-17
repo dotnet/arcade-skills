@@ -10,7 +10,7 @@ description: >
 # Find the PR Target
 
 Identify the repository and branch to create a PR against, based on the change
-and **current branch state**, not the calendar or the developer's checkout.
+and **current branch state**, not the developer's checkout.
 Return verified branch links, merge restrictions, and porting requirements.
 
 This is read-only advice: do not create branches or PRs, cherry-pick, push, merge,
@@ -40,7 +40,12 @@ or ask them directly in the response if none is available. Merely stating
 that a fact is missing is not a question. For an unresolved route, stop before
 giving candidate target links or a conditional menu of branches. Ask for the
 decisive fact instead. Do not ask the user to repeat discoverable facts.
-Do not guess security status, approval, affected bands, or a window's year.
+Do not guess security status, approval, or affected bands. If the year is
+omitted from an approved servicing window, use today's date to infer its
+nearest plausible occurrence when the normal planning horizon makes it clear.
+For offline snapshots, use the snapshot's observation date instead. State the
+inferred year and ask the QB only if the date, cadence, or branch evidence leaves
+more than one plausible window.
 For unknown SDK bands, ask "Which SDK feature bands does this fix affect?" and
 stop: do not enumerate potential targets for all existing bands.
 
@@ -49,6 +54,10 @@ has no Tactics approval yet, report **wait** and request approval for a specific
 window before recommending a servicing check-in. If the QB has not published
 a frozen-intake replacement, report **wait** and request that publication.
 Do not repeatedly ask for a fact the user or evidence has already established.
+Every decisive unknown that blocks routing must have an explicit question in
+the response; saying only that information is missing is insufficient. Use a
+sentence beginning `Question:` and ending with `?` for each unresolved blocker.
+Before responding, check that every blocker has such a question.
 
 ## 2. Establish current branch state
 
@@ -69,6 +78,8 @@ For each relevant band, establish:
 - Whether vNext servicing and next-preview branches exist.
 - Which release/window General Servicing represents, using version metadata
   **and** the current release/QB mapping, not a branch suffix or date alone.
+- For an omitted year, the nearest plausible year for the approved window,
+  using the current date (or snapshot observation date for offline evidence).
 - Whether a Release Specific branch exists for the approved release.
 - For a later approved window: its exact parking ref, including year and band,
   intake/integration state, and any QB-published replacement destination.
@@ -84,6 +95,10 @@ evidence still blocks a definitive target. In an offline exercise, links refer
 to the supplied snapshot's repository URLs, not verified live endpoints.
 Do not assert future branch names, creation dates, or ancestry as verified
 facts. Distinguish intended downstream flow from verified inclusion.
+
+`global.json` selects the SDK used by the checkout's build tooling. It can help
+identify the bootstrap SDK, but it does not identify which product release is
+shipping or which servicing window a branch represents.
 
 ## 3. Apply the routing rules
 
@@ -105,6 +120,17 @@ available, return **wait**, not a link to public `main`.
 **Ports:** a non-security preview fix must also reach the development branch.
 A direct development-branch change needs no such port. Security fixes port to
 that development branch **after public release**, never before disclosure.
+
+### Servicing for .NET 8/9 components
+
+Do not apply the 10.0+ VMR feature-band matrix. Each component repository has
+its own public and internal General Servicing branch and release/window state.
+For .NET 8, use the public branch for non-security fixes and the internal
+branch for security fixes. .NET 9 is out of support and uses internal servicing
+branches only. Identify the repository containing the fix and use its branch
+only when verified state shows that branch represents the approved window.
+Otherwise **wait** and ask the QB for the component's branch/window mapping;
+do not substitute a branch from another repository or release.
 
 ### Servicing (VMR, 10.0+)
 
@@ -177,6 +203,13 @@ only when both base and head are known and verified.
 For example, when security status is unknown, explicitly ask "Is this change
 security-related or non-security?" Saying classification is required is not
 enough. Explain why the answer affects the target; leave targets unresolved.
+For unavailable internal state, directly ask the user or QB: "Can you provide
+the authorized internal branch state or QB-confirmed mapping for the approved
+release, including whether a Release Specific branch exists and its ref, and
+which release window General Servicing represents?" Add parking intake and its
+published handoff when that determines routing. For an older component
+release, ask for that repository's own internal branch and servicing-window
+mapping.
 
 ## Policy references
 
