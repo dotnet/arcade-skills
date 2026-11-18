@@ -10,74 +10,71 @@ description: >
 # Find the PR Target
 
 Identify the repository and branch to create a PR against, based on the change
-and **current branch state**, not the developer's checkout.
-Return verified branch links, merge restrictions, and porting requirements.
+and **current branch state**, not the developer's checkout. Return verified
+branch links, merge restrictions, and porting requirements. This skill applies
+the [VMR Change Target Guide](https://github.com/dotnet/dotnet/blob/main/docs/VMR-Change-Target-Guide.md);
+if current policy conflicts with these rules or observed branch state, surface
+the conflict and ask the QB rather than guessing.
 
 This is read-only advice: do not create branches or PRs, cherry-pick, push, merge,
 change subscriptions, or prepare parking windows. Do not publish security details
 or query public services for private changes or internal refs.
 
-## 1. Discover the change; ask only for missing facts
+## Blocked routes
+
+These rules apply everywhere below. When a decisive fact is unknown:
+
+- **End the response with one `Question:` line per blocker**, ending with `?`,
+  even when the fact must come from the QB (for example, "Question: Can you or
+  the QB provide ...?"). Stating that information is missing or required, or
+  telling the user to obtain it, is not a question. Use the host's question
+  tool instead when available. Never ask for discoverable or established facts.
+- Withhold the target and branch link. Do not list candidate branches, branch
+  classes, or conditional routes; a high-level reason the answer matters is enough.
+- A failed or unauthorized query is **unknown**, not absence. Never fall back to
+  a public target for security or invent a branch link.
+
+Distinguish unknowns from prerequisites known to be absent; for those, report
+**wait** and the next action instead of asking. With no Tactics approval, your
+entire response is exactly: "No target yet. Obtain Tactics approval for a
+specific servicing release, including its window and year, then return for
+target selection." Add nothing else: no snapshot, branch, band, parking, port,
+or matrix details.
+
+## 1. Discover the change
 
 Read the prompt, supplied change/PR, repository instructions, remotes, and a
 scoped diff or commit summary. Do not assume the current branch is the target,
-or that a fork's `origin` is the canonical repository.
-
-Collect only the facts relevant to the route:
+or that a fork's `origin` is the canonical repository. Collect only the facts
+relevant to the route:
 
 - **Intent:** vNext development, a particular preview, or servicing/hotfix.
 - **Visibility:** is this a security change? Absence of security labels is not
-  evidence that a change is non-security. Never ask for exploit details.
-- **Scope:** component(s), product release/train, and affected SDK feature bands.
-  Discover component scope from changed paths and repository build configuration
-  when possible. A mixed runtime/SDK change can need different per-band subsets.
+  evidence. Never ask for exploit details. If unknown, ask "Is this change
+  security-related or non-security?" Until answered, report no band, branch, or
+  branch-class findings, because visibility changes the whole routing model.
+- **Scope:** component(s), product release/train, and affected SDK feature bands,
+  discovered from changed paths and build configuration when possible. A mixed
+  runtime/SDK change can need different per-band subsets. For unknown bands, ask
+  "Which SDK feature bands does this fix affect?" without enumerating per-band targets.
 - **Preview:** does the change target the next preview to ship?
-- **Servicing:** Tactics approval for which release window, including the year;
+- **Servicing:** which release Tactics approved (for example runtime `10.0.4`
+  or SDK `10.0.105`) and its window, including the year (for example `2027/2B`);
   whether it is an OOB; and, for an OOB, the explicitly approved destination.
 
-Ask the minimal unresolved questions together using the host's question tool,
-or ask them directly in the response if none is available. Merely stating
-that a fact is missing is not a question. For an unresolved route, stop before giving candidate target links or naming
-the possible destination branches/branch classes for each answer. Ask for the
-decisive fact instead. A high-level explanation that the answer changes the
-visibility or routing model is enough; do not describe the conditional routes.
-Do not ask the user to repeat discoverable facts.
-Do not guess security status, approval, or affected bands. If the year is
-omitted from an approved servicing window, use today's date to infer its
-nearest plausible occurrence when the normal planning horizon makes it clear.
-For offline snapshots, use the snapshot's observation date instead. State the
-inferred year and ask the QB only if the date, cadence, or branch evidence leaves
-more than one plausible window.
-For unknown SDK bands, ask "Which SDK feature bands does this fix affect?" and
-stop: do not enumerate potential targets for all existing bands.
-
-Distinguish unknown inputs from prerequisites known to be absent. If the user
-has no Tactics approval yet, report **wait** and tell them to obtain Tactics
-approval for a specific window before returning for a target recommendation.
-Do not ask which window was approved when the user has said none was approved.
-For this case, respond with only the wait action and approval prerequisite:
-"No target yet. Obtain Tactics approval for a specific servicing window,
-including the year, then return for target selection." Do not name, link, or
-describe any branch or conditional route while approval is absent; do not
-include band analysis, parking status, ports, or servicing-matrix examples.
-If the QB has not published a frozen-intake replacement, report **wait** and
-request that publication. Do not repeatedly ask for a fact the user or evidence
-has already established.
-Every decisive unknown that blocks routing must have an explicit question in
-the response; saying only that information is missing is insufficient. Use a
-sentence beginning `Question:` and ending with `?` for each unresolved blocker.
-Before responding, check that every blocker has such a question.
+If an approved window omits the year, infer the nearest plausible occurrence
+from today's date (or an offline snapshot's observation date) when the normal
+planning horizon makes it clear, and state the inferred year.
 
 ## 2. Establish current branch state
 
-Follow [branch discovery](references/branch-discovery.md). Use read-only git,
-GitHub, and authorized internal repository queries. For example:
+Follow [branch discovery](references/branch-discovery.md) using read-only git,
+GitHub, and authorized internal repository queries, for example:
 
 ```text
 git status --short --branch
 git remote -v
 git diff --stat
-git diff --cached --stat
 git ls-remote --exit-code --heads <authorized-remote> <exact-ref>
 ```
 
@@ -85,46 +82,28 @@ For each relevant band, establish:
 
 - The canonical public repository and, when needed, the internal VMR repository.
 - Whether vNext servicing and next-preview branches exist.
-- Which release each General Servicing and Release Specific branch represents:
-  inspect their existence and branding at the observed refs. For the VMR,
-  inspect `eng/Versions.props`. Relate branding to the approved release using
-  approval details or an authoritative release/window mapping when needed.
-- For an omitted year, the nearest plausible year for the approved window,
-  using the current date (or snapshot observation date for offline evidence).
-- Whether a Release Specific branch exists for the approved release.
-- For a later approved window: its exact parking ref, including year and band,
-  intake/integration state, and any QB-published replacement destination.
+- Whether a Release Specific branch exists for the approved release, and which
+  release General Servicing represents, from existence and branding at observed
+  refs (VMR: `eng/Versions.props`).
+- For a later approved window: its exact parking ref (year and band), intake
+  state, and any QB-published replacement destination.
 
-A failed or unauthorized query is **unknown**, not proof a branch is absent.
-Only report a branch type as absent when the evidence covers a complete
-inventory of that branch type; lack of an integration handoff does not prove a
-parking ref is absent.
-If missing access or conflicting/stale evidence changes the answer, report the
-blocker and ask for the missing evidence. Do not fall back to a public target
-for security. Do not infer open parking intake from the branch merely existing.
-Matching verified branding and a complete ref inventory can establish the target
-without a separate QB mapping when the approval already identifies that release.
-Do not equate an SDK version with a runtime patch or calendar window by guesswork.
-If approval names only a calendar window and its SDK release remains unknown,
-withhold the target and branch link. Ask for the authoritative window-to-release
-mapping without listing candidate target branches or URLs. Explain that later
-SDK releases can share General Servicing; if the approved release is later than
-the current General Servicing branding, the PR must remain unmerged until its
-window opens.
+Report a branch type absent only from a complete inventory. Do not infer open
+parking intake from a ref existing. Do not equate an SDK version with a runtime
+patch or calendar window by guesswork. If approval names only a window and its
+release is unknown and branch evidence cannot settle the route, ask "Question: Can you or the QB provide the authoritative
+release for window <year/window>?" Explain, without saying where the PR would go
+in each case, that the release decides which branch state applies; later
+releases can share General Servicing but must stay unmerged until their window
+opens. Do not claim each possible release maps to a different branch.
 
-If offline advice is requested with supplied branch-state evidence, use that
-snapshot and label the result **snapshot-based**, not live-verified. Missing
-evidence still blocks a definitive target. In an offline exercise, links refer
-to the supplied snapshot's repository URLs, not verified live endpoints. Use
-the snapshot's observation time, not the CLI's current date, for date-based
-reasoning; if citing the observation date, reproduce it accurately. If the
-snapshot has no observation time, do not invent one. Do not assert future
-branch names, creation dates, or ancestry as verified facts. Distinguish
-intended downstream flow from verified inclusion.
+For offline advice with supplied evidence, label the result **snapshot-based**,
+use the snapshot's observation time (reproduce it exactly; never invent one or
+compare it with the CLI's date), and use its repository URLs for links. Do not
+assert future branch names, creation dates, or ancestry as verified, and
+distinguish intended downstream flow from verified inclusion.
 
-`global.json` selects the SDK used by the checkout's build tooling. It can help
-identify the bootstrap SDK, but it does not identify which product release is
-shipping or which servicing window a branch represents.
+`global.json` identifies the bootstrap SDK, not the shipping release or window.
 
 ## 3. Apply the routing rules
 
@@ -139,24 +118,23 @@ example, VMR `release/11.0.1xx`). Component branch names may differ.
 | Next preview branched **and** change targets it | Public preview branch in VMR or component repo | Corresponding internal preview branch in VMR or component repo |
 | Preview not branched, **or** change does not target the next preview | Development branch | Wait for the internal preview branch for the intended preview; no public fallback |
 
-Verify the actual public/internal preview refs independently; never manufacture
-one by adding or removing `internal/`. If the required internal preview is not
-available, return **wait**, not a link to public `main`.
+Verify public and internal preview refs independently; never manufacture one by
+adding or removing `internal/`. If the required internal preview is unavailable,
+return **wait**, not a link to public `main`.
 
 **Ports:** a non-security preview fix must also reach the development branch.
-A direct development-branch change needs no such port. Security fixes port to
-that development branch **after public release**, never before disclosure.
+Security fixes port there **after public release**, never before disclosure.
 
-### Servicing for .NET 8/9 components
+### Servicing .NET 6 and .NET 8 components
 
-Do not apply the 10.0+ VMR feature-band matrix. Each component repository has
-its own public and internal General Servicing branch and release/window state.
-For .NET 8, use the public branch for non-security fixes and the internal
-branch for security fixes. .NET 9 is out of support and uses internal servicing
-branches only. Identify the repository containing the fix and use its branch
-only when verified state shows that branch represents the approved window.
-Otherwise **wait** and ask the QB for the component's branch/window mapping;
-do not substitute a branch from another repository or release.
+Do not apply the 10.0+ VMR band matrix. Each component repository has its own
+**internal** General Servicing branch; both security and non-security fixes go
+there, never to a public branch; say so even when the exact branch is unknown.
+Use the branch only when verified state shows it represents the approved
+release. Otherwise **wait** and ask "Question: Can you or the QB provide the
+internal <repository> servicing branch for <approved release>?" Do not
+substitute another repository's or release's branch. Other pre-10.0 releases are out of support: report that and
+ask the QB before suggesting any target.
 
 ### Servicing (VMR, 10.0+)
 
@@ -165,20 +143,17 @@ Select bands before selecting destinations:
 - **Runtime/shared-component fixes:** 1xx only; packages flow to higher bands.
 - **SDK/band-specific fixes:** each affected band separately, not every band.
 - **Mixed changes:** keep runtime/shared source edits out of non-1xx PRs; split
-  the change into the appropriate per-band subsets.
-
-For older releases, consult their component servicing policy; do not impose
-10.0+ VMR band rules or invent a VMR destination.
+  the change into per-band subsets. For non-1xx source and toolset limits, see
+  [feature band tooling constraints](https://github.com/dotnet/dotnet/blob/main/docs/VMR-Feature-Band-Tooling-Constraints.md).
 
 Apply these exceptions before the ordinary matrix:
 
-1. **OOB:** use only the explicitly approved OOB destination. No parking branch.
+1. **OOB:** use only the explicitly approved OOB destination; no parking branch.
    If the destination is missing, ask; do not choose a likely branch.
-2. **Parking integration:** follow the QB's published destination for that window.
-   Do not submit to a frozen parking branch. If the destination is unpublished,
-   report **wait** and request QB publication for that band and year/window.
-   If it may be published but cannot be verified, ask for the published
-   repository and branch. Branding may lag the transition.
+2. **Parking integration:** follow the QB's published destination for that
+   window; never submit to a frozen parking branch. If unpublished, report
+   **wait** and ask "Question: Can the QB publish the replacement destination
+   for <band> <year/window>?" Branding may lag the transition.
 
 Then evaluate **each selected band's state** independently:
 
@@ -188,70 +163,55 @@ Then evaluate **each selected band's state** independently:
 | No Release Specific; General Servicing represents the approved release | Public General Servicing in VMR or component repo | Internal VMR General Servicing |
 | No Release Specific; General Servicing represents an earlier release | Public General Servicing PR, **leave unmerged** until the approved window opens | Internal VMR parking branch for the approved year/window and band |
 
-Release Specific takes precedence even while General Servicing is still branded
-for the same release. If General Servicing is later than the approved release,
-or the relationship is unknown, do not treat it as an earlier release: ask the QB.
+Release Specific takes precedence, even when General Servicing has the same or
+later branding. Without Release Specific, if General Servicing is later than the
+approved release, or the relationship is unknown, ask "Question: Can the QB
+provide the destination for <band> <approved release>?"
 
 If the correct parking branch is absent, ask the QB to prepare it and return
-**wait**. Do not create it or substitute General Servicing, a component validation
-branch, a different year, or another window. NETMechanic integrates and deletes
-parking branches when their windows open; developers do not resubmit those fixes.
-Component validation PRs are not the final internal VMR check-in destination.
-When recommending security parking for a later approved window, explain all
-three decisive facts: no Release Specific branch exists for the approved
-release, General Servicing represents an earlier release, and the exact parking
-branch exists with intake open (or has a QB-published handoff). State the
-approved and General Servicing windows in the rationale, not just "earlier".
+**wait**. Do not create it or substitute General Servicing, a component
+validation branch, or another year/window. NETMechanic integrates and deletes
+parking branches when their windows open; developers do not resubmit. When
+recommending security parking, state all three decisive facts: no Release
+Specific branch for the approved release, General Servicing branded for an
+earlier named release, and the exact parking branch with intake open (or a
+QB-published handoff).
 
 **Ports:** non-security fixes port to `main` as necessary; security fixes port
-as necessary **on disclosure day**. Release-tag merges carry shipped fixes back
+to `main` as necessary **on disclosure day**. Release-tag merges carry shipped fixes back
 to General Servicing; they do not justify merging later-window public fixes early.
 
 ## 4. Verify and report
 
-Recheck the chosen ref and any transition/intake restrictions just before
-reporting. For each target, give:
+Recheck the chosen ref and any intake restrictions just before reporting. For
+each target, give:
 
 - **Target:** repository, exact base branch, band, and a clickable branch link
-  constructed from the verified repository URL. See branch discovery for formats.
+  built from the verified repository URL (formats in branch discovery).
 - **Action:** create a PR, prepare an **unmerged** PR, wait, or clarification
-  required. A target recommendation is not permission to merge. Do not say
-  "merge normally" or otherwise grant merge authorization. Where there is no
-  window-specific hold, normal review, validation, and merge policies still apply.
+  required. A target is not merge authorization; never say "merge normally".
+  Normal review, validation, and merge policies still apply.
 - **Why:** the approved/intended release, decisive branch state, and evidence
-  source/ref and observation time (or explicit snapshot qualification).
-- **Ports:** exact branch name and timing, not just "public branches." For
-  servicing, name `main` as necessary (on disclosure day for security). For
-  previews, name the verified development branch. For multiple bands, report
-  all targets and any unresolved band separately.
+  ref and observation time (or snapshot qualification).
+- **Ports:** exact branch and timing, as defined above. For multiple bands,
+  report each target and any unresolved band separately.
 
-Never return example names, `release/vNext`, or unverified URLs as actual targets.
-If blocked, name the exact missing fact/access and ask the next question, or
-give the next action for a prerequisite known to be absent. Never invent a
-branch link. Branch links are enough; add a compare/create-PR link
-only when both base and head are known and verified.
+Never return example names, `release/vNext`, or unverified URLs as targets. Add a
+compare/create-PR link only when both base and head are verified. When internal
+state is unavailable, ask: "Can you provide the authorized branch state,
+including Release Specific existence and branding and General Servicing branding
+for the approved release?" Add parking intake and handoff when they decide routing.
 
-For example, when security status is unknown, explicitly ask "Is this change
-security-related or non-security?" Saying classification is required is not
-enough. Explain why the answer affects the target; leave targets unresolved.
-For unavailable internal state, directly ask the user or QB: "Can you provide
-the missing authorized branch state, including Release Specific existence and
-branding and General Servicing branding for the approved release?" Ask for a
-release/window mapping only if the approval and branch branding do not already
-establish the relationship. Add parking intake and its published handoff when
-that determines routing. For an older component release, ask for that
-repository's own internal branch and servicing-window mapping.
+Before responding, check:
 
-For offline snapshot exercises, use the repository browser URL supplied in the
-snapshot for its example branch link, even when the host or project name is
-synthetic. Do not call it unusable or replace it with a guessed real URL. Label
-the link snapshot-based and do not imply live verification.
+- Every blocker has a `Question:` line ending with `?`.
+- Any quoted snapshot observation time matches the evidence character for character.
+- Downstream flow and release inclusion are stated as expected policy, not as verified.
+- Statements about absence cover only what the evidence inventories (refs, not releases).
 
 ## Policy references
 
-- [Developer Check-in Decision Guide](https://github.com/dotnet/dotnet/blob/main/docs/VMR-Change-Target-Guide.md)
+- [VMR Change Target Guide](https://github.com/dotnet/dotnet/blob/main/docs/VMR-Change-Target-Guide.md)
 - [Servicing workflows](https://github.com/dotnet/dotnet/blob/main/docs/VMR-Servicing-Workflows.md)
 - [Managing SDK bands](https://github.com/dotnet/dotnet/blob/main/docs/VMR-Managing-SDK-Bands.md)
-
-Consult current policy when available. If it conflicts with these rules or
-observed branch state, surface the conflict and ask the QB rather than guessing.
+- [Feature band tooling constraints](https://github.com/dotnet/dotnet/blob/main/docs/VMR-Feature-Band-Tooling-Constraints.md)

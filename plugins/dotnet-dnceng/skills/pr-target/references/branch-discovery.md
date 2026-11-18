@@ -71,20 +71,13 @@ For each affected band:
    internal refs only through authorized internal tools. Component product
    branding may be elsewhere; for runtime source present in a VMR branch,
    `src/runtime/eng/Versions.props` contains its `ProductVersion`.
-3. Compare like-for-like branding with the release identified by the approval.
-   If approval already identifies the exact SDK release and verified branding
-   and refs settle the route, no separate QB mapping is needed. If approval
-   names only a calendar window, use an authoritative release schedule or
-   mapping to relate it to the observed version; ask the QB only if the
-   relationship remains unresolved. Explain that this mapping determines
-   whether the approved release matches Release Specific or General Servicing
-   and whether a later release must wait to merge until its window opens. Do not
-   claim that every possible mapping yields a different branch. Until the
-   mapping is known, withhold the target and branch link instead of listing
-   candidate target branches or URLs, even conditionally. Explain that later
-   SDK releases may share General Servicing; when the approved release is later
-   than current General Servicing branding, hold the PR unmerged until its
-   window opens.
+3. Compare like-for-like branding with the approved release. If the approval
+   names the release and verified branding and refs settle the route, no
+   separate QB mapping is needed. If it names only a calendar window, use an
+   authoritative release schedule or mapping; ask the QB only if the
+   relationship remains unresolved. Explain that the mapping decides whether
+   the release matches Release Specific or General Servicing, or is later and
+   must wait to merge; do not claim every mapping yields a different branch.
 
 Take transition state and conflicting evidence into account:
 
@@ -101,14 +94,12 @@ Take transition state and conflicting evidence into account:
   product patch numbers without changing that window's identity.
 - Intake can be frozen while a parking ref still exists. Obtain its current
   intake state and QB-published destination; a branch listing cannot prove this.
-- Do not infer the absence of a branch type unless its inventory is complete.
 - During integration, the QB can publish General Servicing as the destination
   before its branding change merges. Do not override that handoff from branding.
 
-If authorized access cannot establish a decisive fact, ask for that fact or the
-QB's mapping. Do not ask for credentials, attempt a privilege workaround, or
-report an unverified candidate as ready for PR creation. Record observation
-times and refs; recheck after any release transition.
+If authorized access cannot establish a decisive fact, ask for it or the QB's
+mapping. Do not ask for credentials or attempt a privilege workaround. Record
+observation times and refs; recheck after any release transition.
 
 ## Branch links
 
@@ -123,16 +114,13 @@ metadata, not a token-bearing clone URL:
   branch. Slashes may be percent-encoded or left as slashes in this query value.
   Do not point to `refs/heads/` as part of the displayed branch name.
 
-For an offline snapshot exercise, use the supplied repository browser URL for
-the example link, even when its host or project name is synthetic. Do not call
-it unusable, request a real host, or invent a replacement URL. Label the link
-snapshot-based and do not imply live verification.
+For an offline snapshot, use its supplied repository browser URL even when the
+host or project is synthetic; do not request or invent a real one. Label the
+link snapshot-based.
 
 For an SSH remote, obtain the HTTPS browser URL from host metadata or the user;
 do not guess an internal host/project mapping. Remove credential/userinfo
 components before displaying a URL.
 
-Output a branch link and state that it is the PR **base**. No branch link is
-appropriate when approval, ref existence, visibility, or a frozen-intake
-handoff is still unresolved. If one of several bands is blocked, clearly
-separate its pending result from verified targets.
+State that the branch link is the PR **base**. If one of several bands is
+blocked, separate its pending result from verified targets.

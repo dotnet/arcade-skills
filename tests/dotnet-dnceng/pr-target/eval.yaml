@@ -481,18 +481,20 @@ scenarios:
       - "Keeps shared runtime source changes in 1xx and limits the 2xx PR to SDK-source changes."
     timeout: 180
 
-  - name: ".NET 9 uses repository-specific internal servicing"
-    prompt: "My .NET 9 runtime fix is approved for 2027/1B. Where should I check it in? Use state.md as the available verified offline evidence; do not query services or change files."
+  - name: ".NET 8 non-security uses repository-specific internal servicing"
+    prompt: "My non-security .NET 8 runtime fix is approved for 2027/1B. Where should I check it in? Use state.md as the available verified offline evidence; do not query services or change files."
     setup: *servicing
     assertions:
       - type: "output_matches"
         pattern: "(?i)(policy|component|QB|quarterback)"
       - type: "output_matches"
-        pattern: "(?i)(internal|out of support|unsupported)"
+        pattern: "(?i)internal"
       - type: "output_matches"
         pattern: "(?i)(wait|cannot verify|unknown|which .*branch|what .*branch)"
+      - type: "output_not_matches"
+        pattern: "(?i)github\\.com/dotnet/runtime/tree/release/8\\.0"
     rubric:
-      - "Recognizes .NET 9 is out of support and therefore internal-only; asks the QB for this component repository's branch/window mapping because no .NET 9 state is in evidence, and waits rather than applying .NET 10+ VMR band rules or reusing a .NET 10 ref."
+      - "Routes the non-security .NET 8 fix to the component repository's internal servicing branch, not a public branch; asks the QB for that repository's branch/release mapping because no .NET 8 state is in evidence, and waits rather than applying .NET 10+ VMR band rules or reusing a .NET 10 ref."
     timeout: 180
 
   - name: "General Servicing later than approval is not parking"

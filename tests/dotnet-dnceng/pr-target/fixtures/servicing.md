@@ -40,4 +40,4 @@ constitute approval to use it.
 
 The shared-component build configuration classifies runtime as shared (built
 from source only in 1xx). SDK source changes are band-specific. There is no
-policy or branch mapping for .NET 9 in this snapshot.
+policy or branch mapping for .NET 8 in this snapshot.
