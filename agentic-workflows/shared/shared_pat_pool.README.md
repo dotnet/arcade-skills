@@ -197,9 +197,12 @@ jobs:
     uses: dotnet/arcade-skills/.github/workflows/validate-pat-pool.yml@<sha> # main
     with:
       environment: copilot-pat-pool
+    secrets: inherit
 ```
 
-Unlike the compile-time import, a reusable workflow is fetched when it runs, with access to the caller's environment secrets. Pin it to a full commit SHA that is on `dotnet/arcade-skills` `main`, and update the SHA deliberately (for example, through Dependabot's `github-actions` ecosystem). The called job declares `environment:`, so the `COPILOT_PAT_#` secrets resolve from the caller's environment and do not need to be passed with `secrets:`.
+Unlike the compile-time import, a reusable workflow is fetched when it runs, with access to the caller's secrets. Pin it to a full commit SHA that is on `dotnet/arcade-skills` `main`, and update the SHA deliberately (for example, through Dependabot's `github-actions` ecosystem).
+
+`secrets: inherit` is required. The called job declares `environment:`, but environment secrets are only visible to it when the caller inherits secrets, and a caller job that uses `uses:` cannot declare `environment:` to pass them explicitly. Without it every `COPILOT_PAT_#` reads as empty and validation fails with "The PAT pool is empty".
 
 ## Design / Security
 

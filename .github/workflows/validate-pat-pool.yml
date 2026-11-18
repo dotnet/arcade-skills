@@ -17,7 +17,7 @@ permissions: {}
 
 jobs:
   validate:
-    # Environment secrets resolve from the caller repository's environment.
+    # Environment secrets resolve from the caller's environment; callers must use `secrets: inherit`.
     environment: ${{ inputs.environment }}
     name: Validate Copilot PAT Pool
     runs-on: ubuntu-latest
