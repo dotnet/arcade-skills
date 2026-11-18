@@ -1,7 +1,7 @@
 {
   "name": "dotnet-dnceng",
-  "version": "0.1.0",
-  "description": "Lightweight .NET CI entry point: hlx CLI investigation, known-issue history, and the ci-investigator agent. No MCP servers loaded by default — install dotnet-helix / dotnet-binlog for the richer MCP toolset.",
+  "version": "0.2.0",
+  "description": "Lightweight .NET engineering entry point: PR target selection, hlx CLI investigation, known-issue history, and the ci-investigator agent. No MCP servers loaded by default — install dotnet-helix / dotnet-binlog for the richer MCP toolset.",
   "author": {
     "name": "dotnet"
   },
@@ -11,7 +11,9 @@
     "dnceng",
     "ci",
     "helix",
-    "azure-devops"
+    "azure-devops",
+    "servicing",
+    "pull-request"
   ],
   "skills": "./skills",
   "agents": ["./agents/ci-investigator.agent.md"]

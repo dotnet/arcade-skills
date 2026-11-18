@@ -7,8 +7,8 @@
     {
       "name": "dotnet-dnceng",
       "source": "./plugins/dotnet-dnceng",
-      "description": "Lightweight .NET CI entry point: hlx CLI investigation, known-issue history, and the ci-investigator agent. No MCP servers by default.",
-      "version": "0.1.0"
+      "description": "Lightweight .NET engineering entry point: PR target selection, hlx CLI investigation, known-issue history, and the ci-investigator agent. No MCP servers by default.",
+      "version": "0.2.0"
     },
     {
       "name": "dotnet-helix",
