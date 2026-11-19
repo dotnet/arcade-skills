@@ -20,6 +20,8 @@ jobs:
     # Environment secrets resolve from the caller's environment; callers must use `secrets: inherit`.
     environment: ${{ inputs.environment }}
     name: Validate Copilot PAT Pool
+    # github.event is the caller's event, so forks skip scheduled runs even if the caller omits this guard.
+    if: ${{ github.event_name == 'workflow_dispatch' || !github.event.repository.fork }}
     runs-on: ubuntu-latest
     env:
       VALIDATE_PAT: |
