@@ -10,7 +10,7 @@ This is the single maintained copy for dotnet repositories. Repositories import 
 
 1. A consuming workflow lists this file under `imports:` in its frontmatter (see [Usage](#usage)).
 2. `gh aw compile` fetches the file from `dotnet/arcade-skills` at the requested ref, caches it under `.github/aw/imports/`, and inlines the `pat_pool` job into the consumer's `.lock.yml`.
-3. At run time, GitHub Actions executes only the consumer's committed `.lock.yml`. Nothing is fetched from `dotnet/arcade-skills`. The consumer's `copilot-pat-pool` environment still decides which branches can read the PAT secrets.
+3. At run time, GitHub Actions executes only the consumer's committed `.lock.yml`. Nothing is fetched from `dotnet/arcade-skills`. The PATs come from [organization-level secrets](#pat-pool-secrets) shared with the consumer, and the consumer's `copilot-pat-pool` environment decides which branches can run the agentic jobs.
 4. A change merged here reaches a consumer the next time that consumer recompiles and merges the regenerated lock files.
 
 ### Why `@main`
@@ -34,7 +34,7 @@ Changes here must compile with the oldest `gh aw` version used by consumers (cur
 To use Agentic Workflows with the shared PAT pool in a dotnet org repository:
 
 1. Follow the instructions for [Configuring Your Repository | Agentic Authoring | GitHub Agentic Workflows][configure-repo]. Use `gh aw` **v1.2.2 or newer**.
-2. Create the environment and PAT secrets described below.
+2. Create the [environment](#environment) described below, and ask a dotnet organization admin to [grant the repository access](#granting-a-repository-access) to the organization-level PAT pool secrets.
 3. Import `shared_pat_pool.md` in each agentic workflow (see [Usage](#usage)) and add the [validation workflow](#validating-the-pool).
 4. Compile with `gh aw compile --schedule-seed <org>/<repo>` and commit the workflow sources, `.lock.yml` files, and `.github/aw/imports/`.
 
@@ -55,6 +55,8 @@ Create an environment for the agentic workflows:
 
 This environment is used for all agentic workflows, restricting agentic workflows to the repo's protected branches and preventing the workflows from accessing secrets defined for other environments.
 
+The PATs themselves are organization-level secrets, so the environment does not limit which workflows can read them (see [Organization-level secret considerations](#organization-level-secret-considerations)). The environment remains the required convention for jobs that consume the pool; workflow scans check that the `COPILOT_PAT_#` secrets are referenced only from jobs that run in it. Do not add `COPILOT_PAT_#` secrets to the environment; they would [shadow](#avoid-shadowing-the-organization-secrets) the organization-level secrets.
+
 ## PAT Management
 
 Team members provide PATs into the pool with secret names matching the pattern of `{pool-name}_{0-9}`, such as `COPILOT_PAT_0`.
@@ -72,27 +74,61 @@ Team members providing PATs for workflows should set weekly recurring reminders 
 
 ## PAT Pool Secrets
 
-PATs are added to repositories as **Environment Secrets** for the environment created above. _This requires repo admin permission_.
+PATs are added as **organization-level secrets** in the `dotnet` organization, visible only to the selected repositories approved to use agentic workflows.
 
-* **Settings** >
-   * **Environments** >
-      * **copilot-pat-pool** (or other environment name) >
-         * **Add environment secret** (or edit your existing secret)
-            * Enter your secret name of `COPILOT_PAT_{0-9}` and paste in your PAT
+A PAT is registered once for every approved repository, so it doesn't require weekly admin elevation into each consuming repository. _This requires permission to manage `dotnet` organization secrets._
 
-This can also be accomplished using the `gh` CLI, specifying the repo and environment arguments.
+`--repos` **replaces** the secret's list of selected repositories. Always pass the complete list of approved repositories (View the internal DevDiv wiki's Copilot PAT Pools page).
+
+**Bash**
 
 ```sh
-# Register the PAT secret. This will prompt for you to paste the PAT.
-gh secret set "<pool_name>_<0-9>" --repo <org>/<repo> --env "copilot-pat-pool"
+REPOS="<comma-separated list of approved repositories>"
+
+# Record a marker secret that communicates who owns this PAT.
+gh secret set "COPILOT_PAT_<0-9>_<alias>" --body "<alias>" --org dotnet --repos "$REPOS"
+
+# Register the PAT secret itself. This will prompt for you to paste the PAT.
+gh secret set "COPILOT_PAT_<0-9>" --org dotnet --repos "$REPOS"
 ```
 
-It's also helpful to record who owns each PAT within the pool. To capture which team member is associated with each PAT, a `<pool_name>_<0-9>_<username>` "sidecar secret" can be added alongside the PAT secret to make the username for the PAT pool entry visible. This sidecar secret must have a non-empty value, but it's never consumed, so any value is sufficient.
+**PowerShell**
+
+```powershell
+$Repos = "<comma-separated list of approved repositories>"
+
+# Record a marker secret that communicates who owns this PAT.
+gh secret set "COPILOT_PAT_<0-9>_<alias>" --body "<alias>" --org dotnet --repos $Repos
+
+# Register the PAT secret itself. This will prompt for you to paste the PAT.
+gh secret set "COPILOT_PAT_<0-9>" --org dotnet --repos $Repos
+```
+
+### Recording PAT owners
+
+Workflows must reference secrets by hard-coded names, so the owner can't be part of the `COPILOT_PAT_#` name. Instead, add a `COPILOT_PAT_<0-9>_<alias>` "marker secret" alongside each PAT secret. For example, `COPILOT_PAT_2_foobar` records that `@/foobar` owns `COPILOT_PAT_2`.
+
+### Granting a repository access
+
+View the internal DevDiv wiki for guidance here.
+
+### Avoid shadowing the organization secrets
+
+When secrets with the same name exist at multiple levels, GitHub uses the most specific one: environment, then repository, then organization.
+
+A leftover `COPILOT_PAT_#` environment or repository secret silently replaces the organization-level PAT in that slot. When migrating from environment secrets, delete the old copies once the organization-level secrets are in place:
 
 ```sh
-# Record a sidecar secret that presents who owns this PAT.
-gh secret set "<pool_name>_<0-9>_<username>" --body "<username>" --repo <org>/<repo> --env "copilot-pat-pool"
+gh secret list --repo dotnet/<repo> --env copilot-pat-pool
+gh secret delete "COPILOT_PAT_<0-9>" --repo dotnet/<repo> --env copilot-pat-pool
+
+gh secret list --repo dotnet/<repo>
+gh secret delete "COPILOT_PAT_<0-9>" --repo dotnet/<repo>
 ```
+
+### Organization-level secret considerations
+
+Review content from the internal DevDiv wiki for what we considered here and why we made the decisions we did.
 
 ## Workflow Output Attribution
 
@@ -154,7 +190,7 @@ The `environment` must be specified both to the `shared_pat_pool.md` import and 
 
 ### Customizing the pool
 
-The import declares 10 optional inputs (`COPILOT_PAT_0` through `COPILOT_PAT_9`), each defaulting to `secrets.COPILOT_PAT_#` of the matching number. To point a workflow at a different pool of repository secrets, use the parameterized `uses`/`with` form when importing and pass the substitute secrets as the `COPILOT_PAT_#` inputs:
+The import declares 10 optional inputs (`COPILOT_PAT_0` through `COPILOT_PAT_9`), each defaulting to `secrets.COPILOT_PAT_#` of the matching number. To point a workflow at a different pool of secrets, use the parameterized `uses`/`with` form when importing and pass the substitute secrets as the `COPILOT_PAT_#` inputs:
 
 ```yml
 imports:
@@ -202,13 +238,17 @@ jobs:
 
 Unlike the compile-time import, a reusable workflow is fetched when it runs, with access to the caller's secrets. Pin it to a full commit SHA that is on `dotnet/arcade-skills` `main`, and update the SHA deliberately (for example, through Dependabot's `github-actions` ecosystem).
 
-`secrets: inherit` is required. The called job declares `environment:`, but environment secrets are only visible to it when the caller inherits secrets, and a caller job that uses `uses:` cannot declare `environment:` to pass them explicitly. Without it every `COPILOT_PAT_#` reads as empty and validation fails with "The PAT pool is empty".
+`secrets: inherit` is required.
 
 ## Design / Security
 
 There are several details of this implementation that keep our workflows and repositories safe.
 
-1. **Secrets adhere to existing trust boundaries.** The pool of PAT secrets is
+1. **Secret consumption is confined to trusted steps.** The PATs are
+   [organization-level secrets](#organization-level-secret-considerations)
+   visible to selected repositories, so the `copilot-pat-pool` environment
+   is a convention and branch gate rather than an isolation boundary.
+   Within the workflow, the pool of PAT secrets is
    provided to a dedicated step within the `pat_pool` job. That job runs
    after `pre_activation` and contains only the trusted checkout and action
    steps--no untrusted context or input is within scope. The

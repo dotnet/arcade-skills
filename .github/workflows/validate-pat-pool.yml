@@ -1,13 +1,13 @@
 name: Validate PAT Pool
 
-# Reusable workflow: consuming repositories call it from a scheduled stub so the
-# PATs are read from the caller's own environment. See
-# agentic-workflows/shared/shared_pat_pool.README.md.
+# Reusable workflow: consuming repositories call it from a scheduled stub with
+# `secrets: inherit` so the org-level COPILOT_PAT_0..9 secrets shared with the
+# caller are validated. See agentic-workflows/shared/shared_pat_pool.README.md.
 on:
   workflow_call:
     inputs:
       environment:
-        description: Environment that holds the COPILOT_PAT_0..9 secrets.
+        description: Environment the agentic workflows run in (copilot-pat-pool by convention).
         type: string
         required: false
         default: copilot-pat-pool
@@ -17,7 +17,7 @@ permissions: {}
 
 jobs:
   validate:
-    # Environment secrets resolve from the caller's environment; callers must use `secrets: inherit`.
+    # Org-level PAT secrets reach this job only when the caller uses `secrets: inherit`.
     environment: ${{ inputs.environment }}
     name: Validate Copilot PAT Pool
     # github.event is the caller's event, so forks skip scheduled runs even if the caller omits this guard.
