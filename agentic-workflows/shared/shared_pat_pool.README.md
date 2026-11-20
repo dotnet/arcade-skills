@@ -76,9 +76,9 @@ Team members providing PATs for workflows should set weekly recurring reminders 
 
 PATs are added as **organization-level secrets** in the `dotnet` organization, visible only to the selected repositories approved to use agentic workflows.
 
-A PAT is registered once for every approved repository, so it doesn't require weekly admin elevation into each consuming repository. _This requires permission to manage `dotnet` organization secrets._
+A PAT is registered once for every approved repository, so it doesn't require weekly admin elevation into each consuming repository. _This requires permission to manage `dotnet` organization secrets, and a `gh` token with the `admin:org` scope (`gh auth refresh -h github.com -s admin:org`)._
 
-`--repos` **replaces** the secret's list of selected repositories. Always pass the complete list of approved repositories (View the internal DevDiv wiki's Copilot PAT Pools page).
+`--repos` **replaces** the secret's list of selected repositories. Always pass the complete list of approved repositories (see the internal DevDiv wiki's Copilot PAT Pools page), including when renewing a PAT. Omitting `--repos` makes `gh` fall back to `--visibility private`, which exposes the secret to every private and internal repository in the organization.
 
 **Bash**
 
@@ -106,7 +106,7 @@ gh secret set "COPILOT_PAT_<0-9>" --org dotnet --repos $Repos
 
 ### Recording PAT owners
 
-Workflows must reference secrets by hard-coded names, so the owner can't be part of the `COPILOT_PAT_#` name. Instead, add a `COPILOT_PAT_<0-9>_<alias>` "marker secret" alongside each PAT secret. For example, `COPILOT_PAT_2_foobar` records that `@/foobar` owns `COPILOT_PAT_2`.
+Workflows must reference secrets by hard-coded names, so the owner can't be part of the `COPILOT_PAT_#` name. Instead, add a `COPILOT_PAT_<0-9>_<alias>` "marker secret" alongside each PAT secret. For example, `COPILOT_PAT_2_foobar` records that `foobar` owns `COPILOT_PAT_2`. GitHub stores secret names in uppercase, so it appears as `COPILOT_PAT_2_FOOBAR`.
 
 ### Granting a repository access
 
